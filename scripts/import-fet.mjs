@@ -90,6 +90,10 @@ admin.initializeApp({credential:admin.credential.applicationDefault()});
 const db=admin.firestore();
 const settings=db.collection('settings').doc('control');
 const apply=flag==='--apply';
+const currentControl = await settings.get();
+if (currentControl.exists && currentControl.data().slotStorage !== 'daily-v1') {
+  throw new Error('Run scripts/migrate-daily-locks.mjs before importing into a legacy database.');
+}
 // Pause reservations BEFORE checking for import/booking conflicts.
 if (apply) {
   await settings.set({bookingOpen:false},{merge:true});
@@ -152,6 +156,7 @@ try {
     console.log(`Applied ${Math.min(i+200,changes.length)} / ${changes.length}`);
   }
   await settings.set({bookingOpen:true,startDate:config.startDate,endDate:config.endDate,
+    slotStorage:'daily-v1', periodOrder:Object.fromEntries(config.periods.map((p,i)=>[p.id,i])),
     updatedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true});
   console.log('Import complete. Teacher bookings are open.');
 } catch (err) {

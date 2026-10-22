@@ -14,7 +14,7 @@ service cloud.firestore {
         get(userPath()).data.role in ['teacher', 'admin'];
     }
     function canBook(date) {
-      return approved() && controls().bookingOpen == true &&
+      return approved() && controls().bookingOpen == true && controls().slotStorage == 'daily-v1' &&
         date >= controls().startDate && date <= controls().endDate &&
         dayAllowed(date);
     }
@@ -33,31 +33,39 @@ service cloud.firestore {
         !exists(/databases/$(database)/documents/weeklyRooms/$(key)) ||
         !get(/databases/$(database)/documents/weeklyRooms/$(key)).data.busyPeriods.hasAny(d.periodIds);
     }
-    function slotKey(d, period) {
-      return d.date + '__' + d.roomId + '__' + period;
+    // One occupancy document avoids per-operation document access limits.
+    function consecutive(ids, order) {
+      return (ids.size() < 1 || order[ids[0]] == order[ids[0]] + 0) &&
+        (ids.size() < 2 || order[ids[1]] == order[ids[0]] + 1) &&
+        (ids.size() < 3 || order[ids[2]] == order[ids[0]] + 2) &&
+        (ids.size() < 4 || order[ids[3]] == order[ids[0]] + 3) &&
+        (ids.size() < 5 || order[ids[4]] == order[ids[0]] + 4) &&
+        (ids.size() < 6 || order[ids[5]] == order[ids[0]] + 5) &&
+        (ids.size() < 7 || order[ids[6]] == order[ids[0]] + 6) &&
+        (ids.size() < 8 || order[ids[7]] == order[ids[0]] + 7) &&
+        (ids.size() < 9 || order[ids[8]] == order[ids[0]] + 8) &&
+        (ids.size() < 10 || order[ids[9]] == order[ids[0]] + 9) &&
+        (ids.size() < 11 || order[ids[10]] == order[ids[0]] + 10) &&
+        (ids.size() < 12 || order[ids[11]] == order[ids[0]] + 11) &&
+        (ids.size() < 13 || order[ids[12]] == order[ids[0]] + 12) &&
+        (ids.size() < 14 || order[ids[13]] == order[ids[0]] + 13) &&
+        (ids.size() < 15 || order[ids[14]] == order[ids[0]] + 14) &&
+        (ids.size() < 16 || order[ids[15]] == order[ids[0]] + 15);
     }
-    function bookingSlotMatches(reservationId, d, i) {
-      let key = slotKey(d, d.periodIds[i]);
-      let slot = getAfter(/databases/$(database)/documents/roomSlots/$(key)).data;
-      return slot.source == 'booking' && slot.reservationId == reservationId &&
-        slot.ownerUid == d.ownerUid && slot.date == d.date &&
-        slot.roomId == d.roomId && slot.periodId == d.periodIds[i];
-    }
-    function bookingSlotsPresent(reservationId, d) {
-      return bookingSlotMatches(reservationId, d, 0) &&
-        (d.periodIds.size() < 2 || bookingSlotMatches(reservationId, d, 1)) &&
-        (d.periodIds.size() < 3 || bookingSlotMatches(reservationId, d, 2)) &&
-        (d.periodIds.size() < 4 || bookingSlotMatches(reservationId, d, 3));
-    }
-    function bookingSlotGone(d, i) {
-      let key = slotKey(d, d.periodIds[i]);
-      return !existsAfter(/databases/$(database)/documents/roomSlots/$(key));
-    }
-    function bookingSlotsGone(d) {
-      return bookingSlotGone(d, 0) &&
-        (d.periodIds.size() < 2 || bookingSlotGone(d, 1)) &&
-        (d.periodIds.size() < 3 || bookingSlotGone(d, 2)) &&
-        (d.periodIds.size() < 4 || bookingSlotGone(d, 3));
+    function occupancyChange(id, d, creating) {
+      let path = /databases/$(database)/documents/roomDays/$(d.date + '__' + d.roomId);
+      let before = exists(path) ? get(path).data.bookings : {};
+      let after = getAfter(path).data;
+      let diff = after.bookings.diff(before);
+      // Exact added/removed keys plus an unchanged count of non-id values
+      // ensures every affected period belongs to this reservation. This avoids
+      // 16 separate map-value checks and the 1000-expression evaluation limit.
+      return after.changedReservationId == id &&
+        (creating ?
+          (diff.addedKeys() == d.periodIds.toSet() && diff.changedKeys().size() == 0 && diff.removedKeys().size() == 0 &&
+           after.bookings.values().removeAll([id]).size() == before.values().removeAll([id]).size()) :
+          (diff.removedKeys() == d.periodIds.toSet() && diff.changedKeys().size() == 0 && diff.addedKeys().size() == 0 &&
+           after.bookings.values().removeAll([id]).size() == before.values().removeAll([id]).size()));
     }
     // Legacy four-field publications remain valid while older clients reload.
     function publicMatches(id, d) {
@@ -114,17 +122,19 @@ service cloud.firestore {
         request.resource.data.roomId.matches('^r_[0-9a-f]{12}$') &&
         request.resource.data.periodIds is list &&
         request.resource.data.periodIds.size() >= 1 &&
-        request.resource.data.periodIds.size() <= 4 &&
+        request.resource.data.periodIds.size() <= 16 &&
         request.resource.data.periodIds.toSet().size() == request.resource.data.periodIds.size() &&
         request.resource.data.createdAt == request.time &&
         exists(/databases/$(database)/documents/rooms/$(request.resource.data.roomId)) &&
-        bookingSlotsPresent(reservationId, request.resource.data) &&
+        consecutive(request.resource.data.periodIds, controls().periodOrder) &&
+        occupancyChange(reservationId, request.resource.data, true) &&
         freeOfFet(request.resource.data) &&
         publicMatches(reservationId, request.resource.data);
       allow update: if false;
       allow delete: if approved() && controls().bookingOpen == true &&
         resource.data.ownerUid == request.auth.uid &&
-        bookingSlotsGone(resource.data) &&
+        controls().slotStorage == 'daily-v1' &&
+        occupancyChange(reservationId, resource.data, false) &&
         !existsAfter(/databases/$(database)/documents/publicBookings/$(reservationId));
     }
     match /publicBookings/{id} {
@@ -137,29 +147,28 @@ service cloud.firestore {
         get(/databases/$(database)/documents/reservations/$(id)).data.ownerUid == request.auth.uid &&
         !existsAfter(/databases/$(database)/documents/reservations/$(id));
     }
+    match /roomDays/{key} {
+      allow read: if approved();
+      function validChange() {
+        let id = request.resource.data.changedReservationId;
+        let path = /databases/$(database)/documents/reservations/$(id);
+        let creating = !exists(path);
+        let booking = creating ? getAfter(path).data : get(path).data;
+        return key == booking.date + '__' + booking.roomId &&
+          booking.ownerUid == request.auth.uid &&
+          (creating ? existsAfter(path) : !existsAfter(path));
+      }
+      allow create, update: if approved() && controls().bookingOpen == true &&
+        controls().slotStorage == 'daily-v1' &&
+        request.resource.data.keys().hasOnly(['bookings', 'changedReservationId']) &&
+        request.resource.data.bookings is map &&
+        request.resource.data.changedReservationId is string && validChange();
+      allow delete: if false;
+    }
+    // Historical per-period locks are retained for reference; daily locks are authoritative.
     match /roomSlots/{slotId} {
       allow read: if approved();
-      allow create: if canBook(request.resource.data.date) &&
-        request.resource.data.keys().hasOnly([
-          'source', 'reservationId', 'ownerUid', 'date', 'roomId', 'periodId'
-        ]) &&
-        request.resource.data.keys().hasAll([
-          'source', 'reservationId', 'ownerUid', 'date', 'roomId', 'periodId'
-        ]) &&
-        request.resource.data.source == 'booking' &&
-        request.resource.data.ownerUid == request.auth.uid &&
-        slotId == request.resource.data.date + '__' + request.resource.data.roomId + '__' + request.resource.data.periodId &&
-        exists(/databases/$(database)/documents/periods/$(request.resource.data.periodId)) &&
-        existsAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)) &&
-        getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.ownerUid == request.auth.uid &&
-        getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.date == request.resource.data.date &&
-        getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.roomId == request.resource.data.roomId &&
-        request.resource.data.periodId in getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.periodIds;
-      allow update: if false;
-      allow delete: if approved() && controls().bookingOpen == true &&
-        resource.data.source == 'booking' &&
-        resource.data.ownerUid == request.auth.uid &&
-        !existsAfter(/databases/$(database)/documents/reservations/$(resource.data.reservationId));
+      allow write: if false;
     }
   }
 }

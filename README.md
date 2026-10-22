@@ -1,3 +1,27 @@
+# Daily occupancy upgrade (1–16 periods)
+
+The booking interface is in Albanian. Start/end selectors show boundary times,
+and reservation summaries show a time range rather than period IDs.
+
+For an existing deployment, run `node scripts/migrate-daily-locks.mjs` to preview.
+Then run it with `--apply`: this pauses booking, saves a private JSON backup under
+`/tmp`, reconstructs `roomDays` from reservations, and stores the configured period
+order in `settings/control`. It deliberately leaves booking paused. Deploy the
+new Firestore rules and booking app, then run the migration script with `--reopen`
+to restore the previous booking-open state. Reload existing browser tabs. The
+old per-period locks remain untouched for reference, with browser writes denied.
+The public feed and all existing reservations keep their IDs and metadata.
+
+The new importer initializes daily occupancy mode for fresh databases and requires
+the migration first for older ones. It still checks every imported class against
+all existing reservations. Keep a copy of the migration backup outside `/tmp` if
+long-term retention is needed.
+
+Validation: `node --test tests/booking-ui.test.mjs`, the Firestore emulator suite
+in `tests/public-bookings.rules.mjs`, and the mocked signed-in browser flow in
+`tests/booking-app.browser.mjs` cover length limits, consecutive periods,
+concurrent conflicts, atomic publication/cancellation, and Albanian presentation.
+
 # Optimized edition: important upgrade steps
 
 If you already configured the original starter (but **only dry-ran** the FET import), replace the source files with those in this archive. **Keep your existing `.env`, `data/semester.json`, `data/timetable.csv`, and Firebase project.**
@@ -7,7 +31,7 @@ If you already configured the original starter (but **only dry-ran** the FET imp
 3. Deploy the NEW Firestore security rules **before importing anything**: `npx -y firebase-tools@latest deploy --only firestore:rules --project YOUR_PROJECT_ID`.
 4. With your existing `GOOGLE_APPLICATION_CREDENTIALS` environment variable, run `npm run import -- data/timetable.csv data/semester.json` (without `--apply`).
 5. Inspect the number of changes, test rules in the emulator, then run the command with `--apply`.
-6. Restart the local dev server and test available and blocked slots, including a 4-period reservation and cancellation.
+6. Restart the local dev server and test available and blocked slots, including a 16-period reservation and cancellation.
 
 If you previously imported any **dated FET roomSlots** from the original starter, STOP. The new importer refuses mixed formats; perform a careful migration instead.
 
@@ -19,7 +43,7 @@ This is a **starter**, not an audited finished production application. It implem
 
 - Google sign-in, restricted to administrator-approved Firebase Authentication UIDs.
 - View room availability on a particular calendar date.
-- Book 1–4 consecutive timetable periods, on **one date only**.
+- Book 1–16 consecutive timetable periods, on **one date only**.
 - Cancel your own booking.
 - Firestore transactions and Security Rules protecting the slot locks.
 - Import the FET **timetable CSV** into compact weekly teaching slots (plus date metadata).
@@ -99,7 +123,7 @@ Then apply it:
 npm run import -- data/timetable.csv data/semester.json --apply
 ```
 
-The importer creates one `weeklyRooms` document per weekday and room, containing its occupied periods (rather than repeating the class every calendar week). It also creates one `calendarDays` document per date, plus `rooms`, `periods`, and `settings/control`. Teacher-created `roomSlots` remain dated. Firestore rules check both the weekly FET occupancy and the dated teacher reservation.
+The importer creates one `weeklyRooms` document per weekday and room, containing its occupied periods (rather than repeating the class every calendar week). It also creates one `calendarDays` document per date, plus `rooms`, `periods`, and `settings/control`. Teacher bookings use dated `roomDays` occupancy maps. Historical `roomSlots` are read-only and no longer authoritative. Firestore rules check both the weekly FET occupancy and the dated teacher reservation.
 
 **Important:** the importer initially sets `bookingOpen: false`. It only re-opens booking if all writes complete successfully. If the import fails or finds a conflict with an existing teacher reservation, **keep bookings closed**, fix the source conflict, then re-run.
 
@@ -165,7 +189,7 @@ Firebase docs on rules emulator: https://firebase.google.com/docs/firestore/secu
 
 - Room conflicts are protected; teacher and student subgroup conflicts **are not yet implemented**.
 - Bookings may be created only within the configured semester range; no recurring teacher bookings.
-- This example supports a maximum of four consecutive periods per booking due to Firestore Rules validation limits. This limit can be increased with a more advanced rules design.
+- Bookings support 1–16 consecutive periods. Daily occupancy maps keep security checks below Firestore access limits.
 - The FET importer models room occupancy, not the full student/teacher activity hierarchy. Store extra metadata separately if you want unified public timetable views.
 - Holiday rules should be reviewed for institution-specific exceptions and make-up sessions.
 - A failed large import is **not atomic** across all documents. Use a maintenance window and a backup, and verify completion before reopening booking.
@@ -177,14 +201,14 @@ Firebase docs on rules emulator: https://firebase.google.com/docs/firestore/secu
 
 - `weeklyRooms/{weekday}__{roomId}`: one document per weekday and room, containing an array of occupied period IDs and a map with activity details. Weekday uses JavaScript convention: Sunday `0`, Monday `1`, ..., Saturday `6`.
 - `calendarDays/{YYYY-MM-DD}`: administrator-provided `weekday` string, `fetActive` boolean, and `bookingAllowed` boolean. This prevents clients from lying about weekdays.
-- `roomSlots/{YYYY-MM-DD}__{roomId}__{periodId}`: **only** one-time teacher reservations, not FET classes.
+- `roomDays/{YYYY-MM-DD}__{roomId}`: a `bookings` map from period ID to reservation ID, plus the last changed reservation ID.
 - `reservations/{id}`: one-time teacher event.
 
-For each booking, the browser transaction reads the selected date metadata, date-specific room reservation locks, and one FET room/weekday document. Security rules separately enforce that no weekly FET lock applies to the date.
+For each booking, the browser transaction reads the selected date metadata, one date-specific room occupancy document, and one FET room/weekday document. Security rules separately enforce that no weekly FET lock applies to the date.
 
 **Migration:** This is a replacement for the initial importer. If you already applied the original importer (and have dated `roomSlots` with `source: fet`), do not mix formats; the optimized importer refuses to run. In that case, devise a maintenance migration before importing. If you only ran dry runs, you can switch immediately.
 
-**Caveat:** This is a development example. Security rules need emulator tests, especially 4-period transactions (Security Rules have cross-document access limits). Before production, validate simultaneous booking, cancellation, import conflicts, holiday handling, and all authorization paths in the emulator.
+**Caveat:** This is a development example. Security rules need emulator tests, especially 16-period transactions (Security Rules have cross-document access limits). Before production, validate simultaneous booking, cancellation, import conflicts, holiday handling, and all authorization paths in the emulator.
 
 ## Public timetable reservations
 
