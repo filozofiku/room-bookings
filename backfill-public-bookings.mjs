@@ -6,23 +6,28 @@ admin.initializeApp({credential:admin.credential.applicationDefault()});
 const db = admin.firestore();
 const apply = process.argv.includes('--apply');
 const existing = await db.collection('reservations').get();
-const publicData = data => {
+const publicData = (data, creatorName) => {
   const {title, date, roomId, periodIds} = data;
   if (typeof title !== 'string' || !date || !roomId || !Array.isArray(periodIds) || !periodIds.length) {
     throw new Error('Incomplete reservation; nothing should be published until corrected.');
   }
-  return {title,date,roomId,periodIds};
+  return {title,date,roomId,periodIds, ...(creatorName ? {creatorName,createdAt:data.createdAt || null} : {})};
 };
 // Validate the complete snapshot before writing anything.
 existing.docs.forEach(item => publicData(item.data()));
 let count = 0;
 for (const item of existing.docs) {
   if (!apply) { count++; continue; }
+  let creatorName = 'Emri nuk është i disponueshëm';
+  try {
+    const user = await admin.auth().getUser(item.data().ownerUid);
+    creatorName = user.displayName || 'Mësimdhënës';
+  } catch(error) { if (error.code !== 'auth/user-not-found') throw error; }
   // Re-read inside a transaction: a concurrent cancellation must not be resurrected.
   const published = await db.runTransaction(async tx => {
     const current = await tx.get(item.ref);
     if (!current.exists) return false;
-    tx.set(db.collection('publicBookings').doc(item.id), publicData(current.data()));
+    tx.set(db.collection('publicBookings').doc(item.id), publicData(current.data(), creatorName));
     return true;
   });
   if (published) count++;

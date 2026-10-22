@@ -120,7 +120,8 @@
     @media (max-width:600px){.hero{padding:22px 0 30px}.brand{margin-bottom:26px}.page{padding-top:16px}.navigation{display:grid;grid-template-columns:1fr 1fr}.nav-btn{padding:10px 7px}.refresh-btn{grid-column:1/-1}.fields,.free-filters{grid-template-columns:1fr;gap:12px}.fields>:last-child{grid-column:auto}.filters{padding:17px}.result-title{font-size:18px}.tools{width:100%}.agenda{padding:4px 13px 15px}.agenda-row{grid-template-columns:86px minmax(0,1fr);gap:7px}.agenda-time{font-size:11px}.room-list{grid-template-columns:repeat(2,minmax(0,1fr))}.room-choice{padding:12px;font-size:13px}.count{font-size:11px}.micro{width:100%}}
     @media print{body{background:#fff}.hero{background:white!important;color:#15293e;padding:0 0 10px}.hero-p,.hero-bottom,.brand-mark,.navigation,.filters,.tools,.legend,.footnote,.hint,.load-status{display:none!important}.brand{margin:0 0 10px}.brand-name,.brand-sub,.eyebrow{color:#15293e}.page{padding:0}.calendar-box{border:0;box-shadow:none}.calendar-scroll{display:none!important}.agenda{display:block!important}.agenda-row{break-inside:avoid}.agenda-day{break-inside:avoid}.result-title{font-size:19px}}
     @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
-  </style>
+  .reservation-event{border-left:4px solid #b45309!important;background:#fff2d5!important;color:#713f12!important}
+</style>
 </head>
 <body>
 <header class="hero">
@@ -148,17 +149,12 @@
     <button type="button" class="nav-btn refresh-btn" id="refreshFiles" title="Rifresko të dhënat e fundit">↻ Rifresko të dhënat</button>
   </nav>
 
-  <section class="card filters" aria-labelledby="bookingsHeading">
-    <h2 id="bookingsHeading" class="section-heading">Rezervimet e sallave</h2>
-    <p class="subheading">Rezervimet vlejnë vetëm për datën e shënuar. Orari mësimor më poshtë paraqet javën e zakonshme.</p>
-    <label for="bookingDate">Data e rezervimeve dhe e kërkimit të sallave të lira</label>
+  <div class="card filters">
+    <label for="bookingDate">Data — shfaq javën përkatëse</label>
     <input type="date" id="bookingDate">
+    <p class="hint">Rezervimet shfaqen në orarin e sallës, vetëm në javën e zgjedhur. Kliko rezervimin për emrin dhe kohën e krijimit.</p>
     <p id="bookingStatus" role="status" aria-live="polite">Duke ngarkuar rezervimet…</p>
-    <div style="overflow-x:auto"><table style="width:100%;text-align:left" aria-label="Rezervimet për datën e zgjedhur">
-      <thead><tr><th>Ora</th><th>Salla</th><th>Rezervimi</th><th>Data</th></tr></thead>
-      <tbody id="bookingRows"></tbody>
-    </table></div>
-  </section>
+  </div>
 
   <section id="schedulesPanel" aria-labelledby="scheduleHeading">
     <div class="card filters">
@@ -234,19 +230,28 @@
 </dialog>
 <!-- Timetables are loaded directly from three files in the same folder. -->
 <script type="module">
-import {localDate, overlaps, dayIndex} from './booking-model.js';
+import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTimestamp} from './booking-model.js';
 (() => {
   "use strict";
   let data;
   let publicState = {status:'loading'};
   function renderBookings(result) {
     publicState = result;
-    const rows = result.status === 'ready' ? result.rows : [];
-    $('bookingRows').innerHTML = rows.map(b => `<tr><td>${esc(b.slots.map(p => `${p.start}–${p.end}`).join(', '))}</td><td>${esc(b.room)}</td><td>${esc(b.title)}</td><td>${esc(b.date)}</td></tr>`).join('');
     $('bookingStatus').textContent = result.status === 'ready'
-      ? (rows.length ? `${rows.length} rezervime më ${result.date}.` : `Nuk ka rezervime më ${result.date}.`)
+      ? `Java ${weekDates(result.date)[0]} – ${weekDates(result.date)[6]}`
       : result.status === 'loading' ? 'Duke ngarkuar rezervimet…' : result.message;
+    display();
     renderFree();
+  }
+  function datesInView() { return weekDates($('bookingDate').value || localDate()); }
+  function dateForDay(d) {
+    return datesInView().find(date => dayIndex(data.days,new Date(`${date}T12:00:00Z`).getUTCDay()) === d);
+  }
+  function dayHeading(d) { return `${data.days[d]} · ${dateForDay(d)}`; }
+  function visibleEvents() {
+    const recurring = (state.item?.e || []).filter(e => publicState.days?.[dateForDay(e.d)]?.fetActive !== false);
+    if (state.type !== 'rooms' || publicState.status !== 'ready') return recurring;
+    return [...recurring,...reservationEvents(publicState.rows,state.item?.n,datesInView(),data.days,data.times)];
   }
   async function startBookings() {
     $('bookingDate').value = localDate();
@@ -392,21 +397,22 @@ import {localDate, overlaps, dayIndex} from './booking-model.js';
   function hours(e){return `${data.times[e.s]}–${data.times[e.e]}`;}
   function colorClass(subject){let hash=0;for(const c of subject)hash=((hash<<5)-hash+c.charCodeAt(0))|0;return "tone-"+(Math.abs(hash)%6);}
   function extraForEvent(event){
+    if(event.booking) return `Rezervim · ${event.creatorName}`;
     if(state.type==="subgroups") return [event.p,event.r].filter(Boolean).join(" · ");
     if(state.type==="teachers") return [event.g,event.r].filter(Boolean).join(" · ");
     return [event.g,event.p].filter(Boolean).join(" · ");
   }
   function week(){
-    $("weekHeader").innerHTML = `<div>Ora</div>`+data.days.map(d=>`<div>${esc(d)}</div>`).join("");
+    $("weekHeader").innerHTML = `<div>Ora</div>`+data.days.map((day,d)=>`<div>${esc(dayHeading(d))}</div>`).join("");
     let times=`<div class="time-axis">`;
     for(let s=0;s<data.times.length-1;s++){if(parseMinutes(data.times[s])%60===0)times+=`<div class="time-label" style="top:${s*15}px">${esc(data.times[s])}</div>`;}
     times+=`<div class="time-label" style="top:${(data.times.length-1)*15}px">${esc(data.times.at(-1))}</div></div>`;
-    const evs=state.item ? state.item.e : [];
+    const evs=visibleEvents();
     const columns = data.days.map((day,d)=>{
       const cells=evs.filter(e=>e.d===d).map(event=>{
         const index = evs.indexOf(event);
         const ht=(event.e-event.s)*15-3;
-        return `<button class="event ${colorClass(event.t)} ${ht<=48?"tiny":""}" data-event="${index}" type="button" aria-label="${esc(event.t)} – ${esc(day)} ${hours(event)}" style="top:${event.s*15+2}px;height:${ht}px"><span class="event-title">${esc(event.t)}</span><span class="event-sub">${esc(extraForEvent(event))}</span></button>`;
+        return `<button class="event ${colorClass(event.t)} ${event.booking?"reservation-event":""} ${ht<=48?"tiny":""}" data-event="${index}" type="button" aria-label="${esc(event.t)} – ${esc(day)} ${hours(event)}" style="top:${event.s*15+2}px;height:${ht}px"><span class="event-title">${esc(event.t)}</span><span class="event-sub">${esc(extraForEvent(event))}</span></button>`;
       }).join("");
       return `<div class="day-column" aria-label="${esc(day)}">${cells}</div>`;
     }).join("");
@@ -414,13 +420,13 @@ import {localDate, overlaps, dayIndex} from './booking-model.js';
     $("weekBody").querySelectorAll("[data-event]").forEach(button=>button.addEventListener("click",()=>showEvent(evs[Number(button.dataset.event)])));
   }
   function agenda(){
-    const evs = filteredEvents(state.item?.e ?? []);
+    const evs = filteredEvents(visibleEvents());
     $("agendaView").innerHTML=data.days.map((day,d)=>{
       const rows=evs.filter(e=>e.d===d);
-      return `<section class="agenda-day"><h3>${esc(day)}</h3>${rows.length?
+      return `<section class="agenda-day"><h3>${esc(dayHeading(d))}</h3>${rows.length?
         rows.map((e)=>{
           const index=evs.indexOf(e);
-          return `<div class="agenda-row"><div class="agenda-time">${hours(e)}</div><button class="agenda-entry ${colorClass(e.t)}" data-agenda="${index}" type="button"><strong>${esc(e.t)}</strong><span>${esc(e.a)}${e.a&&extraForEvent(e)?" · ":""}${esc(extraForEvent(e))}</span></button></div>`;
+          return `<div class="agenda-row"><div class="agenda-time">${hours(e)}</div><button class="agenda-entry ${colorClass(e.t)} ${e.booking?"reservation-event":""}" data-agenda="${index}" type="button"><strong>${esc(e.t)}</strong><span>${esc(e.a)}${e.a&&extraForEvent(e)?" · ":""}${esc(extraForEvent(e))}</span></button></div>`;
         }).join(""):`<p class="no-events">Nuk ka aktivitete të planifikuara.</p>`}</section>`;
     }).join("");
     $("agendaView").querySelectorAll("[data-agenda]").forEach(button=>button.addEventListener("click",()=>showEvent(evs[Number(button.dataset.agenda)])));
@@ -435,7 +441,7 @@ import {localDate, overlaps, dayIndex} from './booking-model.js';
   }
   function display(){
     $("selectedTitle").textContent=state.item?.l || "Nuk ka rezultate";
-    $("selectedMeta").textContent=state.item?`${categoryLabel[state.type]} · ${state.item.e.length} aktivitete në javë · E hënë – E premte`:"Provo një emër tjetër.";
+    $("selectedMeta").textContent=state.item?`${categoryLabel[state.type]} · ${visibleEvents().length} aktivitete · ${datesInView()[0]} – ${datesInView()[6]}`:"Provo një emër tjetër.";
     week();agenda();renderView();
     if(state.page==="schedules"&&!state.suspendHash)setHash();
   }
@@ -443,6 +449,7 @@ import {localDate, overlaps, dayIndex} from './booking-model.js';
     $("modalTitle").textContent=e.t;
     $("modalTag").textContent=e.a || "Aktivitet mësimor";
     const pairs=[["Dita",data.days[e.d]],["Ora",hours(e)],["Studentët / Grupi",e.g],["Mësimdhënësi",e.p],["Salla",e.r]];
+    if(e.booking) pairs.push(["Data",e.date],["Rezervuar nga",e.creatorName],["Rezervimi u krijua më",bookingTimestamp(e.createdAt)]);
     $("modalDetails").innerHTML=pairs.filter(([,v])=>v).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
     $("detailDialog").showModal();
   }
@@ -463,7 +470,7 @@ import {localDate, overlaps, dayIndex} from './booking-model.js';
     }
     const free=ordered.rooms.filter(room => publicState.rooms.some(r => r.name === room.n) &&
       (!day.fetActive || !room.e.some(event=>event.d===d&&event.s<e&&event.e>s)) &&
-      !publicState.rows.some(b => overlaps(b,room.n,data.times[s],data.times[e])));
+      !publicState.rows.some(b => b.date === publicState.date && overlaps(b,room.n,data.times[s],data.times[e])));
     $("freeCount").textContent=`${free.length} nga ${data.rooms.length} salla të lira`;
     $("freeSummary").textContent=`${publicState.date} · ${data.times[s]}–${data.times[e]}`;
     $("roomResults").innerHTML=free.length?
@@ -514,6 +521,9 @@ import {localDate, overlaps, dayIndex} from './booking-model.js';
   async function start(){
     try{
       data=await loadTimetables();
+      for(const [weekday,label] of [[6,'E shtunë'],[0,'E diel']]) {
+        if(dayIndex(data.days,weekday)<0) data.days.push(label);
+      }
       for(const kind of ["subgroups","teachers","rooms"])ordered[kind]=[...data[kind]].sort(niceSort);
       if(!data.rooms.length)throw Error("Nuk ka salla në orarin zyrtar. Nuk mund të llogaritet disponueshmëria.");
       document.documentElement.style.setProperty("--day-count",data.days.length);

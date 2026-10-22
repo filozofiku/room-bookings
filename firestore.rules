@@ -59,12 +59,16 @@ service cloud.firestore {
         (d.periodIds.size() < 3 || bookingSlotGone(d, 2)) &&
         (d.periodIds.size() < 4 || bookingSlotGone(d, 3));
     }
-    // Public documents contain only the four explicitly published event fields.
+    // Legacy four-field publications remain valid while older clients reload.
     function publicMatches(id, d) {
       let p = getAfter(/databases/$(database)/documents/publicBookings/$(id)).data;
-      return p.keys().hasOnly(['title', 'date', 'roomId', 'periodIds']) &&
+      return p.keys().hasOnly(['title', 'date', 'roomId', 'periodIds', 'creatorName', 'createdAt']) &&
         p.title == d.title && p.date == d.date &&
-        p.roomId == d.roomId && p.periodIds == d.periodIds;
+        p.roomId == d.roomId && p.periodIds == d.periodIds &&
+        ((!p.keys().hasAny(['creatorName', 'createdAt'])) ||
+          (p.keys().hasAll(['creatorName', 'createdAt']) &&
+           p.creatorName == request.auth.token.get('name', 'Mësimdhënës') &&
+           p.createdAt == d.createdAt));
     }
     match /users/{uid} {
       allow get: if request.auth != null && request.auth.uid == uid;

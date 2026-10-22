@@ -21,3 +21,37 @@ export function dayIndex(days, weekday) {
   const names = [['e diel','sunday'],['e hene','monday'],['e marte','tuesday'],['e merkure','wednesday'],['e enjte','thursday'],['e premte','friday'],['e shtune','saturday']];
   return days.findIndex(day => names[Number(weekday)]?.includes(day.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()));
 }
+
+export function weekDates(date) {
+  const day = new Date(`${date}T12:00:00Z`);
+  day.setUTCDate(day.getUTCDate() - (day.getUTCDay() + 6) % 7);
+  return Array.from({length:7}, (_,i) => {
+    const next = new Date(day);
+    next.setUTCDate(day.getUTCDate()+i);
+    return next.toISOString().slice(0,10);
+  });
+}
+export function reservationEvents(rows, room, dates, days, times) {
+  return rows.filter(b => b.room === room && dates.includes(b.date)).flatMap(b => {
+    const runs = [];
+    for (const slot of b.slots) {
+      const last = runs.at(-1);
+      if (last && last.end === slot.start) last.end = slot.end;
+      else runs.push({...slot});
+    }
+    return runs.map(run => {
+      const s = times.indexOf(run.start), e = times.indexOf(run.end);
+      if (s < 0 || e <= s) throw Error('Orët e rezervimit nuk përputhen me orarin zyrtar.');
+      return {d:dayIndex(days,new Date(`${b.date}T12:00:00Z`).getUTCDay()),s,e,
+        t:b.title,r:b.room,a:'Rezervim',g:'',p:'',booking:true,date:b.date,
+        creatorName:b.creatorName || 'Emri nuk është i disponueshëm',createdAt:b.createdAt};
+    });
+  });
+}
+export function bookingTimestamp(value) {
+  const date = typeof value?.toDate === 'function' ? value.toDate() :
+    typeof value?.seconds === 'number' ? new Date(value.seconds * 1000) : null;
+  return date && Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat('sq-AL', {
+    timeZone:'Europe/Tirane',dateStyle:'medium',timeStyle:'short'
+  }).format(date) : 'Koha nuk është e disponueshme';
+}

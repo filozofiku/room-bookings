@@ -129,7 +129,7 @@ async function createReservation(event) {
         throw new Error('One or more periods are occupied by a class or reservation.');
       }
       tx.set(reservationRef, { title, date, roomId, periodIds, ownerUid: currentUser.uid, createdAt: serverTimestamp() });
-      tx.set(publicRef, {title, date, roomId, periodIds});
+      tx.set(publicRef, {title, date, roomId, periodIds, creatorName:currentUser.displayName || 'Mësimdhënës', createdAt:serverTimestamp()});
       for (let i=0; i<periodIds.length; i++) {
         tx.set(slotRefs[i], { source:'booking', reservationId:reservationRef.id,
           ownerUid:currentUser.uid, date, roomId, periodId:periodIds[i] });

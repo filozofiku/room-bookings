@@ -23,7 +23,7 @@ test('public publication is private-data-free, authorized, and atomic for 1–4 
         ...periodIds.map(id => setDoc(doc(db,'periods',id),{start:'08:00',end:'08:15'}))
       ]);
     });
-    const db = env.authenticatedContext('teacher').firestore();
+    const db = env.authenticatedContext('teacher',{name:'Test Teacher'}).firestore();
     const anonymous = env.unauthenticatedContext().firestore();
     const other = env.authenticatedContext('other').firestore();
     const create = (id, periods, publish = true, extra = {}) => {
@@ -45,12 +45,14 @@ test('public publication is private-data-free, authorized, and atomic for 1–4 
     };
     await assertFails(create('missing-public',periodIds,false));
     await assertFails(create('private-field',periodIds,true,{ownerUid:'teacher'}));
+    await assertFails(create('forged-name',periodIds,true,{creatorName:'Someone else',createdAt:serverTimestamp()}));
+    await assertFails(create('forged-time',periodIds,true,{creatorName:'Test Teacher',createdAt:new Date(0)}));
     await assertFails(create('wrong-title',periodIds,true,{title:'Forged'}));
     await assertFails(setDoc(doc(anonymous,'publicBookings','fake'),payload));
     await assertFails(setDoc(doc(db,'publicBookings','fake'),payload));
     for (let n=1;n<=4;n++) {
       const id = `booking-${n}`, selected = periodIds.slice(0,n);
-      await assertSucceeds(create(id,selected));
+      await assertSucceeds(create(id,selected,true,{creatorName:'Test Teacher',createdAt:serverTimestamp()}));
       await assertSucceeds(getDocs(collection(anonymous,'publicBookings')));
       await assertFails(getDoc(doc(anonymous,'reservations',id)));
       await assertFails(getDoc(doc(anonymous,'users','teacher')));
