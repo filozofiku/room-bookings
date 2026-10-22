@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="sq">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#172d47">
+  <meta name="description" content="Orari mësimor i Fakultetit Filozofik, Universiteti i Prishtinës. Kërko sipas grupit të studentëve, mësimdhënësit ose sallës dhe gjej sallat e lira.">
+  <title>Orari mësimor | Universiteti i Prishtinës</title>
+  <style>
+    :root{
+      --ink:#172d47;--ink-soft:#50627a;--muted:#75859a;--line:#dfe6ee;
+      --page:#f5f7fa;--white:#fff;--accent:#0d7d8d;--accent-hover:#086778;
+      --tint:#e9f5f5;--shadow:0 10px 32px rgba(23,45,71,.055);
+      --slot-height:15px;--timetable-height:795px;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{margin:0;background:var(--page);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:15px;line-height:1.45}
+    button,input,select{font:inherit}
+    button{cursor:pointer}
+    button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:3px solid #56b6bf;outline-offset:2px}
+    [hidden]{display:none!important}
+    .wrap{max-width:1340px;margin:0 auto;padding-left:clamp(16px,4vw,46px);padding-right:clamp(16px,4vw,46px)}
+    .hero{background:linear-gradient(115deg,#162b45 0%,#1b3c58 70%,#125466 130%);color:#fff;padding:28px 0 36px}
+    .brand{display:flex;align-items:center;gap:12px;margin-bottom:30px}
+    .brand-mark{display:grid;place-items:center;background:#fff;color:#19425a;width:43px;height:43px;border-radius:12px;font-weight:850;letter-spacing:-1px;font-size:20px}
+    .brand-name{font-size:13px;font-weight:720;letter-spacing:.035em}
+    .brand-sub{font-size:12px;color:#b8cfda}
+    .eyebrow{color:#93d8db;font-weight:750;letter-spacing:.15em;text-transform:uppercase;font-size:11px;margin-bottom:8px}
+    h1{font-size:clamp(29px,4vw,44px);letter-spacing:-.045em;line-height:1.12;margin:0 0 12px;font-weight:800}
+    .hero-p{max-width:750px;margin:0;color:#d0dee7;font-size:15px}
+    .hero-bottom{display:flex;gap:10px 20px;flex-wrap:wrap;align-items:center;margin-top:22px}
+    .micro{color:#bad1de;font-size:12px}
+    .count{color:#e8fcfc;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.13);border-radius:22px;font-size:12px;padding:5px 11px}
+    .load-status{margin-top:20px;border:1px solid #cfe5e8;background:#eef8f8;color:#255e6a;border-radius:12px;padding:16px 19px;white-space:pre-line;font-size:14px}
+    .load-status.failed{background:#fff4f2;border-color:#f2c5be;color:#8e2d21}
+    .page{padding-top:24px;padding-bottom:54px}
+    .navigation{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:21px}
+    .nav-btn{border:1px solid #dce6ed;background:white;color:var(--ink-soft);padding:11px 18px;border-radius:12px;font-size:14px;font-weight:740;box-shadow:0 2px 5px rgba(0,0,0,.012)}
+    .nav-btn.active{background:var(--ink);color:white;border-color:var(--ink)}
+    .card{border:1px solid #e3eaf1;border-radius:18px;background:#fff;box-shadow:var(--shadow)}
+    .filters{padding:25px;margin-bottom:19px}
+    .section-heading{font-size:20px;letter-spacing:-.025em;line-height:1.3;font-weight:770;margin:0}
+    .subheading{font-size:13px;color:var(--muted);margin:7px 0 22px}
+    .fields{display:grid;grid-template-columns:minmax(190px,.8fr) minmax(220px,1fr) minmax(250px,1.3fr);gap:15px;align-items:end}
+    label{display:block;font-size:12px;color:var(--ink-soft);font-weight:730;margin-bottom:7px}
+    input,select{width:100%;height:45px;background:#fff;border:1px solid #cfdae5;border-radius:10px;color:var(--ink);padding:0 12px;outline:none;min-width:0}
+    input::placeholder{color:#9ba8b8}
+    select{cursor:pointer}
+    .result-header{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;align-items:center;margin:2px 0 14px}
+    .result-title{font-size:21px;font-weight:790;letter-spacing:-.025em;margin:0;overflow-wrap:anywhere}
+    .result-meta{font-size:12px;color:var(--muted);margin-top:4px}
+    .tools{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+    .tool-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;background:#fff;border:1px solid #d9e3ec;color:var(--ink-soft);border-radius:9px;padding:8px 11px;font-weight:680;font-size:12px}
+    .tool-btn.active{color:var(--accent-hover);background:var(--tint);border-color:#aadbdc}
+    .tool-btn:hover,.nav-btn:not(.active):hover{background:#f4f8fa}
+    .calendar-box{overflow:hidden}
+    .calendar-scroll{overflow-x:auto;max-width:100%}
+    .calendar-inner{min-width:950px}
+    .weekday-header{display:grid;grid-template-columns:64px repeat(var(--day-count, 5),minmax(0,1fr));background:#f8fafc;border-bottom:1px solid var(--line)}
+    .weekday-header>div{padding:13px 10px;text-align:center;font-size:12px;font-weight:790;color:#3c5167;border-right:1px solid #e7edf3}
+    .weekday-header>div:first-child{font-weight:550;color:var(--muted)}
+    .calendar-body{display:grid;grid-template-columns:64px repeat(var(--day-count, 5),minmax(0,1fr))}
+    .time-axis,.day-column{height:var(--timetable-height);position:relative}
+    .time-axis{border-right:1px solid var(--line);background:#fafcfe}
+    .time-label{position:absolute;right:9px;transform:translateY(-50%);font-size:11px;color:#708197;white-space:nowrap;font-variant-numeric:tabular-nums}
+    .time-label:first-child{transform:translateY(0)}
+    .day-column{border-right:1px solid #e8edf2;background:repeating-linear-gradient(to bottom,transparent 0,transparent calc(var(--slot-height) * 4 - 1px),#e7edf2 calc(var(--slot-height) * 4 - 1px),#e7edf2 calc(var(--slot-height) * 4))}
+    .day-column:nth-child(even){background-color:#fafcfd}
+    .event{position:absolute;left:3px;right:3px;overflow:hidden;text-align:left;border:0;border-left:3px solid var(--event-border);border-radius:5px;background:var(--event-bg);color:var(--ink);padding:5px 6px;display:block;box-shadow:0 1px 3px rgba(0,0,0,.07);transition:filter .12s,transform .12s}
+    .event:hover{filter:brightness(.97);z-index:2;transform:translateY(-1px)}
+    .event-title{display:block;font-size:11px;line-height:1.28;font-weight:790;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+    .event-sub{font-size:10px;line-height:1.28;color:#4d5e6d;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .event.tiny{padding:3px 5px}
+    .event.tiny .event-title{font-size:10px;-webkit-line-clamp:2}
+    .event.tiny .event-sub{display:none}
+    .tone-0{--event-bg:#dcf0ef;--event-border:#179b93}
+    .tone-1{--event-bg:#e5eafb;--event-border:#6686d4}
+    .tone-2{--event-bg:#fae9de;--event-border:#db8d4b}
+    .tone-3{--event-bg:#efe5f5;--event-border:#a27bc0}
+    .tone-4{--event-bg:#e4f1df;--event-border:#75a961}
+    .tone-5{--event-bg:#f9ebee;--event-border:#d08298}
+    .agenda{padding:10px 20px 22px}
+    .agenda-day{border-bottom:1px solid #e6edf3;padding:17px 0}
+    .agenda-day:last-child{border-bottom:0}
+    .agenda-day h3{margin:0 0 13px;font-size:15px}
+    .agenda-row{display:grid;grid-template-columns:108px minmax(0,1fr);gap:10px;margin:9px 0}
+    .agenda-time{font-size:12px;font-weight:700;color:var(--ink-soft);padding-top:9px;font-variant-numeric:tabular-nums}
+    .agenda-entry{border:none;border-left:4px solid var(--event-border);background:var(--event-bg);border-radius:7px;padding:10px 12px;text-align:left;width:100%}
+    .agenda-entry strong{display:block;font-size:13px;margin-bottom:4px}
+    .agenda-entry span{display:block;font-size:12px;color:#43556a}
+    .no-events{font-size:13px;color:var(--muted);padding:10px 0}
+    .legend{padding:11px 18px;color:#8190a0;font-size:12px;background:#fafbfc;border-top:1px solid #e7edf3}
+    .empty-state{padding:62px 22px;text-align:center;color:var(--muted)}
+    .empty-state strong{display:block;color:var(--ink);font-size:19px;margin-bottom:7px}
+    .free-filters{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:15px}
+    .free-results{margin-top:22px}
+    .free-head{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin:0 0 14px}
+    .availability-count{font-size:24px;font-weight:820;line-height:1.3}
+    .availability-meta{font-size:13px;color:var(--muted);margin-top:4px}
+    .room-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:12px}
+    .room-choice{display:flex;align-items:center;justify-content:space-between;text-align:left;gap:10px;padding:16px;background:#fff;border:1px solid #dfebea;border-radius:12px;color:var(--ink);font-weight:750;min-height:62px}
+    .room-choice:hover{border-color:#85cbcc;background:#eef9f7}
+    .arrow{font-size:18px;color:var(--accent);font-weight:500}
+    .hint{font-size:12px;color:#728396;margin-top:17px;max-width:850px}
+    .error{border:1px solid #efc2c2;background:#fff5f3;color:#a33a32;border-radius:11px;padding:15px 17px;font-size:13px}
+    .refresh-btn{margin-left:auto}
+    .footnote{font-size:12px;color:#718197;text-align:center;margin-top:29px}
+    .detail-modal{width:min(500px,calc(100vw - 24px));border:1px solid #dce7ef;border-radius:18px;padding:0;box-shadow:0 28px 75px rgba(13,36,60,.28)}
+    .detail-modal::backdrop{background:rgba(15,32,50,.52)}
+    .modal-content{padding:27px}
+    .modal-title{font-size:21px;line-height:1.25;letter-spacing:-.02em;margin:0 25px 7px 0}
+    .modal-tag{display:inline-block;color:#12677a;background:#e5f4f4;border-radius:20px;padding:4px 9px;font-size:12px;margin:6px 0 20px}
+    .detail-dl{display:grid;grid-template-columns:105px minmax(0,1fr);gap:12px 9px;margin:6px 0 20px;font-size:13px}
+    .detail-dl dt{font-weight:690;color:#778599}
+    .detail-dl dd{margin:0;color:var(--ink);overflow-wrap:anywhere}
+    .close-dialog{position:absolute;right:15px;top:13px;background:none;border:0;color:#53677a;font-size:24px;width:34px;height:34px;border-radius:8px}
+    .close-dialog:hover{background:#eef2f5}
+    @media (max-width:830px){.fields{grid-template-columns:1fr 1fr}.fields>:last-child{grid-column:1/-1}.free-filters{grid-template-columns:repeat(3,1fr)}.filters{padding:19px}}
+    @media (max-width:600px){.hero{padding:22px 0 30px}.brand{margin-bottom:26px}.page{padding-top:16px}.navigation{display:grid;grid-template-columns:1fr 1fr}.nav-btn{padding:10px 7px}.refresh-btn{grid-column:1/-1}.fields,.free-filters{grid-template-columns:1fr;gap:12px}.fields>:last-child{grid-column:auto}.filters{padding:17px}.result-title{font-size:18px}.tools{width:100%}.agenda{padding:4px 13px 15px}.agenda-row{grid-template-columns:86px minmax(0,1fr);gap:7px}.agenda-time{font-size:11px}.room-list{grid-template-columns:repeat(2,minmax(0,1fr))}.room-choice{padding:12px;font-size:13px}.count{font-size:11px}.micro{width:100%}}
+    @media print{body{background:#fff}.hero{background:white!important;color:#15293e;padding:0 0 10px}.hero-p,.hero-bottom,.brand-mark,.navigation,.filters,.tools,.legend,.footnote,.hint,.load-status{display:none!important}.brand{margin:0 0 10px}.brand-name,.brand-sub,.eyebrow{color:#15293e}.page{padding:0}.calendar-box{border:0;box-shadow:none}.calendar-scroll{display:none!important}.agenda{display:block!important}.agenda-row{break-inside:avoid}.agenda-day{break-inside:avoid}.result-title{font-size:19px}}
+    @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
+  </style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">UP</div>
+      <div><div class="brand-name">UNIVERSITETI I PRISHTINËS</div><div class="brand-sub">Fakulteti Filozofik</div></div>
+    </div>
+    <div class="eyebrow">Orari zyrtar · Universiteti i Prishtinës</div>
+    <h1>Orari mësimor</h1>
+    <p class="hero-p">Gjej orarin e grupit të studentëve, mësimdhënësit ose sallës. Kontrollo cilat salla janë të lira gjatë kohës që të nevojitet.</p>
+    <div class="hero-bottom">
+      <span class="count" id="statSubgroups"></span>
+      <span class="count" id="statTeachers"></span>
+      <span class="count" id="statRooms"></span>
+      <span class="micro" id="updateDate"></span>
+    </div>
+  </div>
+</header>
+<div class="wrap"><div id="loadStatus" class="load-status" role="status" aria-live="polite">Duke ngarkuar oraret zyrtare…</div></div>
+<main class="wrap page" id="mainContent" hidden>
+  <nav class="navigation" aria-label="Funksionet kryesore">
+    <button type="button" class="nav-btn active" id="navSchedules" aria-current="page">Orari mësimor</button>
+    <button type="button" class="nav-btn" id="navFree">Sallat e lira</button>
+    <button type="button" class="nav-btn refresh-btn" id="refreshFiles" title="Rifresko të dhënat e fundit">↻ Rifresko të dhënat</button>
+  </nav>
+
+  <section class="card filters" aria-labelledby="bookingsHeading">
+    <h2 id="bookingsHeading" class="section-heading">Rezervimet e sallave</h2>
+    <p class="subheading">Rezervimet vlejnë vetëm për datën e shënuar. Orari mësimor më poshtë paraqet javën e zakonshme.</p>
+    <label for="bookingDate">Data e rezervimeve dhe e kërkimit të sallave të lira</label>
+    <input type="date" id="bookingDate">
+    <p id="bookingStatus" role="status" aria-live="polite">Duke ngarkuar rezervimet…</p>
+    <div style="overflow-x:auto"><table style="width:100%;text-align:left" aria-label="Rezervimet për datën e zgjedhur">
+      <thead><tr><th>Ora</th><th>Salla</th><th>Rezervimi</th><th>Data</th></tr></thead>
+      <tbody id="bookingRows"></tbody>
+    </table></div>
+  </section>
+
+  <section id="schedulesPanel" aria-labelledby="scheduleHeading">
+    <div class="card filters">
+      <h2 class="section-heading" id="scheduleHeading">Gjej orarin që të duhet</h2>
+      <p class="subheading">Zgjidh kategorinë dhe më pas personin, grupin e studentëve ose sallën.</p>
+      <div class="fields">
+        <div><label for="category">Kategoria</label>
+          <select id="category">
+            <option value="subgroups">Grupet e studentëve</option>
+            <option value="teachers">Mësimdhënësit</option>
+            <option value="rooms">Sallat</option>
+          </select>
+        </div>
+        <div><label for="lookup">Kërko sipas emrit</label>
+          <input id="lookup" type="search" placeholder="Shkruaj për të filtruar..." autocomplete="off">
+        </div>
+        <div><label for="entity">Zgjidh orarin</label>
+          <select id="entity" aria-label="Zgjidh grupin e studentëve, mësimdhënësin ose sallën"></select>
+        </div>
+      </div>
+    </div>
+    <div class="result-header">
+      <div><h2 class="result-title" id="selectedTitle">Orari javor</h2><div class="result-meta" id="selectedMeta"></div></div>
+      <div class="tools" aria-label="Mënyra e shfaqjes">
+        <button type="button" id="viewWeek" class="tool-btn active" aria-pressed="true">Pamja javore</button>
+        <button type="button" id="viewList" class="tool-btn" aria-pressed="false">Pamja listë</button>
+        <button type="button" id="copyLink" class="tool-btn">Kopjo lidhjen</button>
+        <button type="button" id="printSchedule" class="tool-btn">Printo</button>
+      </div>
+    </div>
+    <div class="card calendar-box" id="calendarBox">
+      <div class="calendar-scroll" id="weeklyView">
+        <div class="calendar-inner">
+          <div class="weekday-header" id="weekHeader"></div>
+          <div class="calendar-body" id="weekBody"></div>
+        </div>
+      </div>
+      <div class="agenda" id="agendaView" hidden></div>
+      <div class="legend" id="calendarNote">Kliko një aktivitet për të parë të gjitha hollësitë.</div>
+    </div>
+  </section>
+
+  <section id="freePanel" hidden aria-labelledby="freeHeading">
+    <div class="card filters">
+      <h2 class="section-heading" id="freeHeading">Gjej sallat e lira</h2>
+      <p class="subheading">Një sallë shfaqet si e lirë vetëm kur nuk ka asnjë aktivitet të planifikuar në të gjithë intervalin e zgjedhur.</p>
+      <div class="free-filters">
+        <div><label for="freeDay">Dita (sipas datës së zgjedhur)</label><select id="freeDay" disabled></select></div>
+        <div><label for="freeStart">Nga ora</label><select id="freeStart"></select></div>
+        <div><label for="freeEnd">Deri në orën</label><select id="freeEnd"></select></div>
+      </div>
+    </div>
+    <div class="free-results">
+      <div id="freeError" class="error" hidden>Ora e përfundimit duhet të jetë pas orës së fillimit.</div>
+      <div id="freeValid">
+        <div class="free-head">
+          <div><div id="freeCount" class="availability-count"></div><div id="freeSummary" class="availability-meta"></div></div>
+        </div>
+        <div id="roomResults" class="room-list"></div>
+        <p class="hint">Disponueshmëria për datën e zgjedhur përfshin orarin zyrtar dhe rezervimet në aplikacion. Rezervimi përfundimtar bëhet në aplikacionin e rezervimeve. Kliko një sallë për ta parë orarin e saj.</p>
+      </div>
+    </div>
+  </section>
+  <div class="footnote">Të dhënat bazohen në oraret e zyrtare të publikuara. Për ndryshimet zyrtare, kontakto administratën e fakultetit.</div>
+</main>
+<dialog id="detailDialog" class="detail-modal" aria-labelledby="modalTitle">
+  <button type="button" class="close-dialog" id="closeDialog" aria-label="Mbyll">×</button>
+  <div class="modal-content">
+    <h2 class="modal-title" id="modalTitle"></h2>
+    <span class="modal-tag" id="modalTag"></span>
+    <dl class="detail-dl" id="modalDetails"></dl>
+  </div>
+</dialog>
+<!-- Timetables are loaded directly from three files in the same folder. -->
+<script type="module">
+import {localDate, overlaps, dayIndex} from './booking-model.js';
+(() => {
+  "use strict";
+  let data;
+  let publicState = {status:'loading'};
+  function renderBookings(result) {
+    publicState = result;
+    const rows = result.status === 'ready' ? result.rows : [];
+    $('bookingRows').innerHTML = rows.map(b => `<tr><td>${esc(b.slots.map(p => `${p.start}–${p.end}`).join(', '))}</td><td>${esc(b.room)}</td><td>${esc(b.title)}</td><td>${esc(b.date)}</td></tr>`).join('');
+    $('bookingStatus').textContent = result.status === 'ready'
+      ? (rows.length ? `${rows.length} rezervime më ${result.date}.` : `Nuk ka rezervime më ${result.date}.`)
+      : result.status === 'loading' ? 'Duke ngarkuar rezervimet…' : result.message;
+    renderFree();
+  }
+  async function startBookings() {
+    $('bookingDate').value = localDate();
+    try {
+      const [{connectBookings}, {default:config}] = await Promise.all([import('./public-bookings.js'), import('./firebase-config.js')]);
+      await connectBookings(config, selectDate => {
+        $('bookingDate').addEventListener('change', () => selectDate($('bookingDate').value));
+        selectDate($('bookingDate').value);
+      }, renderBookings);
+    } catch(error) {
+      console.error(error);
+      renderBookings({status:'error', message:'Rezervimet nuk u ngarkuan. Disponueshmëria nuk mund të verifikohet.'});
+    }
+  }
+  const $ = id => document.getElementById(id);
+  const esc = input => String(input ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const normal = value => String(value).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLocaleLowerCase("sq");
+  const niceSort = (a,b) => a.l.localeCompare(b.l,"sq",{numeric:true,sensitivity:"base"});
+  const ordered = {};
+  const categoryLabel = {subgroups:"Grupi i studentëve",teachers:"Mësimdhënës",rooms:"Sallë"};
+  const state = {page:"schedules",type:"subgroups",item:null,view:matchMedia("(max-width: 750px)").matches ? "list":"week",query:""};
+  // The three source files can be overwritten on GitHub Pages without changing this page.
+  const FILENAMES = {
+    subgroups:"WinterF_subgroups_days_vertical.html",
+    teachers:"WinterF_teachers_days_vertical.html",
+    rooms:"WinterF_rooms_days_vertical.html"
+  };
+  const KIND_LABELS = {subgroups:"grupeve",teachers:"mësimdhënësve",rooms:"sallave"};
+
+  function parseMinutes(s){
+    const m = /^(\d{1,2}):(\d{2})$/.exec(s.trim());
+    if(!m)throw Error(`Ora e pavlefshme në orarin zyrtar: ${s}`);
+    return Number(m[1])*60+Number(m[2]);
+  }
+  function minuteLabel(min){return `${String(Math.floor(min/60)).padStart(2,"0")}:${String(min%60).padStart(2,"0")}`;}
+  function parseFET(html, kind, filename){
+    // DOMParser treats the downloaded HTML as an inert document; scripts are never executed.
+    const doc = new DOMParser().parseFromString(html,"text/html");
+    const tables = [...doc.querySelectorAll('table[id^="table_"]')];
+    if(!tables.length)throw Error(`Nuk u gjetën tabelat zyrtare në ${filename}.`);
+    const firstHeaders = [...tables[0].querySelectorAll("thead th.xAxis")].map(e=>e.textContent.trim());
+    if(firstHeaders.length < 2)throw Error(`Nuk u gjetën orët në ${filename}.`);
+    const minutes = firstHeaders.map(parseMinutes);
+    const interval = minutes[1]-minutes[0];
+    if(interval <= 0 || minutes.some((m,i)=>i>0 && m-minutes[i-1]!==interval))throw Error(`Intervalet kohore nuk janë të rregullta në ${filename}.`);
+    const timeLabels = [...firstHeaders,minuteLabel(minutes.at(-1)+interval)];
+    const firstDays = [...tables[0].querySelectorAll("tbody th.yAxis")].map(x=>x.textContent.trim());
+    if(!firstDays.length || new Set(firstDays).size!==firstDays.length)throw Error(`Nuk mund të lexohen ditët në ${filename}.`);
+    const entities = tables.map(table=>{
+      const name=table.querySelector("caption span.name")?.textContent.trim();
+      if(!name)throw Error(`Emri i sallës/grupit/mësimdhënësit mungon në ${filename}.`);
+      const l = kind==="subgroups" ? name.replace(/\s+Automatic (?:Group )?Automatic Subgroup$/i,"").replace(/\s+Automatic Group$/i,"").replace(/\s+Automatic Subgroup$/i,"") : name;
+      const headers = [...table.querySelectorAll("thead th.xAxis")].map(x=>x.textContent.trim());
+      if(headers.length!==firstHeaders.length || headers.some((t,i)=>t!==firstHeaders[i]))throw Error(`Orët nuk janë të njëjta në tabelën ${name} (${filename}).`);
+      const dayRows = [...table.querySelectorAll("tbody tr")].filter(tr=>tr.querySelector("th.yAxis"));
+      if(dayRows.length!==firstDays.length)throw Error(`Ditët nuk janë të njëjta për ${name} (${filename}).`);
+      const events = [];
+      dayRows.forEach((tr,d)=>{
+        const dayName=tr.querySelector("th.yAxis").textContent.trim();
+        if(dayName!==firstDays[d])throw Error(`Renditja e ditëve nuk përputhet për ${name} (${filename}).`);
+        let pos=0;
+        for(const cell of [...tr.children].filter(x=>x.tagName.toLowerCase()==="td")){
+          const span = Number(cell.getAttribute("colspan")||1);
+          if(!Number.isInteger(span)||span<1||pos+span>firstHeaders.length)throw Error(`Problem me kohëzgjatjen e aktivitetit për ${name}.`);
+          if(!cell.classList.contains("empty")){
+            const value=cls=>[...cell.querySelectorAll("."+cls)].map(e=>e.textContent.trim()).filter(Boolean).join(" · ");
+            // A future export may mark a room unavailable without assigning a class.
+            // Treat any nonempty, non-activity cell as BLOCKED, never as free.
+            events.push({d,s:pos,e:pos+span,t:value("subject")||"Sallë e bllokuar / e padisponueshme",
+              a:value("activitytag"),g:value("studentsset"),
+              p:kind==="teachers"?name:value("teacher"),
+              r:kind==="rooms"?name:value("room")});
+          }
+          pos+=span;
+        }
+        if(pos!==firstHeaders.length)throw Error(`Tabela jo e plotë për ${name}, ${dayName} (${filename}).`);
+      });
+      return {n:name,l,e:events};
+    });
+    const foot=tables[0].querySelector("tr.foot")?.textContent?.replace(/\s+/g," ").trim()||"";
+    const stamped=foot.match(/Timetable generated with FET[^]*? on (.+)$/i)?.[1]?.trim()||"";
+    return {entities,days:firstDays,times:timeLabels,stamp:stamped};
+  }
+  async function loadTimetables(){
+    // cache:no-store asks the browser to revalidate the files when visitors reload.
+    const results=await Promise.all(Object.entries(FILENAMES).map(async ([kind,filename])=>{
+      let response;
+      try {response=await fetch(filename,{cache:"no-store"});}
+      catch {throw Error(`Nuk mund të lexohet ${filename}. Hap faqen nga GitHub Pages (HTTPS), jo drejtpërdrejt si file://, dhe sigurohu që skedarët ndodhen në të njëjtën dosje.`);}
+      if(!response.ok)throw Error(`Nuk u gjet skedari ${filename} (HTTP ${response.status}). Ngarko të tre oraret në të njëjtën dosje me index.html.`);
+      return [kind,parseFET(await response.text(),kind,filename)];
+    }));
+    const all=Object.fromEntries(results);
+    const baseline=all.rooms;
+    for(const [kind,part] of results){
+      if(part.days.join("\0")!==baseline.days.join("\0")||part.times.join("\0")!==baseline.times.join("\0"))throw Error(`Ditët ose orët ndryshojnë mes skedarëve FET (${KIND_LABELS[kind]} dhe sallave). Ngarko eksportet e së njëjtës gjenerim.`);
+      if(part.stamp && baseline.stamp && part.stamp!==baseline.stamp)throw Error(`Skedarët janë gjeneruar në kohë të ndryshme (${kind}: ${part.stamp}; rooms: ${baseline.stamp}). Ngarko të tre HTML-të nga e njëjta gjenerim i FET.`);
+    }
+    return {subgroups:all.subgroups.entities,teachers:all.teachers.entities,rooms:all.rooms.entities,
+      times:baseline.times,days:baseline.days,date:baseline.stamp||"Datë e pacaktuar"};
+  }
+
+  function setHash(){
+    const hash = state.page === "free" ? "#sallat-e-lira" :
+      "#orari/" + state.type + "/" + encodeURIComponent(state.item?.n ?? "");
+    if(location.hash !== hash) history.replaceState(null,"",hash);
+  }
+  function switchPage(page, update=true){
+    state.page = page;
+    $("schedulesPanel").hidden = page !== "schedules";
+    $("freePanel").hidden = page !== "free";
+    $("navSchedules").classList.toggle("active",page==="schedules");
+    $("navFree").classList.toggle("active",page==="free");
+    $("navSchedules").setAttribute("aria-current",page==="schedules"?"page":"false");
+    $("navFree").setAttribute("aria-current",page==="free"?"page":"false");
+    if(update) setHash();
+  }
+  function options(){
+    const filtered = ordered[state.type].filter(e => normal(e.l).includes(normal(state.query)) || normal(e.n).includes(normal(state.query)));
+    const previous = state.item?.n;
+    if(previous && !filtered.some(e=>e.n===previous)) state.item = null;
+    if(!state.item) state.item = filtered[0] ?? null;
+    const select = $("entity");
+    select.innerHTML = filtered.length ? filtered.map(e => `<option value="${esc(e.n)}">${esc(e.l)}</option>`).join("") :
+      `<option value="">Nuk u gjet asnjë rezultat</option>`;
+    select.disabled = !filtered.length;
+    if(state.item) select.value = state.item.n;
+    display();
+  }
+  function setCategory(kind){
+    state.type = kind;state.query="";$("category").value=kind;$("lookup").value="";
+    state.item = null; options();
+  }
+  function setEntityByName(name){
+    const entry = ordered[state.type].find(e=>e.n===name);
+    if(!entry)return false;
+    state.item=entry;state.query="";$("lookup").value="";
+    options();return true;
+  }
+  function filteredEvents(e){
+    return [...e].sort((a,b)=>a.d-b.d||a.s-b.s||a.t.localeCompare(b.t,"sq"));
+  }
+  function hours(e){return `${data.times[e.s]}–${data.times[e.e]}`;}
+  function colorClass(subject){let hash=0;for(const c of subject)hash=((hash<<5)-hash+c.charCodeAt(0))|0;return "tone-"+(Math.abs(hash)%6);}
+  function extraForEvent(event){
+    if(state.type==="subgroups") return [event.p,event.r].filter(Boolean).join(" · ");
+    if(state.type==="teachers") return [event.g,event.r].filter(Boolean).join(" · ");
+    return [event.g,event.p].filter(Boolean).join(" · ");
+  }
+  function week(){
+    $("weekHeader").innerHTML = `<div>Ora</div>`+data.days.map(d=>`<div>${esc(d)}</div>`).join("");
+    let times=`<div class="time-axis">`;
+    for(let s=0;s<data.times.length-1;s++){if(parseMinutes(data.times[s])%60===0)times+=`<div class="time-label" style="top:${s*15}px">${esc(data.times[s])}</div>`;}
+    times+=`<div class="time-label" style="top:${(data.times.length-1)*15}px">${esc(data.times.at(-1))}</div></div>`;
+    const evs=state.item ? state.item.e : [];
+    const columns = data.days.map((day,d)=>{
+      const cells=evs.filter(e=>e.d===d).map(event=>{
+        const index = evs.indexOf(event);
+        const ht=(event.e-event.s)*15-3;
+        return `<button class="event ${colorClass(event.t)} ${ht<=48?"tiny":""}" data-event="${index}" type="button" aria-label="${esc(event.t)} – ${esc(day)} ${hours(event)}" style="top:${event.s*15+2}px;height:${ht}px"><span class="event-title">${esc(event.t)}</span><span class="event-sub">${esc(extraForEvent(event))}</span></button>`;
+      }).join("");
+      return `<div class="day-column" aria-label="${esc(day)}">${cells}</div>`;
+    }).join("");
+    $("weekBody").innerHTML = times+columns;
+    $("weekBody").querySelectorAll("[data-event]").forEach(button=>button.addEventListener("click",()=>showEvent(evs[Number(button.dataset.event)])));
+  }
+  function agenda(){
+    const evs = filteredEvents(state.item?.e ?? []);
+    $("agendaView").innerHTML=data.days.map((day,d)=>{
+      const rows=evs.filter(e=>e.d===d);
+      return `<section class="agenda-day"><h3>${esc(day)}</h3>${rows.length?
+        rows.map((e)=>{
+          const index=evs.indexOf(e);
+          return `<div class="agenda-row"><div class="agenda-time">${hours(e)}</div><button class="agenda-entry ${colorClass(e.t)}" data-agenda="${index}" type="button"><strong>${esc(e.t)}</strong><span>${esc(e.a)}${e.a&&extraForEvent(e)?" · ":""}${esc(extraForEvent(e))}</span></button></div>`;
+        }).join(""):`<p class="no-events">Nuk ka aktivitete të planifikuara.</p>`}</section>`;
+    }).join("");
+    $("agendaView").querySelectorAll("[data-agenda]").forEach(button=>button.addEventListener("click",()=>showEvent(evs[Number(button.dataset.agenda)])));
+  }
+  function renderView(){
+    $("weeklyView").hidden=state.view!=="week";
+    $("agendaView").hidden=state.view!=="list";
+    $("viewWeek").classList.toggle("active",state.view==="week");
+    $("viewList").classList.toggle("active",state.view==="list");
+    $("viewWeek").setAttribute("aria-pressed",String(state.view==="week"));
+    $("viewList").setAttribute("aria-pressed",String(state.view==="list"));
+  }
+  function display(){
+    $("selectedTitle").textContent=state.item?.l || "Nuk ka rezultate";
+    $("selectedMeta").textContent=state.item?`${categoryLabel[state.type]} · ${state.item.e.length} aktivitete në javë · E hënë – E premte`:"Provo një emër tjetër.";
+    week();agenda();renderView();
+    if(state.page==="schedules"&&!state.suspendHash)setHash();
+  }
+  function showEvent(e){
+    $("modalTitle").textContent=e.t;
+    $("modalTag").textContent=e.a || "Aktivitet mësimor";
+    const pairs=[["Dita",data.days[e.d]],["Ora",hours(e)],["Studentët / Grupi",e.g],["Mësimdhënësi",e.p],["Salla",e.r]];
+    $("modalDetails").innerHTML=pairs.filter(([,v])=>v).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
+    $("detailDialog").showModal();
+  }
+  function renderFree(){
+    const day = publicState.day;
+    const d = day ? dayIndex(data.days, day.weekday) : -1;
+    $("freeDay").value = String(d);
+    const s=Number($("freeStart").value),e=Number($("freeEnd").value);
+    const invalid = e<=s;
+    $("freeError").hidden=!invalid;$("freeValid").hidden=invalid;
+    if(invalid)return;
+    const unavailable = publicState.status !== 'ready' || !day || (day.fetActive && d < 0);
+    if (unavailable || !day.bookingAllowed) {
+      $('freeCount').textContent = unavailable ? 'Disponueshmëria nuk mund të verifikohet' : 'Data është e mbyllur për rezervime';
+      $('freeSummary').textContent = $('bookingDate').value;
+      $('roomResults').replaceChildren();
+      return;
+    }
+    const free=ordered.rooms.filter(room => publicState.rooms.some(r => r.name === room.n) &&
+      (!day.fetActive || !room.e.some(event=>event.d===d&&event.s<e&&event.e>s)) &&
+      !publicState.rows.some(b => overlaps(b,room.n,data.times[s],data.times[e])));
+    $("freeCount").textContent=`${free.length} nga ${data.rooms.length} salla të lira`;
+    $("freeSummary").textContent=`${publicState.date} · ${data.times[s]}–${data.times[e]}`;
+    $("roomResults").innerHTML=free.length?
+      free.map(room=>`<button type="button" class="room-choice" data-room="${esc(room.n)}"><span>${esc(room.l)}</span><span class="arrow" aria-hidden="true">↗</span></button>`).join("") :
+      `<div class="card empty-state" style="grid-column:1/-1"><strong>Nuk ka salla të lira</strong>Provo një interval më të shkurtër ose një orar tjetër.</div>`;
+    $("roomResults").querySelectorAll("[data-room]").forEach(button=>button.addEventListener("click",()=>{
+      setCategory("rooms");setEntityByName(button.dataset.room);switchPage("schedules");
+      window.scrollTo({top:0,behavior:"smooth"});
+    }));
+  }
+  function initFree(){
+    $("freeDay").innerHTML=data.days.map((d,i)=>`<option value="${i}">${esc(d)}</option>`).join("");
+    const today=(new Date().getDay()+6)%7;
+    $("freeDay").value=today<5?today:0;
+    const options = data.times.map((t,i)=>`<option value="${i}">${esc(t)}</option>`).join("");
+    $("freeStart").innerHTML=options;$("freeEnd").innerHTML=options;
+    const start=data.times.indexOf("12:00"),end=data.times.indexOf("14:00");
+    $("freeStart").value=start>=0?start:0;
+    $("freeEnd").value=end>=0?end:data.times.length-1;
+    for(const id of ["freeDay","freeStart","freeEnd"]) $(id).addEventListener("change",renderFree);
+    renderFree();
+  }
+  $("category").addEventListener("change",e=>setCategory(e.target.value));
+  $("lookup").addEventListener("input",e=>{state.query=e.target.value;state.item=null;options();});
+  $("entity").addEventListener("change",e=>{state.item=ordered[state.type].find(x=>x.n===e.target.value)||null;display();});
+  $("viewWeek").addEventListener("click",()=>{state.view="week";renderView();});
+  $("viewList").addEventListener("click",()=>{state.view="list";renderView();});
+  $("navSchedules").addEventListener("click",()=>switchPage("schedules"));
+  $("navFree").addEventListener("click",()=>switchPage("free"));
+  $("printSchedule").addEventListener("click",()=>window.print());
+  $("closeDialog").addEventListener("click",()=>$("detailDialog").close());
+  $("detailDialog").addEventListener("click",event=>{if(event.target===$("detailDialog"))$("detailDialog").close();});
+  $("copyLink").addEventListener("click",async()=>{
+    const btn=$("copyLink"),url=location.href;
+    try{await navigator.clipboard.writeText(url);btn.textContent="Lidhja u kopjua ✓";}
+    catch{window.prompt("Kopjo lidhjen:",url);}
+    setTimeout(()=>{btn.textContent="Kopjo lidhjen";},2000);
+  });
+  function routeFromHash(){
+    let hash; try{hash=decodeURIComponent(location.hash.slice(1));}catch{hash="";}
+    if(hash==="sallat-e-lira"){switchPage("free",false);return;}
+    const m=hash.match(/^orari\/(rooms|teachers|subgroups)\/(.*)$/);
+    if(m){state.type=m[1];state.query="";$("category").value=state.type;$("lookup").value="";
+      state.item=ordered[state.type].find(e=>e.n===m[2])||null;options();}
+    switchPage("schedules",false);
+  }
+  $("refreshFiles").addEventListener("click",()=>window.location.reload());
+  async function start(){
+    try{
+      data=await loadTimetables();
+      for(const kind of ["subgroups","teachers","rooms"])ordered[kind]=[...data[kind]].sort(niceSort);
+      if(!data.rooms.length)throw Error("Nuk ka salla në orarin zyrtar. Nuk mund të llogaritet disponueshmëria.");
+      document.documentElement.style.setProperty("--day-count",data.days.length);
+      document.documentElement.style.setProperty("--timetable-height",`${(data.times.length-1)*15}px`);
+      $("statSubgroups").textContent=data.subgroups.length+" grupe";
+      $("statTeachers").textContent=data.teachers.length+" mësimdhënës";
+      $("statRooms").textContent=data.rooms.length+" salla";
+      $("updateDate").textContent="FET · "+data.date;
+      initFree();
+      startBookings();
+      state.suspendHash=true;setCategory("subgroups");routeFromHash();state.suspendHash=false;
+      if(!location.hash)setHash();
+      window.addEventListener("hashchange",routeFromHash);
+      $("loadStatus").hidden=true;
+      $("mainContent").hidden=false;
+    }catch(error){
+      console.error("Error while loading FET timetables:",error);
+      $("loadStatus").classList.add("failed");
+      $("loadStatus").textContent="Nuk u ngarkuan oraret.\n"+error.message+"\n\nPërditëso faqen pasi t'i kesh ngarkuar skedarët e saktë.";
+    }
+  }
+  start();
+})();
+</script>
+</body>
+</html>

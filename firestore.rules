@@ -59,6 +59,13 @@ service cloud.firestore {
         (d.periodIds.size() < 3 || bookingSlotGone(d, 2)) &&
         (d.periodIds.size() < 4 || bookingSlotGone(d, 3));
     }
+    // Public documents contain only the four explicitly published event fields.
+    function publicMatches(id, d) {
+      let p = getAfter(/databases/$(database)/documents/publicBookings/$(id)).data;
+      return p.keys().hasOnly(['title', 'date', 'roomId', 'periodIds']) &&
+        p.title == d.title && p.date == d.date &&
+        p.roomId == d.roomId && p.periodIds == d.periodIds;
+    }
     match /users/{uid} {
       allow get: if request.auth != null && request.auth.uid == uid;
       allow list, create, update, delete: if false;
@@ -68,15 +75,16 @@ service cloud.firestore {
       allow list, write: if false;
     }
     match /rooms/{id} {
-      allow read: if approved();
+      allow read: if true;
       allow write: if false;
     }
     match /periods/{id} {
-      allow read: if approved();
+      allow read: if true;
       allow write: if false;
     }
     match /calendarDays/{date} {
-      allow read: if approved();
+      allow get: if true;
+      allow list: if approved();
       allow write: if false;
     }
     match /weeklyRooms/{key} {
@@ -107,11 +115,23 @@ service cloud.firestore {
         request.resource.data.createdAt == request.time &&
         exists(/databases/$(database)/documents/rooms/$(request.resource.data.roomId)) &&
         bookingSlotsPresent(reservationId, request.resource.data) &&
-        freeOfFet(request.resource.data);
+        freeOfFet(request.resource.data) &&
+        publicMatches(reservationId, request.resource.data);
       allow update: if false;
       allow delete: if approved() && controls().bookingOpen == true &&
         resource.data.ownerUid == request.auth.uid &&
-        bookingSlotsGone(resource.data);
+        bookingSlotsGone(resource.data) &&
+        !existsAfter(/databases/$(database)/documents/publicBookings/$(reservationId));
+    }
+    match /publicBookings/{id} {
+      allow read: if true;
+      allow create: if approved() &&
+        getAfter(/databases/$(database)/documents/reservations/$(id)).data.ownerUid == request.auth.uid &&
+        publicMatches(id, getAfter(/databases/$(database)/documents/reservations/$(id)).data);
+      allow update: if false;
+      allow delete: if approved() && controls().bookingOpen == true &&
+        get(/databases/$(database)/documents/reservations/$(id)).data.ownerUid == request.auth.uid &&
+        !existsAfter(/databases/$(database)/documents/reservations/$(id));
     }
     match /roomSlots/{slotId} {
       allow read: if approved();

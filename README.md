@@ -185,3 +185,10 @@ For each booking, the browser transaction reads the selected date metadata, date
 **Migration:** This is a replacement for the initial importer. If you already applied the original importer (and have dated `roomSlots` with `source: fet`), do not mix formats; the optimized importer refuses to run. In that case, devise a maintenance migration before importing. If you only ran dry runs, you can switch immediately.
 
 **Caveat:** This is a development example. Security rules need emulator tests, especially 4-period transactions (Security Rules have cross-document access limits). Before production, validate simultaneous booking, cancellation, import conflicts, holiday handling, and all authorization paths in the emulator.
+
+## Public timetable reservations
+
+The completed public feed integration lives in [public-schedule/README.md](public-schedule/README.md).
+It includes the updated public HTML, live date-specific reservations, free-room
+filtering, stricter atomic publication rules, and a dry-run-first backfill for
+existing bookings. Follow its deployment order when upgrading both websites.

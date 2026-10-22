@@ -107,6 +107,7 @@ async function createReservation(event) {
   if (date < settings.startDate || date > settings.endDate) return message('Date is outside the configured semester.',true);
   if (!settings.bookingOpen) return message('Booking is paused for a timetable import.',true);
   const reservationRef = doc(collection(db,'reservations'));
+  const publicRef = doc(db,'publicBookings',reservationRef.id);
   const slotRefs = periodIds.map(p => doc(db,'roomSlots',slotId(date,roomId,p)));
   try {
     $('booking-form').querySelector('button').disabled = true;
@@ -128,6 +129,7 @@ async function createReservation(event) {
         throw new Error('One or more periods are occupied by a class or reservation.');
       }
       tx.set(reservationRef, { title, date, roomId, periodIds, ownerUid: currentUser.uid, createdAt: serverTimestamp() });
+      tx.set(publicRef, {title, date, roomId, periodIds});
       for (let i=0; i<periodIds.length; i++) {
         tx.set(slotRefs[i], { source:'booking', reservationId:reservationRef.id,
           ownerUid:currentUser.uid, date, roomId, periodId:periodIds[i] });
@@ -150,6 +152,7 @@ async function cancelReservation(id) {
     const slots = await Promise.all(refs.map(ref => tx.get(ref)));
     if (slots.some(s => !s.exists() || s.data().reservationId !== id)) throw new Error('Reservation data is inconsistent. Ask the administrator.');
     tx.delete(reservationRef);
+    tx.delete(doc(db,'publicBookings',id));
     refs.forEach(ref => tx.delete(ref));
   });
 }
