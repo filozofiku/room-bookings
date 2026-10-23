@@ -50,6 +50,8 @@
     .result-header{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;align-items:center;margin:2px 0 14px}
     .result-title{font-size:21px;font-weight:790;letter-spacing:-.025em;margin:0;overflow-wrap:anywhere}
     .result-meta{font-size:12px;color:var(--muted);margin-top:4px}
+    .room-features:not([hidden]){display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+    .room-features span{padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:#f8fafc;color:var(--ink-soft);font-size:13px}
     .tools{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
     .tool-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;background:#fff;border:1px solid #d9e3ec;color:var(--ink-soft);border-radius:9px;padding:8px 11px;font-weight:680;font-size:12px}
     .tool-btn.active{color:var(--accent-hover);background:var(--tint);border-color:#aadbdc}
@@ -177,7 +179,7 @@
       </div>
     </div>
     <div class="result-header">
-      <div><h2 class="result-title" id="selectedTitle">Orari javor</h2><div class="result-meta" id="selectedMeta"></div></div>
+      <div><h2 class="result-title" id="selectedTitle">Orari javor</h2><div class="result-meta" id="selectedMeta"></div><div class="room-features" id="roomFeatures" aria-label="Karakteristikat e sallës" hidden></div></div>
       <div class="tools" aria-label="Mënyra e shfaqjes">
         <button type="button" id="viewWeek" class="tool-btn active" aria-pressed="true">Pamja javore</button>
         <button type="button" id="viewList" class="tool-btn" aria-pressed="false">Pamja listë</button>
@@ -271,6 +273,30 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
   const normal = value => String(value).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLocaleLowerCase("sq");
   const niceSort = (a,b) => a.l.localeCompare(b.l,"sq",{numeric:true,sensitivity:"base"});
   const ordered = {};
+  // Faculty-provided inventory: seats, Smartboard, Tabelë e bardhë.
+  const roomFeatures = {
+    'Salla 02': [20, true, false],
+    'Salla 03': [63, true, false],
+    'Salla 04': [56, true, false],
+    'Salla 05': [121, true, true],
+    'Salla 014': [99, true, false],
+    'Salla 101': [112, true, true],
+    'Salla 102': [39, true, false],
+    'Salla 103': [60, true, true],
+    'Salla 105': [61, true, false],
+    'Salla 106': [46, true, true],
+    'Salla 108': [17, false, false],
+    'Salla 109': [61, true, true],
+    'Salla 114': [59, false, false],
+    'Salla 126': [31, false, false],
+    'Salla 128': [70, true, false],
+    'Salla 201': [114, true, false],
+    'Salla 202': [56, true, false],
+    'Salla 203A': [27, true, false],
+    'Salla 203B': [30, false, false],
+    'Salla 204': [36, true, true],
+    'Salla 302': [30, true, true]
+  };
   const categoryLabel = {subgroups:"Grupi i studentëve",teachers:"Mësimdhënës",rooms:"Sallë"};
   const state = {page:"schedules",type:"subgroups",item:null,view:matchMedia("(max-width: 750px)").matches ? "list":"week",query:""};
   // The three source files can be overwritten on GitHub Pages without changing this page.
@@ -447,7 +473,25 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     $("viewWeek").setAttribute("aria-pressed",String(state.view==="week"));
     $("viewList").setAttribute("aria-pressed",String(state.view==="list"));
   }
+  function displayRoomFeatures() {
+    const container = $('roomFeatures');
+    container.replaceChildren();
+    container.hidden = state.type !== 'rooms' || !state.item;
+    if (container.hidden) return;
+    const features = roomFeatures[state.item.n];
+    const labels = features ? [
+      `Kapaciteti: ${features[0]} ulëse`,
+      `Smartboard: ${features[1] ? 'Po' : 'Jo'}`,
+      `Tabelë e bardhë: ${features[2] ? 'Po' : 'Jo'}`
+    ] : ['Karakteristikat e kësaj salle nuk janë të disponueshme.'];
+    for (const label of labels) {
+      const badge = document.createElement('span');
+      badge.textContent = label;
+      container.appendChild(badge);
+    }
+  }
   function display(){
+    displayRoomFeatures();
     $("selectedTitle").textContent=state.item?.l || "Nuk ka rezultate";
     $("selectedMeta").textContent=state.item?`${categoryLabel[state.type]} · ${visibleEvents().length} aktivitete · ${datesInView()[0]} – ${datesInView()[6]}`:"Provo një emër tjetër.";
     week();agenda();renderView();
