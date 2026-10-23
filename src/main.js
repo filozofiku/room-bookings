@@ -1,6 +1,6 @@
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, query, where, runTransaction, serverTimestamp } from 'firebase/firestore';
-import { BookingError, selectPeriods, reservationTime, errorText } from './booking-ui.js';
+import { BookingError, selectPeriods, reservationTime, errorText, MAX_PERIODS } from './booking-ui.js';
 import { auth, db } from './firebase.js';
 
 const $ = (id) => document.getElementById(id);
@@ -19,6 +19,22 @@ function message(text, isError = false) {
 }
 function selectedPeriodIds() {
   return selectPeriods(periods, $('from').value, $('through').value);
+}
+function prepareReservation(period) {
+  const minutes = time => {
+    const [hours, mins] = time.split(':').map(Number);
+    return hours * 60 + mins;
+  };
+  const from = periods.findIndex(p => p.id === period.id);
+  const target = minutes(period.start) + 90;
+  const candidates = periods.slice(from, from + MAX_PERIODS);
+  const through = candidates.filter(p => minutes(p.end) <= target).at(-1) || period;
+  $('from').value = period.id;
+  $('through').value = through.id;
+  $('selection-hint').textContent = minutes(through.end) === target ? '' :
+    `Ora e përfundimit u vendos në ${through.end}, sipas periudhave të orarit. Mund ta ndryshoni para rezervimit.`;
+  $('booking-form').scrollIntoView({behavior:'smooth', block:'start'});
+  $('title').focus({preventScroll:true});
 }
 function confirmCancellation(data) {
   const dialog = $('cancel-dialog');
@@ -68,6 +84,15 @@ async function readAvailability() {
     state.className = busy ? 'busy' : 'free';
     state.textContent = busy ? (busy.source === 'closed' ? 'Data është e mbyllur' : busy.source === 'fet' ? 'Mësim sipas orarit' : 'E rezervuar') : 'Salla e lirë';
     item.append(time, state);
+    if (!busy) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'reserve-from';
+      button.textContent = 'Rezervo nga kjo orë';
+      button.setAttribute('aria-label', `Rezervo nga kjo orë: ${p.start}`);
+      button.onclick = () => prepareReservation(p);
+      item.appendChild(button);
+    }
     $('slots').appendChild(item);
   });
 }
@@ -197,6 +222,7 @@ $('logout').onclick = async () => { try { await signOut(auth); } catch(e) {messa
 $('date').onchange = () => readAvailability().catch(e => message(errText(e),true));
 $('room').onchange = () => readAvailability().catch(e => message(errText(e),true));
 $('booking-form').onsubmit = createReservation;
+for (const id of ['from','through']) $(id).addEventListener('change', () => { $('selection-hint').textContent = ''; });
 onAuthStateChanged(auth,async user => {
   currentUser = user;
   $('login').hidden = Boolean(user);
