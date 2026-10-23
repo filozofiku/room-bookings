@@ -20,6 +20,20 @@ try {
   const roomName = await page.locator('#entity').inputValue();
   const result = {status:'ready',date:'2026-10-23',day:{weekday:'5',fetActive:false,bookingAllowed:true},rooms:[{id:'r1',name:roomName}],rows:[]};
   await page.evaluate(value => window.testReport(value),result);
+  assert.equal(await page.locator('#weekBody .day-column').count(),5);
+  assert.equal(await page.locator('#agendaView .agenda-day').count(),5);
+  for(const date of ['2026-10-24','2026-10-25']) {
+    await page.evaluate(value => window.testReport(value),{...result,rows:[{
+      title:'Rezervim në fundjavë',date,room:roomName,slots:[{start:'12:00',end:'12:15'}]
+    }]});
+    assert.equal(await page.locator('#weekBody .day-column').count(),7);
+    assert.equal(await page.locator('#agendaView .agenda-day').count(),7);
+    assert.match(await page.locator('#weekHeader').textContent(),/E shtunë/);
+    assert.match(await page.locator('#weekHeader').textContent(),/E diel/);
+  }
+  await page.evaluate(value => window.testReport(value),result);
+  assert.equal(await page.locator('#weekBody .day-column').count(),5);
+  assert.equal(await page.locator('#agendaView .agenda-day').count(),5);
   await page.click('#navFree');
   assert.equal(await page.locator('.room-choice').count(),1);
   const booking = {title:'<img src=x onerror=alert(1)>',date:result.date,room:roomName,creatorName:'Test Teacher',createdAt:{seconds:1792706400},slots:[{start:'12:00',end:'12:15'},{start:'12:15',end:'12:30'}]};

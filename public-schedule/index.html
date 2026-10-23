@@ -402,13 +402,21 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     if(state.type==="teachers") return [event.g,event.r].filter(Boolean).join(" · ");
     return [event.g,event.p].filter(Boolean).join(" · ");
   }
+  function visibleDays(events) {
+    const weekend = [dayIndex(data.days,6), dayIndex(data.days,0)];
+    const showWeekend = events.some(event => weekend.includes(event.d));
+    return data.days.map((day,d) => ({day,d}))
+      .filter(({d}) => showWeekend || !weekend.includes(d));
+  }
   function week(){
-    $("weekHeader").innerHTML = `<div>Ora</div>`+data.days.map((day,d)=>`<div>${esc(dayHeading(d))}</div>`).join("");
+    const evs=visibleEvents();
+    const days=visibleDays(evs);
+    document.documentElement.style.setProperty('--day-count',days.length);
+    $("weekHeader").innerHTML = `<div>Ora</div>`+days.map(({day,d})=>`<div>${esc(dayHeading(d))}</div>`).join("");
     let times=`<div class="time-axis">`;
     for(let s=0;s<data.times.length-1;s++){if(parseMinutes(data.times[s])%60===0)times+=`<div class="time-label" style="top:${s*15}px">${esc(data.times[s])}</div>`;}
     times+=`<div class="time-label" style="top:${(data.times.length-1)*15}px">${esc(data.times.at(-1))}</div></div>`;
-    const evs=visibleEvents();
-    const columns = data.days.map((day,d)=>{
+    const columns = days.map(({day,d})=>{
       const cells=evs.filter(e=>e.d===d).map(event=>{
         const index = evs.indexOf(event);
         const ht=(event.e-event.s)*15-3;
@@ -421,7 +429,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
   }
   function agenda(){
     const evs = filteredEvents(visibleEvents());
-    $("agendaView").innerHTML=data.days.map((day,d)=>{
+    $("agendaView").innerHTML=visibleDays(evs).map(({day,d})=>{
       const rows=evs.filter(e=>e.d===d);
       return `<section class="agenda-day"><h3>${esc(dayHeading(d))}</h3>${rows.length?
         rows.map((e)=>{
