@@ -9,6 +9,7 @@ const provider = new GoogleAuthProvider();
 auth.languageCode = 'sq';
 provider.setCustomParameters({hl:'sq'});
 let currentUser = null;
+let canCancelAll = false;
 let rooms = [];
 let periods = [];
 let settings = null;
@@ -101,11 +102,13 @@ async function readAvailability() {
 }
 async function readMyBookings() {
   if (!currentUser) return;
-  const snap = await getDocs(query(collection(db, 'reservations'), where('ownerUid','==',currentUser.uid)));
+  const reservations = collection(db, 'reservations');
+  const snap = await getDocs(canCancelAll ? reservations : query(reservations, where('ownerUid','==',currentUser.uid)));
+  $('reservations-heading').textContent = canCancelAll ? 'Të gjitha rezervimet' : 'Rezervimet e mia';
   const sorted = snap.docs.sort((a,b) => a.data().date.localeCompare(b.data().date));
   const wrapper = $('my-reservations');
   wrapper.replaceChildren();
-  if (!sorted.length) { wrapper.textContent = 'Ende nuk keni rezervime.'; return; }
+  if (!sorted.length) { wrapper.textContent = canCancelAll ? 'Ende nuk ka rezervime.' : 'Ende nuk keni rezervime.'; return; }
   for (const item of sorted) {
     const data = item.data();
     const roomName = rooms.find(r => r.id === data.roomId)?.name || data.roomId || 'Pa sallë';
@@ -113,6 +116,7 @@ async function readMyBookings() {
     div.className = 'slot';
     const description = document.createElement('span');
     description.append(safeText(`${data.date} · ${roomName} · ${data.title} · ${reservationTime(data.periodIds, periods)}`));
+    if (canCancelAll) description.append(safeText(` · Rezervuar nga: ${data.creatorName || (data.ownerUid === currentUser.uid ? currentUser.displayName : '') || 'Emri nuk është i disponueshëm'}`));
     const button = document.createElement('button');
     button.className = 'danger';
     button.textContent = 'Anuloni';
@@ -200,7 +204,7 @@ async function cancelReservation(id) {
     const existing = await tx.get(reservationRef);
     if (!existing.exists()) throw new BookingError('Rezervimi nuk ekziston më.');
     const booking = existing.data();
-    if (booking.ownerUid !== currentUser.uid) throw new BookingError('Ky rezervim nuk ju përket juve.');
+    if (!canCancelAll && booking.ownerUid !== currentUser.uid) throw new BookingError('Ky rezervim nuk ju përket juve.');
     const occupancyRef = doc(db,'eventDays',booking.date);
     const occupancy = await tx.get(occupancyRef);
     const locks = occupancy.exists() ? {...occupancy.data().bookings} : {};
@@ -218,6 +222,7 @@ async function loadApp() {
     message(`Keni hyrë me llogarinë Google, por ajo ende nuk është miratuar. Dërgojani administratorit këtë identifikues të llogarisë: ${currentUser.uid}`,true);
     return;
   }
+  canCancelAll = userSnap.data().canCancelAll === true;
   const [settingsSnap,roomSnap,periodSnap,catalogSnap] = await Promise.all([
     getDoc(doc(db,'settings','control')),
     getDocs(collection(db,'rooms')),
@@ -241,6 +246,7 @@ async function loadApp() {
       input.type = 'checkbox'; input.value = id;
       label.append(input, safeText(name)); $(kind).appendChild(label);
     }
+    filterChoices(kind);
   }
   fillOptions($('from'),periods,p=>p.id,p=>p.start);
   fillOptions($('through'),periods,p=>p.id,p=>p.end);
@@ -252,6 +258,19 @@ async function loadApp() {
   $('app').hidden = false;
   message(settings.bookingOpen ? 'Keni hyrë me sukses. Mund të rezervoni një sallë.' : 'Rezervimet janë pezulluar përkohësisht gjatë përditësimit të orarit.');
   await Promise.all([readAvailability(), readMyBookings()]);
+}
+function filterChoices(kind) {
+  const normalize = text => text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('sq').trim();
+  const search = normalize($(`${kind}-search`).value);
+  const labels = [...$(kind).querySelectorAll('label')];
+  for (const label of labels) label.hidden = !normalize(label.textContent).includes(search);
+  const matches = labels.filter(label=>!label.hidden).length;
+  const selected = $(kind).querySelectorAll('input:checked').length;
+  $(`${kind}-results`).textContent = `${matches ? `${matches} rezultate` : 'Nuk u gjet asnjë rezultat.'} · ${selected} të përzgjedhur`;
+}
+for (const kind of ['groups','teachers']) {
+  $(`${kind}-search`).addEventListener('input',()=>filterChoices(kind));
+  $(kind).addEventListener('change',()=>filterChoices(kind));
 }
 $('login').onclick = async () => { try { await signInWithPopup(auth, provider); } catch(e) {message(errText(e),true);} };
 $('logout').onclick = async () => { try { await signOut(auth); } catch(e) {message(errText(e),true);} };
@@ -270,6 +289,7 @@ $('mode').onchange = () => { $('online-field').hidden = $('mode').value !== 'onl
 for (const id of ['from','through']) $(id).addEventListener('change', () => { $('selection-hint').textContent = ''; });
 onAuthStateChanged(auth,async user => {
   currentUser = user;
+  canCancelAll = false;
   $('login').hidden = Boolean(user);
   $('logout').hidden = !user;
   $('identity').textContent = user?.email || '';

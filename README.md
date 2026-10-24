@@ -12,6 +12,17 @@ shfaqet në hollësitë e aktivitetit në orarin publik. Kufiri kontrollohet edh
 rregullat e Firebase. Te “Orari mësimor” navigimi bëhet me shigjeta javore;
 te “Sallat e lira” mbetet zgjedhja e datës.
 
+Kërkimi i grupeve dhe mësimdhënësve filtron listat pa hequr përzgjedhjet e bëra.
+Përdoruesit me `users/{uid}.canCancelAll: true` shohin “Të gjitha rezervimet” dhe
+mund të anulojnë çdo rezervim. Kjo leje vendoset vetëm nga administratori përmes
+Admin SDK; roli `admin` pa këtë leje nuk jep automatikisht anulim për të tjerët.
+Anulimi heq në të njëjtin transaksion rezervimin, publikimin dhe zënien e burimeve.
+
+Për aktivizim llogarie: `node scripts/manage-booking-user.mjs EMAIL teacher --apply`.
+Për lejen e anulimit të çdo rezervimi, përdorni `cancel-all` në vend të `teacher`.
+Pa `--apply` bëhet vetëm kontrolli paraprak. Llogaritë e reja hyjnë me Google;
+skripti nuk vendos fjalëkalim dhe nuk dërgon email.
+
 Modeli aktiv:
 - `resourceCatalog/current`: emrat dhe identifikuesit e sallave, grupeve dhe mësimdhënësve.
 - `weeklyResources/{weekday}`: intervalet e zëna sipas tre eksporteve zyrtare HTML.

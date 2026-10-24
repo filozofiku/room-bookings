@@ -13,6 +13,9 @@ service cloud.firestore {
         get(userPath()).data.active == true &&
         get(userPath()).data.role in ['teacher', 'admin'];
     }
+    function mayCancel(booking) {
+      return booking.ownerUid == request.auth.uid || get(userPath()).data.get('canCancelAll', false) == true;
+    }
     function canBook(date) {
       return approved() && controls().bookingOpen == true && controls().slotStorage == 'resources-v2' &&
         date >= controls().startDate && date <= controls().endDate &&
@@ -133,7 +136,7 @@ service cloud.firestore {
         publicMatches(reservationId, request.resource.data);
       allow update: if false;
       allow delete: if approved() && controls().bookingOpen == true &&
-        resource.data.ownerUid == request.auth.uid &&
+        mayCancel(resource.data) &&
         controls().slotStorage == 'resources-v2' &&
         (resources(resource.data).size() == 0 || occupancyWritten(reservationId, resource.data)) &&
         !existsAfter(/databases/$(database)/documents/publicBookings/$(reservationId));
@@ -145,7 +148,7 @@ service cloud.firestore {
         publicMatches(id, getAfter(/databases/$(database)/documents/reservations/$(id)).data);
       allow update: if false;
       allow delete: if approved() && controls().bookingOpen == true &&
-        get(/databases/$(database)/documents/reservations/$(id)).data.ownerUid == request.auth.uid &&
+        mayCancel(get(/databases/$(database)/documents/reservations/$(id)).data) &&
         !existsAfter(/databases/$(database)/documents/reservations/$(id));
     }
     match /eventDays/{key} {
@@ -157,7 +160,7 @@ service cloud.firestore {
         let booking = creating ? getAfter(path).data : get(path).data;
         let expected = keys(booking);
         return key == booking.date && resources(booking).size() > 0 &&
-          booking.ownerUid == request.auth.uid &&
+          (creating ? booking.ownerUid == request.auth.uid : mayCancel(booking)) &&
           (creating ? existsAfter(path) : !existsAfter(path)) &&
           occupancyChange(id, booking, creating, expected) && (!creating || freeOfFet(booking, expected));
       }

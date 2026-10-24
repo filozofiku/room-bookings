@@ -14,6 +14,7 @@ test('resource reservations: atomic publication, optional resources, conflicts, 
  const teachers=Object.fromEntries(Array.from({length:93},(_,i)=>[`t_${String(i).padStart(12,'0')}`,`Teacher ${i}`]));
  const base={title:'Panel',date,roomId,periodIds:['p01'],groupIds:Object.keys(groups).slice(0,2),teacherIds:Object.keys(teachers).slice(0,2),eventType:'Panel',isPublic:false,mode:'physical',onlineUrl:'',creatorName:'Teacher'};
  const db=env.authenticatedContext('teacher',{name:'Teacher'}).firestore(), other=env.authenticatedContext('other',{name:'Other'}).firestore(), anon=env.unauthenticatedContext().firestore();
+ const manager=env.authenticatedContext('manager',{name:'Manager'}).firestore();
  const seed=async(path,data)=>env.withSecurityRulesDisabled(ctx=>setDoc(doc(ctx.firestore(),path),data));
  const create=(id,override={},options={})=>runTransaction(options.db||db,async tx=>{
    const context=options.db||db, d={...base,...override}, ref=doc(context,'eventDays',date);
@@ -34,6 +35,7 @@ test('resource reservations: atomic publication, optional resources, conflicts, 
    if(keys.length && options.locks!==false)tx.set(ref,{bookings,changedReservationId:id});
  });
  try{
+  await seed('users/manager',{active:true,role:'admin',canCancelAll:true});
   await seed('users/teacher',{active:true,role:'teacher'});await seed('users/other',{active:true,role:'teacher'});
   await seed('settings/control',{bookingOpen:true,slotStorage:'resources-v2',startDate:'2026-09-01',endDate:'2026-12-31',periodOrder:Object.fromEntries(periods.map((p,i)=>[p.id,i])),validPeriodRanges:validPeriodRanges(periods)});
   await seed('resourceCatalog/current',{rooms:{[roomId]:'Salla 014'},groups,teachers});
@@ -45,6 +47,22 @@ test('resource reservations: atomic publication, optional resources, conflicts, 
   }
   await assertSucceeds(create('all-resources',{periodIds:periods.slice(0,16).map(p=>p.id),groupIds:Object.keys(groups),teacherIds:Object.keys(teachers)}));
   await assertSucceeds(cancel('all-resources'));
+  await assertSucceeds(create('managed',{periodIds:periods.slice(0,16).map(p=>p.id),groupIds:Object.keys(groups),teacherIds:Object.keys(teachers)}));
+  await assertSucceeds(create('keep',{periodIds:['p17']}));
+  await assertFails(cancel('managed',{db:manager,locks:false}));
+  await assertFails(cancel('managed',{db:manager,publish:false}));
+  await assertSucceeds(cancel('managed',{db:manager}));
+  assert.ok(Object.values((await getDoc(doc(db,'eventDays',date))).data().bookings).every(id=>id==='keep'));
+  await assertFails(setDoc(doc(db,'users','teacher'),{active:true,role:'admin',canCancelAll:true}));
+  await assertFails(create('forged-owner',{}, {db:manager}));
+  await seed('users/manager',{active:false,role:'admin',canCancelAll:true});
+  await assertFails(cancel('keep',{db:manager}));
+  await seed('users/manager',{active:true,role:'admin',canCancelAll:false});
+  await assertFails(cancel('keep',{db:manager}));
+  await seed('users/manager',{active:true,role:'admin',canCancelAll:true});
+  await assertSucceeds(cancel('keep',{db:manager}));
+  await assertSucceeds(create('roomless-managed',{roomId:'',groupIds:[],teacherIds:[]}));
+  await assertSucceeds(cancel('roomless-managed',{db:manager}));
   for(const selected of [['p01,p02'],['p01','p03'],['p02','p01'],['p01','p01'],['p99'],[],periods.slice(0,17).map(p=>p.id)])await assertFails(create('bad',{periodIds:selected}));
   for(const override of [{roomId:'unknown'},{groupIds:['unknown']},{teacherIds:['unknown']},{groupIds:[base.groupIds[0],base.groupIds[0]]},{eventType:'Unknown'},{isPublic:'yes'},{mode:'online',onlineUrl:'javascript:alert(1)'},{mode:'online',onlineUrl:''},{mode:'physical',onlineUrl:'https://example.test'},{creatorName:'Forged'}])await assertFails(create('bad',override));
   for(const options of [{locks:false},{publish:false},{public:{title:'Forged'}},{public:{ownerUid:'teacher'}},{public:{creatorName:'Forged'}},{private:{createdAt:new Date(0)}},{tamper:(b,k)=>delete b[k[0]]},{tamper:(b,k)=>b[k[0]]='other'},{tamper:b=>b['extra__p01']='bad'}])await assertFails(create('bad',{},options));

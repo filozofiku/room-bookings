@@ -29,10 +29,10 @@ window.testStore=store;
 export const collection=(db,name)=>name;
 export const doc=(db,...parts)=>{const path=parts.length?parts.join('/'):(db+'/new');return {path,id:path.split('/').at(-1)};};
 export const where=(...args)=>args;
-export const query=(path,...filters)=>path;
+export const query=(path,...filters)=>({path,filters});
 const snap=ref=>{const path=ref.path||ref;return {id:path.split('/').at(-1),exists:()=>store.has(path),data:()=>store.get(path)};};
 export const getDoc=async path=>{if(window.testFail)throw Object.assign(new Error('English SDK error'),{code:'unavailable'});return snap(path)};
-export const getDocs=async path=>({docs:[...store.keys()].filter(k=>k.startsWith(path+'/')).map(snap)});
+export const getDocs=async ref=>{const path=ref.path||ref;return {docs:[...store.keys()].filter(k=>k.startsWith(path+'/')).map(snap).filter(s=>(ref.filters||[]).every(([field,op,value])=>s.data()[field]===value))}};
 export const serverTimestamp=()=>({seconds:123456});
 export const runTransaction=async(db,callback)=>{
 const writes=[];await callback({get:getDoc,set:(...args)=>writes.push(['set',...args]),delete:path=>writes.push(['delete',path])});
@@ -57,6 +57,20 @@ return route.fulfill({contentType,body});
 await page.goto('https://booking.test/');
 await page.waitForFunction(()=>document.getElementById('slots').children.length===18);
 assert.equal(await page.locator('html').getAttribute('lang'),'sq');
+for (const kind of ['groups','teachers']) {
+ const search=kind==='groups'?'GRUPI 2':'mesimdhenesi 2';
+ await page.locator(`#${kind} input`).first().check();
+ await page.fill(`#${kind}-search`,search);
+ assert.equal(await page.locator(`#${kind} label:visible`).count(),1);
+ assert.equal(await page.locator(`#${kind} input`).first().isChecked(),true);
+ await page.fill(`#${kind}-search`,'nukekziston');
+ assert.equal(await page.locator(`#${kind} label:visible`).count(),0);
+ assert.match(await page.locator(`#${kind}-results`).textContent(),/Nuk u gjet/);
+ await page.fill(`#${kind}-search`,'');
+ assert.equal(await page.locator(`#${kind} label:visible`).count(),2);
+ await page.locator(`#${kind} input`).first().uncheck();
+}
+
 assert.equal(await page.locator('#from option').first().textContent(),'08:00');
 assert.equal(await page.locator('#through option').first().textContent(),'08:15');
 assert.equal(await page.getByText('Salla e lirë',{exact:true}).count(),16);
@@ -154,6 +168,22 @@ await page.locator('#booking-form button').click();
 await page.waitForFunction(()=>window.testStore.has('reservations/new'));
 assert.deepEqual(await page.evaluate(()=>{const d=window.testStore.get('reservations/new');return [d.groupIds,d.teacherIds,d.onlineUrl,d.isPublic]}),[['g_one','g_two'],['t_one','t_two'],'',false]);
 assert.equal(await page.evaluate(()=>Object.keys(window.testStore.get('eventDays/2026-10-23').bookings).length),10);
+await page.evaluate(async()=>{
+ window.testStore.set('reservations/someone',{date:'2026-10-23',roomId:'',periodIds:['p01'],title:'Rezervimi i kolegut',ownerUid:'someone',creatorName:'Kolegu'});
+ window.testStore.set('publicBookings/someone',{title:'Rezervimi i kolegut'});
+ await window.testAuth({uid:'teacher',displayName:'Mësimdhënës'});
+});
+assert.equal(await page.locator('#my-reservations').getByText(/Rezervimi i kolegut/).count(),0);
+assert.equal(await page.locator('#reservations-heading').textContent(),'Rezervimet e mia');
+await page.evaluate(async()=>{
+ window.testStore.set('users/manager',{active:true,role:'admin',canCancelAll:true});
+ await window.testAuth({uid:'manager',displayName:'Administratori'});
+});
+assert.equal(await page.locator('#reservations-heading').textContent(),'Të gjitha rezervimet');
+await page.locator('#my-reservations .slot').filter({hasText:'Rezervimi i kolegut'}).getByRole('button').click();
+await page.locator('#cancel-dialog button[value="cancel"]').click();
+await page.waitForFunction(()=>!window.testStore.has('reservations/someone'));
+assert.equal(await page.evaluate(()=>window.testStore.has('publicBookings/someone')),false);
 await page.evaluate(()=>{window.testFail=true});await page.locator('#room').dispatchEvent('change');
 await page.waitForFunction(()=>document.getElementById('message').textContent.includes('Shërbimi nuk është'));
 assert.doesNotMatch(await page.locator('#message').textContent(),/English SDK/);
