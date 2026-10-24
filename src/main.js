@@ -1,7 +1,7 @@
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, query, where, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { BookingError, selectPeriods, reservationTime, errorText, MAX_PERIODS } from './booking-ui.js';
-import { EVENT_TYPES, slotKeys, conflictMessage } from './booking-resources.js';
+import { EVENT_TYPES, slotKeys, conflictMessage, wordCount } from './booking-resources.js';
 import { auth, db } from './firebase.js';
 
 const $ = (id) => document.getElementById(id);
@@ -153,8 +153,10 @@ async function createReservation(event) {
     try { if (!/^https?:$/.test(new URL(onlineUrl).protocol) || onlineUrl.length > 2000) throw Error(); }
     catch { return bookingMessage('Vendosni një link të vlefshëm që fillon me https:// ose http://.', true); }
   }
+  const description = $('visibility').value === 'public' ? $('description').value.trim().replace(/\s+/gu, ' ') : '';
+  if (wordCount(description) > 500) return bookingMessage('Përshkrimi i aktivitetit nuk mund të ketë më shumë se 500 fjalë.', true);
   const checked = id => [...$(id).querySelectorAll('input:checked')].map(input => input.value);
-  const data = {title, date, roomId, periodIds, groupIds:checked('groups'), teacherIds:checked('teachers'),
+  const data = {title, date, roomId, periodIds, description, groupIds:checked('groups'), teacherIds:checked('teachers'),
     eventType:$('event-type').value, isPublic:$('visibility').value === 'public', mode:$('mode').value, onlineUrl,
     creatorName:currentUser.displayName || 'Mësimdhënës'};
   const reservationRef = doc(collection(db,'reservations'));
@@ -185,6 +187,8 @@ async function createReservation(event) {
       if (keys.length) tx.set(occupancyRef, {bookings:locks, changedReservationId:reservationRef.id});
     });
     $('title').value = '';
+    $('description').value = '';
+    $('description-count').textContent = '0 / 500 fjalë';
     bookingMessage('Rezervimi u krijua me sukses.');
     await Promise.all([readAvailability(),readMyBookings()]);
   } catch (e) { bookingMessage(errText(e),true); }
@@ -254,7 +258,14 @@ $('logout').onclick = async () => { try { await signOut(auth); } catch(e) {messa
 $('date').onchange = () => readAvailability().catch(e => message(errText(e),true));
 $('room').onchange = () => readAvailability().catch(e => message(errText(e),true));
 $('booking-form').onsubmit = createReservation;
-$('visibility').onchange = () => { $('email-notice').hidden = $('visibility').value !== 'public'; };
+$('visibility').onchange = () => {
+  $('email-notice').hidden = $('description-field').hidden = $('visibility').value !== 'public';
+};
+$('description').oninput = () => {
+  const count = wordCount($('description').value);
+  $('description-count').textContent = `${count} / 500 fjalë`;
+  $('description-count').className = count > 500 ? 'error' : '';
+};
 $('mode').onchange = () => { $('online-field').hidden = $('mode').value !== 'online'; };
 for (const id of ['from','through']) $(id).addEventListener('change', () => { $('selection-hint').textContent = ''; });
 onAuthStateChanged(auth,async user => {

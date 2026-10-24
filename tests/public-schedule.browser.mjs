@@ -15,7 +15,16 @@ try {
   `}));
   await page.goto(process.env.PREVIEW_URL || 'http://127.0.0.1:8765');
   await page.waitForFunction(() => window.testReport && !document.getElementById('mainContent').hidden);
-  await page.locator('#bookingDate').fill('2026-10-23');
+  await page.locator('#bookingDate').evaluate((el,date)=>{el.value=date},'2026-10-23');
+  assert.equal(await page.locator('#bookingDate').isVisible(),false);
+  assert.equal(await page.locator('#weekNavigation').isVisible(),true);
+  await page.click('#nextWeek');assert.equal(await page.locator('#bookingDate').inputValue(),'2026-10-26');
+  assert.equal(await page.evaluate(()=>window.testDate),'2026-10-26');
+  await page.click('#previousWeek');assert.equal(await page.locator('#bookingDate').inputValue(),'2026-10-19');
+  await page.click('#navFree');assert.equal(await page.locator('#bookingDate').isVisible(),true);
+  assert.equal(await page.locator('#weekNavigation').isVisible(),false);
+  await page.locator('#bookingDate').fill('2026-10-23');await page.locator('#bookingDate').dispatchEvent('change');
+  await page.click('#navSchedules');assert.equal(await page.locator('#bookingDate').isVisible(),false);
   await page.selectOption('#category','rooms');
   const roomName = await page.locator('#entity').inputValue();
   const result = {status:'ready',date:'2026-10-23',day:{weekday:'5',fetActive:false,bookingAllowed:true},rooms:[{id:'r1',name:roomName}],rows:[]};
@@ -56,11 +65,12 @@ try {
   for (const kind of ['subgroups','teachers']) {
     await page.selectOption('#category',kind);
     const name=await page.locator('#entity').inputValue();
-    const selected={...booking,title:'Konferencë online',eventType:'Konferencë',room:'',groups:kind==='subgroups'?[name]:[],groupNames:kind==='subgroups'?[name]:[],teachers:kind==='teachers'?[name]:[],isPublic:false,mode:'online',onlineUrl:'https://example.test/event'};
+    const selected={...booking,title:'Konferencë online',description:'Përshkrimi i konferencës',eventType:'Konferencë',room:'',groups:kind==='subgroups'?[name]:[],groupNames:kind==='subgroups'?[name]:[],teachers:kind==='teachers'?[name]:[],isPublic:false,mode:'online',onlineUrl:'https://example.test/event'};
     await page.evaluate(value=>window.testReport(value),{...result,rows:[selected]});
     assert.equal(await page.locator('#agendaView .reservation-event').count(),1);
     await page.locator('#agendaView .reservation-event').click();
     assert.match(await page.locator('#modalDetails').textContent(),/Pa sallë/);
+    assert.match(await page.locator('#modalDetails').textContent(),/Përshkrimi i konferencës/);
     assert.equal(await page.locator('#modalDetails a').getAttribute('href'),'https://example.test/event');
     assert.equal(await page.locator('#modalDetails a').getAttribute('rel'),'noopener noreferrer');
     await page.click('#closeDialog');
@@ -90,10 +100,10 @@ try {
   await page.evaluate(value=>window.testReport(value),result);
   assert.equal(await page.locator('.reservation-event').count(),0);
   await page.selectOption('#category','rooms');
-  await page.locator('#bookingDate').fill('2026-10-30');
+  await page.locator('#bookingDate').evaluate((el,date)=>{el.value=date},'2026-10-30');
   await page.locator('#bookingDate').dispatchEvent('change');
   assert.equal(await page.locator('.reservation-event').count(),0);
-  await page.locator('#bookingDate').fill('2026-10-23');
+  await page.locator('#bookingDate').evaluate((el,date)=>{el.value=date},'2026-10-23');
   await page.click('#navFree');
   await page.evaluate(value => window.testReport(value),result);
   assert.equal(await page.locator('.room-choice').count(),1);
@@ -103,7 +113,7 @@ try {
   await page.evaluate(() => window.testReport({status:'error',message:'Offline'}));
   assert.equal(await page.locator('.room-choice').count(),0);
   assert.match(await page.locator('#freeCount').textContent(),/nuk mund/);
-  await page.locator('#bookingDate').fill('2026-10-24');
+  await page.locator('#bookingDate').evaluate((el,date)=>{el.value=date},'2026-10-24');
   await page.locator('#bookingDate').dispatchEvent('change');
   assert.equal(await page.evaluate(() => window.testDate),'2026-10-24');
   assert.equal(await page.locator('.room-choice').count(),0);

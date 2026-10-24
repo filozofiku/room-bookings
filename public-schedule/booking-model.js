@@ -43,7 +43,7 @@ export function reservationEvents(rows, room, dates, days, times, kind = 'rooms'
       const s = times.indexOf(run.start), e = times.indexOf(run.end);
       if (s < 0 || e <= s) throw Error('Orët e rezervimit nuk përputhen me orarin zyrtar.');
       return {d:dayIndex(days,new Date(`${b.date}T12:00:00Z`).getUTCDay()),s,e,
-        t:b.title,r:b.room || 'Pa sallë',a:b.eventType || 'Rezervim',g:b.groups?.join(', ') || 'Pa grup të studentëve',p:b.teachers?.join(', ') || 'Pa mësimdhënës',booking:true,date:b.date,mode:b.mode,onlineUrl:b.onlineUrl,
+        t:b.title,r:b.room || 'Pa sallë',a:b.eventType || 'Rezervim',g:b.groups?.join(', ') || 'Pa grup të studentëve',p:b.teachers?.join(', ') || 'Pa mësimdhënës',booking:true,date:b.date,mode:b.mode,onlineUrl:b.onlineUrl,description:b.description,
         creatorName:b.creatorName || 'Emri nuk është i disponueshëm',createdAt:b.createdAt};
     });
   });

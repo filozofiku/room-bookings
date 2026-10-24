@@ -18,6 +18,9 @@
     body{margin:0;background:var(--page);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:15px;line-height:1.45}
     button,input,select{font:inherit}
     button{cursor:pointer}
+    #weekNavigation:not([hidden]){display:flex;align-items:center;gap:12px;max-width:480px}
+    #weekNavigation button{min-width:44px;min-height:44px;flex-shrink:0}
+    #weekRange{flex:1;min-width:0;text-align:center}
     button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:3px solid #56b6bf;outline-offset:2px}
     [hidden]{display:none!important}
     .wrap{max-width:1340px;margin:0 auto;padding-left:clamp(16px,4vw,46px);padding-right:clamp(16px,4vw,46px)}
@@ -152,9 +155,10 @@
   </nav>
 
   <div class="card filters">
-    <label for="bookingDate">Data — shfaq javën përkatëse</label>
-    <input type="date" id="bookingDate">
-    <p class="hint">Rezervimet shfaqen në orarin e sallës, vetëm në javën e zgjedhur. Kliko rezervimin për emrin dhe kohën e krijimit.</p>
+    <div id="dateNavigation" hidden><label for="bookingDate">Data</label>
+    <input type="date" id="bookingDate"></div>
+    <div id="weekNavigation"><button type="button" id="previousWeek" class="tool-btn" aria-label="Java e mëparshme">←</button> <span id="weekRange" aria-live="polite"></span> <button type="button" id="nextWeek" class="tool-btn" aria-label="Java e ardhshme">→</button></div>
+    <p class="hint">Rezervimet shfaqen në orar, vetëm në javën e zgjedhur. Kliko rezervimin për emrin dhe kohën e krijimit.</p>
     <p id="bookingStatus" role="status" aria-live="polite">Duke ngarkuar rezervimet…</p>
   </div>
 
@@ -256,12 +260,29 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     if (publicState.status !== 'ready') return recurring;
     return [...recurring,...reservationEvents(publicState.rows,state.item?.n,datesInView(),data.days,data.times,state.type)];
   }
+  function updateWeekRange() {
+    const dates = datesInView();
+    $('weekRange').textContent = `Java ${dates[0]} – ${dates[6]}`;
+  }
+  function moveWeek(offset) {
+    const date = new Date(`${datesInView()[0]}T12:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + offset * 7);
+    $('bookingDate').value = date.toISOString().slice(0,10);
+    $('bookingDate').dispatchEvent(new Event('change'));
+  }
   async function startBookings() {
     $('bookingDate').value = localDate();
+    updateWeekRange();
+    let selectBookings = null;
+    $('bookingDate').addEventListener('change', () => {
+      updateWeekRange();
+      if (selectBookings) selectBookings($('bookingDate').value);
+      else { display(); renderFree(); }
+    });
     try {
       const [{connectBookings}, {default:config}] = await Promise.all([import('./public-bookings.js'), import('./firebase-config.js')]);
       await connectBookings(config, selectDate => {
-        $('bookingDate').addEventListener('change', () => selectDate($('bookingDate').value));
+        selectBookings = selectDate;
         selectDate($('bookingDate').value);
       }, renderBookings);
     } catch(error) {
@@ -388,6 +409,8 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
   }
   function switchPage(page, update=true){
     state.page = page;
+    $("dateNavigation").hidden = page !== "free";
+    $("weekNavigation").hidden = page !== "schedules";
     $("schedulesPanel").hidden = page !== "schedules";
     $("freePanel").hidden = page !== "free";
     $("navSchedules").classList.toggle("active",page==="schedules");
@@ -503,7 +526,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     $("modalTitle").textContent=e.t;
     $("modalTag").textContent=e.a || "Aktivitet mësimor";
     const pairs=[["Dita",data.days[e.d]],["Ora",hours(e)],["Studentët / Grupi",e.g],["Mësimdhënësi",e.p],["Salla",e.r]];
-    if(e.booking) pairs.push(["Data",e.date],["Rezervuar nga",e.creatorName],["Rezervimi u krijua më",bookingTimestamp(e.createdAt)],["Mënyra e zhvillimit",e.mode === "online" ? "Online" : e.mode === "physical" ? "Fizik" : ""]);
+    if(e.booking) pairs.push(["Përshkrimi",e.description],["Data",e.date],["Rezervuar nga",e.creatorName],["Rezervimi u krijua më",bookingTimestamp(e.createdAt)],["Mënyra e zhvillimit",e.mode === "online" ? "Online" : e.mode === "physical" ? "Fizik" : ""]);
     $("modalDetails").innerHTML=pairs.filter(([,v])=>v).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
     if(e.booking && e.mode === 'online' && /^https?:\/\//i.test(e.onlineUrl || '')) {
       const dt=document.createElement('dt'), dd=document.createElement('dd'), link=document.createElement('a');
@@ -552,6 +575,8 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     for(const id of ["freeDay","freeStart","freeEnd"]) $(id).addEventListener("change",renderFree);
     renderFree();
   }
+  $('previousWeek').addEventListener('click', () => moveWeek(-1));
+  $('nextWeek').addEventListener('click', () => moveWeek(1));
   $("category").addEventListener("change",e=>setCategory(e.target.value));
   $("lookup").addEventListener("input",e=>{state.query=e.target.value;state.item=null;options();});
   $("entity").addEventListener("change",e=>{state.item=ordered[state.type].find(x=>x.n===e.target.value)||null;display();});

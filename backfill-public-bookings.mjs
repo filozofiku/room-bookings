@@ -11,7 +11,7 @@ const publicData = (data, creatorName) => {
   if (typeof title !== 'string' || !date || typeof roomId !== 'string' || !Array.isArray(periodIds) || !periodIds.length) {
     throw new Error('Incomplete reservation; nothing should be published until corrected.');
   }
-  const metadata = Object.fromEntries(['groupIds','teacherIds','eventType','isPublic','mode','onlineUrl'].filter(key=>key in data).map(key=>[key,data[key]]));
+  const metadata = Object.fromEntries(['groupIds','teacherIds','eventType','isPublic','mode','onlineUrl','description'].filter(key=>key in data).map(key=>[key,data[key]]));
   return {title,date,roomId,periodIds,...metadata, ...(creatorName ? {creatorName,createdAt:data.createdAt || null} : {})};
 };
 // Validate the complete snapshot before writing anything.

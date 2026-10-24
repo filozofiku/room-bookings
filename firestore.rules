@@ -58,7 +58,7 @@ service cloud.firestore {
       return !day.fetActive || !get(/databases/$(database)/documents/weeklyResources/$(day.weekday)).data.busyKeys.hasAny(expected);
     }
     function valid(d) {
-      return d.keys().hasOnly(['title','date','roomId','periodIds','ownerUid','creatorName','createdAt','groupIds','teacherIds','eventType','isPublic','mode','onlineUrl']) &&
+      return d.keys().hasOnly(['title','date','roomId','periodIds','ownerUid','creatorName','createdAt','groupIds','teacherIds','eventType','isPublic','mode','onlineUrl','description']) &&
         d.ownerUid == request.auth.uid && d.creatorName == request.auth.token.get('name','Mësimdhënës') &&
         d.title is string && d.title.size() > 0 && d.title.size() <= 120 &&
         d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
@@ -68,6 +68,9 @@ service cloud.firestore {
         d.periodIds is list && d.periodIds.size() > 0 && d.periodIds.size() <= 16 &&
         controls().periodOrder.keys().hasAll(d.periodIds) && d.periodIds.join(',') in controls().validPeriodRanges &&
         d.eventType in ['Zëvendësim i mësimit','Konferencë','Panel','Mbrojtje publike'] &&
+        d.get('description','') is string &&
+        d.get('description','').split('\\s+').removeAll(['']).size() <= 500 &&
+        (d.isPublic || d.get('description','') == '') &&
         d.isPublic is bool && d.mode in ['physical','online'] && d.onlineUrl is string &&
         (d.mode == 'physical' ? d.onlineUrl == '' : (d.onlineUrl.size() <= 2000 && d.onlineUrl.matches('^https?://[^ /]+.*$'))) &&
         d.createdAt == request.time;

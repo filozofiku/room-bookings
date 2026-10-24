@@ -6,6 +6,12 @@ njoftimit me email; **nuk dërgohet email** dhe hollësitë e të gjitha rezervi
 mbeten publike në oraret e burimeve të përzgjedhura. Çdo aktivitet pa sallë shfaqet edhe te “Ngjarjet e tjera” në orarin publik,
 përfshirë aktivitetet pa grupe ose mësimdhënës.
 
+Konfliktet për grupe, sallë dhe mësimdhënës shfaqen së bashku pranë butonit të
+rezervimit. Aktivitetet publike mund të kenë përshkrim deri në 500 fjalë, i cili
+shfaqet në hollësitë e aktivitetit në orarin publik. Kufiri kontrollohet edhe nga
+rregullat e Firebase. Te “Orari mësimor” navigimi bëhet me shigjeta javore;
+te “Sallat e lira” mbetet zgjedhja e datës.
+
 Modeli aktiv:
 - `resourceCatalog/current`: emrat dhe identifikuesit e sallave, grupeve dhe mësimdhënësve.
 - `weeklyResources/{weekday}`: intervalet e zëna sipas tre eksporteve zyrtare HTML.
