@@ -14,7 +14,7 @@ service cloud.firestore {
         get(userPath()).data.role in ['teacher', 'admin'];
     }
     function canBook(date) {
-      return approved() && controls().bookingOpen == true && controls().slotStorage == 'daily-v1' &&
+      return approved() && controls().bookingOpen == true && controls().slotStorage == 'resources-v2' &&
         date >= controls().startDate && date <= controls().endDate &&
         dayAllowed(date);
     }
@@ -24,36 +24,56 @@ service cloud.firestore {
     function dayAllowed(date) {
       return exists(dayPath(date)) && get(dayPath(date)).data.bookingAllowed == true;
     }
-    // Each weekday+room stores its occupied periods in one admin-owned doc.
-    // calendarDays is admin-managed, so a client cannot forge weekday mapping.
-    function freeOfFet(d) {
-      let dateInfo = get(dayPath(d.date)).data;
-      let key = dateInfo.weekday + '__' + d.roomId;
-      return dateInfo.fetActive == false ||
-        !exists(/databases/$(database)/documents/weeklyRooms/$(key)) ||
-        !get(/databases/$(database)/documents/weeklyRooms/$(key)).data.busyPeriods.hasAny(d.periodIds);
+    function catalog() { return get(/databases/$(database)/documents/resourceCatalog/current).data; }
+    function resources(d) {
+      return d.get('groupIds', []).concat(d.get('teacherIds', [])).concat(d.roomId == '' ? [] : [d.roomId]);
     }
-    // One occupancy document avoids per-operation document access limits.
-    function consecutive(ids, order) {
-      return (ids.size() < 1 || order[ids[0]] == order[ids[0]] + 0) &&
-        (ids.size() < 2 || order[ids[1]] == order[ids[0]] + 1) &&
-        (ids.size() < 3 || order[ids[2]] == order[ids[0]] + 2) &&
-        (ids.size() < 4 || order[ids[3]] == order[ids[0]] + 3) &&
-        (ids.size() < 5 || order[ids[4]] == order[ids[0]] + 4) &&
-        (ids.size() < 6 || order[ids[5]] == order[ids[0]] + 5) &&
-        (ids.size() < 7 || order[ids[6]] == order[ids[0]] + 6) &&
-        (ids.size() < 8 || order[ids[7]] == order[ids[0]] + 7) &&
-        (ids.size() < 9 || order[ids[8]] == order[ids[0]] + 8) &&
-        (ids.size() < 10 || order[ids[9]] == order[ids[0]] + 9) &&
-        (ids.size() < 11 || order[ids[10]] == order[ids[0]] + 10) &&
-        (ids.size() < 12 || order[ids[11]] == order[ids[0]] + 11) &&
-        (ids.size() < 13 || order[ids[12]] == order[ids[0]] + 12) &&
-        (ids.size() < 14 || order[ids[13]] == order[ids[0]] + 13) &&
-        (ids.size() < 15 || order[ids[14]] == order[ids[0]] + 14) &&
-        (ids.size() < 16 || order[ids[15]] == order[ids[0]] + 15);
+    function periodKeys(ids, periods, index) {
+      return index >= periods.size() ? [] :
+        (ids.join('__' + periods[index] + '|') + '__' + periods[index]).split('[|]');
     }
-    function occupancyChange(id, d, creating) {
-      let path = /databases/$(database)/documents/roomDays/$(d.date + '__' + d.roomId);
+    function keys(d) {
+      let ids = resources(d);
+      let p = d.periodIds;
+      return ids.size() == 0 ? [] :
+        periodKeys(ids, p, 0)
+        .concat(periodKeys(ids, p, 1))
+        .concat(periodKeys(ids, p, 2))
+        .concat(periodKeys(ids, p, 3))
+        .concat(periodKeys(ids, p, 4))
+        .concat(periodKeys(ids, p, 5))
+        .concat(periodKeys(ids, p, 6))
+        .concat(periodKeys(ids, p, 7))
+        .concat(periodKeys(ids, p, 8))
+        .concat(periodKeys(ids, p, 9))
+        .concat(periodKeys(ids, p, 10))
+        .concat(periodKeys(ids, p, 11))
+        .concat(periodKeys(ids, p, 12))
+        .concat(periodKeys(ids, p, 13))
+        .concat(periodKeys(ids, p, 14))
+        .concat(periodKeys(ids, p, 15));
+    }
+    function freeOfFet(d, expected) {
+      let day = get(dayPath(d.date)).data;
+      return !day.fetActive || !get(/databases/$(database)/documents/weeklyResources/$(day.weekday)).data.busyKeys.hasAny(expected);
+    }
+    function valid(d) {
+      return d.keys().hasOnly(['title','date','roomId','periodIds','ownerUid','creatorName','createdAt','groupIds','teacherIds','eventType','isPublic','mode','onlineUrl']) &&
+        d.ownerUid == request.auth.uid && d.creatorName == request.auth.token.get('name','Mësimdhënës') &&
+        d.title is string && d.title.size() > 0 && d.title.size() <= 120 &&
+        d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+        d.roomId is string && (d.roomId == '' || d.roomId in catalog().rooms) &&
+        d.groupIds is list && d.groupIds.toSet().size() == d.groupIds.size() && catalog().groups.keys().hasAll(d.groupIds) &&
+        d.teacherIds is list && d.teacherIds.toSet().size() == d.teacherIds.size() && catalog().teachers.keys().hasAll(d.teacherIds) &&
+        d.periodIds is list && d.periodIds.size() > 0 && d.periodIds.size() <= 16 &&
+        controls().periodOrder.keys().hasAll(d.periodIds) && d.periodIds.join(',') in controls().validPeriodRanges &&
+        d.eventType in ['Zëvendësim i mësimit','Konferencë','Panel','Mbrojtje publike'] &&
+        d.isPublic is bool && d.mode in ['physical','online'] && d.onlineUrl is string &&
+        (d.mode == 'physical' ? d.onlineUrl == '' : (d.onlineUrl.size() <= 2000 && d.onlineUrl.matches('^https?://[^ /]+.*$'))) &&
+        d.createdAt == request.time;
+    }
+    function occupancyChange(id, d, creating, expected) {
+      let path = /databases/$(database)/documents/eventDays/$(d.date);
       let before = exists(path) ? get(path).data.bookings : {};
       let after = getAfter(path).data;
       let diff = after.bookings.diff(before);
@@ -62,22 +82,22 @@ service cloud.firestore {
       // 16 separate map-value checks and the 1000-expression evaluation limit.
       return after.changedReservationId == id &&
         (creating ?
-          (diff.addedKeys() == d.periodIds.toSet() && diff.changedKeys().size() == 0 && diff.removedKeys().size() == 0 &&
+          (diff.addedKeys() == expected.toSet() && diff.changedKeys().size() == 0 && diff.removedKeys().size() == 0 &&
            after.bookings.values().removeAll([id]).size() == before.values().removeAll([id]).size()) :
-          (diff.removedKeys() == d.periodIds.toSet() && diff.changedKeys().size() == 0 && diff.addedKeys().size() == 0 &&
+          (diff.removedKeys() == expected.toSet() && diff.changedKeys().size() == 0 && diff.addedKeys().size() == 0 &&
            after.bookings.values().removeAll([id]).size() == before.values().removeAll([id]).size()));
     }
-    // Legacy four-field publications remain valid while older clients reload.
+    function occupancyWritten(id, d) {
+      let path = /databases/$(database)/documents/eventDays/$(d.date);
+      return getAfter(path).data.changedReservationId == id &&
+        (!exists(path) || getAfter(path).data.bookings != get(path).data.bookings);
+    }
     function publicMatches(id, d) {
       let p = getAfter(/databases/$(database)/documents/publicBookings/$(id)).data;
-      return p.keys().hasOnly(['title', 'date', 'roomId', 'periodIds', 'creatorName', 'createdAt']) &&
-        p.title == d.title && p.date == d.date &&
-        p.roomId == d.roomId && p.periodIds == d.periodIds &&
-        ((!p.keys().hasAny(['creatorName', 'createdAt'])) ||
-          (p.keys().hasAll(['creatorName', 'createdAt']) &&
-           p.creatorName == request.auth.token.get('name', 'Mësimdhënës') &&
-           p.createdAt == d.createdAt));
+      return !p.keys().hasAny(['ownerUid']) && d.diff(p).affectedKeys() == ['ownerUid'].toSet();
     }
+    match /resourceCatalog/{id} { allow read: if true; allow write: if false; }
+    match /weeklyResources/{id} { allow read: if approved(); allow write: if false; }
     match /users/{uid} {
       allow get: if request.auth != null && request.auth.uid == uid;
       allow list, create, update, delete: if false;
@@ -105,36 +125,14 @@ service cloud.firestore {
     }
     match /reservations/{reservationId} {
       allow read: if approved();
-      allow create: if canBook(request.resource.data.date) &&
-        request.resource.data.keys().hasOnly([
-          'title', 'date', 'roomId', 'periodIds', 'ownerUid', 'createdAt'
-        ]) &&
-        request.resource.data.keys().hasAll([
-          'title', 'date', 'roomId', 'periodIds', 'ownerUid', 'createdAt'
-        ]) &&
-        request.resource.data.ownerUid == request.auth.uid &&
-        request.resource.data.title is string &&
-        request.resource.data.title.size() > 0 &&
-        request.resource.data.title.size() <= 120 &&
-        request.resource.data.date is string &&
-        request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
-        request.resource.data.roomId is string &&
-        request.resource.data.roomId.matches('^r_[0-9a-f]{12}$') &&
-        request.resource.data.periodIds is list &&
-        request.resource.data.periodIds.size() >= 1 &&
-        request.resource.data.periodIds.size() <= 16 &&
-        request.resource.data.periodIds.toSet().size() == request.resource.data.periodIds.size() &&
-        request.resource.data.createdAt == request.time &&
-        exists(/databases/$(database)/documents/rooms/$(request.resource.data.roomId)) &&
-        consecutive(request.resource.data.periodIds, controls().periodOrder) &&
-        occupancyChange(reservationId, request.resource.data, true) &&
-        freeOfFet(request.resource.data) &&
+      allow create: if canBook(request.resource.data.date) && valid(request.resource.data) &&
+        (resources(request.resource.data).size() == 0 || occupancyWritten(reservationId, request.resource.data)) &&
         publicMatches(reservationId, request.resource.data);
       allow update: if false;
       allow delete: if approved() && controls().bookingOpen == true &&
         resource.data.ownerUid == request.auth.uid &&
-        controls().slotStorage == 'daily-v1' &&
-        occupancyChange(reservationId, resource.data, false) &&
+        controls().slotStorage == 'resources-v2' &&
+        (resources(resource.data).size() == 0 || occupancyWritten(reservationId, resource.data)) &&
         !existsAfter(/databases/$(database)/documents/publicBookings/$(reservationId));
     }
     match /publicBookings/{id} {
@@ -147,24 +145,27 @@ service cloud.firestore {
         get(/databases/$(database)/documents/reservations/$(id)).data.ownerUid == request.auth.uid &&
         !existsAfter(/databases/$(database)/documents/reservations/$(id));
     }
-    match /roomDays/{key} {
+    match /eventDays/{key} {
       allow read: if approved();
       function validChange() {
         let id = request.resource.data.changedReservationId;
         let path = /databases/$(database)/documents/reservations/$(id);
         let creating = !exists(path);
         let booking = creating ? getAfter(path).data : get(path).data;
-        return key == booking.date + '__' + booking.roomId &&
+        let expected = keys(booking);
+        return key == booking.date && resources(booking).size() > 0 &&
           booking.ownerUid == request.auth.uid &&
-          (creating ? existsAfter(path) : !existsAfter(path));
+          (creating ? existsAfter(path) : !existsAfter(path)) &&
+          occupancyChange(id, booking, creating, expected) && (!creating || freeOfFet(booking, expected));
       }
       allow create, update: if approved() && controls().bookingOpen == true &&
-        controls().slotStorage == 'daily-v1' &&
+        controls().slotStorage == 'resources-v2' &&
         request.resource.data.keys().hasOnly(['bookings', 'changedReservationId']) &&
         request.resource.data.bookings is map &&
         request.resource.data.changedReservationId is string && validChange();
       allow delete: if false;
     }
+    match /roomDays/{key} { allow read: if approved(); allow write: if false; }
     // Historical per-period locks are retained for reference; daily locks are authoritative.
     match /roomSlots/{slotId} {
       allow read: if approved();

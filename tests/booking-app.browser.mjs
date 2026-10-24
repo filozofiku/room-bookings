@@ -17,11 +17,12 @@ return {id:'p'+String(i+1).padStart(2,'0'),start:time(i),end:time(i+1),label:tim
 const room='r_123456abcdef', date='2026-10-23';
 const store=new Map([
 ['users/teacher',{active:true,role:'teacher'}],
-['settings/control',{bookingOpen:true,slotStorage:'daily-v1',startDate:date,endDate:date}],
+['settings/control',{bookingOpen:true,slotStorage:'resources-v2',startDate:date,endDate:date}],
 ['rooms/'+room,{name:'Salla 014'}],
 ['calendarDays/'+date,{weekday:'5',bookingAllowed:true,fetActive:true}],
-['weeklyRooms/5__'+room,{busyPeriods:['p18']}],
-['roomDays/'+date+'__'+room,{bookings:{p17:'existing'},changedReservationId:'existing'}],
+['resourceCatalog/current',{groups:{g_one:'Grupi 1',g_two:'Grupi 2'},teachers:{t_one:'Mësimdhënësi 1',t_two:'Mësimdhënësi 2'}}],
+['weeklyResources/5',{busyKeys:[room+'__p18']}],
+['eventDays/'+date,{bookings:{[room+'__p17']:'existing'},changedReservationId:'existing'}],
 ['reservations/existing',{date,roomId:room,periodIds:['p17'],title:'Mbledhje',ownerUid:'teacher'}],
 ...periods.map(p=>['periods/'+p.id,p])]);
 window.testStore=store;
@@ -49,7 +50,7 @@ else if(path==='/auth.js')body=authModule;
 else if(path==='/firestore.js')body=firestoreModule;
 else if(path==='/src/firebase.js')body='export const auth={};export const db={};';
 else if(path==='/src/main.js')body=readFileSync('src/main.js','utf8').replaceAll("'firebase/auth'","'/auth.js'").replaceAll("'firebase/firestore'","'/firestore.js'");
-else if(path==='/src/booking-ui.js')body=readFileSync('src/booking-ui.js','utf8');
+else if(['/src/booking-ui.js','/src/booking-resources.js'].includes(path))body=readFileSync(path.slice(1),'utf8');
 else return route.abort();
 return route.fulfill({contentType,body});
 });
@@ -94,6 +95,44 @@ await page.locator('#my-reservations .slot').filter({hasText:'Seminar'}).getByRo
 await page.locator('#cancel-dialog button[value="cancel"]').click();
 await page.waitForFunction(()=>document.getElementById('message').textContent.includes('u anulua'));
 assert.equal(await page.evaluate(()=>window.testStore.has('reservations/new')),false);
+// Optional resources, metadata, and exact conflict messages.
+assert.deepEqual(await page.locator('#event-type option').allTextContents(),['Zëvendësim i mësimit','Konferencë','Panel','Mbrojtje publike']);
+await page.selectOption('#room','');
+await page.fill('#title','Ngjarje online');await page.selectOption('#through','p02');
+await page.selectOption('#event-type','Konferencë');
+await page.selectOption('#visibility','public');assert.equal(await page.locator('#email-notice').isVisible(),true);
+await page.selectOption('#mode','online');assert.equal(await page.locator('#online-field').isVisible(),true);
+await page.fill('#online-url','javascript:alert(1)');await page.locator('#booking-form button').click();
+assert.match(await page.locator('#message').textContent(),/link të vlefshëm/);
+await page.fill('#online-url','https://example.test/event');
+await page.locator('#booking-form button').click();
+await page.waitForFunction(()=>document.getElementById('message').textContent.includes('u krijua me sukses'));
+assert.deepEqual(await page.evaluate(()=>{const d=window.testStore.get('reservations/new');return [d.roomId,d.groupIds,d.teacherIds,d.isPublic,d.mode,d.onlineUrl,d.eventType]}),['',[],[],true,'online','https://example.test/event','Konferencë']);
+await page.locator('#my-reservations .slot').filter({hasText:'Ngjarje online'}).getByRole('button').click();await page.locator('#cancel-dialog button[value="cancel"]').click();
+await page.waitForFunction(()=>!window.testStore.has('reservations/new'));
+await page.selectOption('#mode','physical');assert.equal(await page.locator('#online-field').isVisible(),false);
+await page.selectOption('#visibility','private');assert.equal(await page.locator('#email-notice').isVisible(),false);
+await page.fill('#title','Panel');
+for(const [selector,key,error] of [['#groups input[value="g_one"]','g_one','Grupi i studentëve'],['#teachers input[value="t_one"]','t_one','Mësimdhënësi']]) {
+ await page.locator(selector).check();
+ for(const source of ['fet','booking']) {
+  await page.evaluate(({source,key})=>{window.testStore.set('weeklyResources/5',{busyKeys:source==='fet'?[key+'__p01']:[]});window.testStore.set('eventDays/2026-10-23',{bookings:source==='booking'?{[key+'__p01']:'occupied'}:{}})},{source,key});
+  await page.locator('#booking-form button').click();
+  assert.equal(await page.locator('#message').textContent(),error+' nuk është i lirë në intervalin e përzgjedhur.');
+ }
+ await page.locator(selector).uncheck();
+}
+await page.selectOption('#room','r_123456abcdef');
+await page.evaluate(()=>window.testStore.set('weeklyResources/5',{busyKeys:['r_123456abcdef__p01']}));
+await page.locator('#booking-form button').click();
+assert.equal(await page.locator('#message').textContent(),'Salla nuk është e lirë në intervalin e përzgjedhur.');
+await page.evaluate(()=>{window.testStore.set('weeklyResources/5',{busyKeys:[]});window.testStore.set('eventDays/2026-10-23',{bookings:{}})});
+await page.locator('#groups input').first().check();await page.locator('#groups input').last().check();
+await page.locator('#teachers input').first().check();await page.locator('#teachers input').last().check();
+await page.locator('#booking-form button').click();
+await page.waitForFunction(()=>window.testStore.has('reservations/new'));
+assert.deepEqual(await page.evaluate(()=>{const d=window.testStore.get('reservations/new');return [d.groupIds,d.teacherIds,d.onlineUrl,d.isPublic]}),[['g_one','g_two'],['t_one','t_two'],'',false]);
+assert.equal(await page.evaluate(()=>Object.keys(window.testStore.get('eventDays/2026-10-23').bookings).length),10);
 await page.evaluate(()=>{window.testFail=true});await page.locator('#room').dispatchEvent('change');
 await page.waitForFunction(()=>document.getElementById('message').textContent.includes('Shërbimi nuk është'));
 assert.doesNotMatch(await page.locator('#message').textContent(),/English SDK/);

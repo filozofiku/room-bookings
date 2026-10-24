@@ -8,10 +8,11 @@ const apply = process.argv.includes('--apply');
 const existing = await db.collection('reservations').get();
 const publicData = (data, creatorName) => {
   const {title, date, roomId, periodIds} = data;
-  if (typeof title !== 'string' || !date || !roomId || !Array.isArray(periodIds) || !periodIds.length) {
+  if (typeof title !== 'string' || !date || typeof roomId !== 'string' || !Array.isArray(periodIds) || !periodIds.length) {
     throw new Error('Incomplete reservation; nothing should be published until corrected.');
   }
-  return {title,date,roomId,periodIds, ...(creatorName ? {creatorName,createdAt:data.createdAt || null} : {})};
+  const metadata = Object.fromEntries(['groupIds','teacherIds','eventType','isPublic','mode','onlineUrl'].filter(key=>key in data).map(key=>[key,data[key]]));
+  return {title,date,roomId,periodIds,...metadata, ...(creatorName ? {creatorName,createdAt:data.createdAt || null} : {})};
 };
 // Validate the complete snapshot before writing anything.
 existing.docs.forEach(item => publicData(item.data()));

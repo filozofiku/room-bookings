@@ -252,8 +252,8 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
   function dayHeading(d) { return `${data.days[d]} · ${dateForDay(d)}`; }
   function visibleEvents() {
     const recurring = (state.item?.e || []).filter(e => publicState.days?.[dateForDay(e.d)]?.fetActive !== false);
-    if (state.type !== 'rooms' || publicState.status !== 'ready') return recurring;
-    return [...recurring,...reservationEvents(publicState.rows,state.item?.n,datesInView(),data.days,data.times)];
+    if (publicState.status !== 'ready') return recurring;
+    return [...recurring,...reservationEvents(publicState.rows,state.item?.n,datesInView(),data.days,data.times,state.type)];
   }
   async function startBookings() {
     $('bookingDate').value = localDate();
@@ -501,8 +501,13 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     $("modalTitle").textContent=e.t;
     $("modalTag").textContent=e.a || "Aktivitet mësimor";
     const pairs=[["Dita",data.days[e.d]],["Ora",hours(e)],["Studentët / Grupi",e.g],["Mësimdhënësi",e.p],["Salla",e.r]];
-    if(e.booking) pairs.push(["Data",e.date],["Rezervuar nga",e.creatorName],["Rezervimi u krijua më",bookingTimestamp(e.createdAt)]);
+    if(e.booking) pairs.push(["Data",e.date],["Rezervuar nga",e.creatorName],["Rezervimi u krijua më",bookingTimestamp(e.createdAt)],["Mënyra e zhvillimit",e.mode === "online" ? "Online" : e.mode === "physical" ? "Fizik" : ""]);
     $("modalDetails").innerHTML=pairs.filter(([,v])=>v).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
+    if(e.booking && e.mode === 'online' && /^https?:\/\//i.test(e.onlineUrl || '')) {
+      const dt=document.createElement('dt'), dd=document.createElement('dd'), link=document.createElement('a');
+      dt.textContent='Linku i ngjarjes online'; link.textContent=e.onlineUrl; link.href=e.onlineUrl; link.target='_blank'; link.rel='noopener noreferrer';
+      dd.append(link); $('modalDetails').append(dt,dd);
+    }
     $("detailDialog").showModal();
   }
   function renderFree(){

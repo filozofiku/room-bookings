@@ -89,6 +89,7 @@ console.log(`FET rows: ${records.length}; unassigned room rows: ${unassigned}; r
 admin.initializeApp({credential:admin.credential.applicationDefault()});
 const db=admin.firestore();
 const settings=db.collection('settings').doc('control');
+if ((await settings.get()).data()?.slotStorage === 'resources-v2') throw Error('Use scripts/migrate-resources.mjs with the three HTML exports; CSV does not contain complete student-group occupancy.');
 const apply=flag==='--apply';
 const currentControl = await settings.get();
 if (currentControl.exists && currentControl.data().slotStorage !== 'daily-v1') {

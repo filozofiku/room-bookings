@@ -4,14 +4,14 @@ export function localDate(now = new Date()) {
   }).formatToParts(now).map(p => [p.type, p.value]));
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
-export function bookingRows(bookings, rooms, periods) {
+export function bookingRows(bookings, rooms, periods, catalog = {}) {
   return bookings.map(booking => {
     const room = rooms.find(r => r.id === booking.roomId);
     const slots = booking.periodIds?.map(id => periods.find(p => p.id === id));
-    if (!room || !slots?.length || slots.some(p => !p || !/^\d{2}:\d{2}$/.test(p.start) || !/^\d{2}:\d{2}$/.test(p.end))) {
+    if ((booking.roomId && !room) || !slots?.length || slots.some(p => !p || !/^\d{2}:\d{2}$/.test(p.start) || !/^\d{2}:\d{2}$/.test(p.end))) {
       throw new Error('Rezervimet nuk përputhen me sallat ose orët.');
     }
-    return {...booking, room: room.name, slots: slots.sort((a,b) => a.start.localeCompare(b.start))};
+    return {...booking, room: room?.name || '', groups:(booking.groupIds || []).map(id=>catalog.groups?.[id] || id), groupNames:(booking.groupIds || []).map(id=>catalog.groupNames?.[id] || catalog.groups?.[id] || id), teachers:(booking.teacherIds || []).map(id=>catalog.teachers?.[id] || id), slots: slots.sort((a,b) => a.start.localeCompare(b.start))};
   }).sort((a,b) => a.slots[0].start.localeCompare(b.slots[0].start) || a.room.localeCompare(b.room));
 }
 export function overlaps(booking, roomName, start, end) {
@@ -31,8 +31,8 @@ export function weekDates(date) {
     return next.toISOString().slice(0,10);
   });
 }
-export function reservationEvents(rows, room, dates, days, times) {
-  return rows.filter(b => b.room === room && dates.includes(b.date)).flatMap(b => {
+export function reservationEvents(rows, room, dates, days, times, kind = 'rooms') {
+  return rows.filter(b => (kind === 'rooms' ? b.room === room : kind === 'teachers' ? b.teachers?.includes(room) : b.groupNames?.includes(room) || b.groups?.includes(room)) && dates.includes(b.date)).flatMap(b => {
     const runs = [];
     for (const slot of b.slots) {
       const last = runs.at(-1);
@@ -43,7 +43,7 @@ export function reservationEvents(rows, room, dates, days, times) {
       const s = times.indexOf(run.start), e = times.indexOf(run.end);
       if (s < 0 || e <= s) throw Error('Orët e rezervimit nuk përputhen me orarin zyrtar.');
       return {d:dayIndex(days,new Date(`${b.date}T12:00:00Z`).getUTCDay()),s,e,
-        t:b.title,r:b.room,a:'Rezervim',g:'',p:'',booking:true,date:b.date,
+        t:b.title,r:b.room || 'Pa sallë',a:b.eventType || 'Rezervim',g:b.groups?.join(', ') || 'Pa grup të studentëve',p:b.teachers?.join(', ') || 'Pa mësimdhënës',booking:true,date:b.date,mode:b.mode,onlineUrl:b.onlineUrl,
         creatorName:b.creatorName || 'Emri nuk është i disponueshëm',createdAt:b.createdAt};
     });
   });

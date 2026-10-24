@@ -1,3 +1,47 @@
+## Rezervime me grupe dhe mësimdhënës (resources-v2)
+
+Formulari mbështet katër llojet e aktivitetit, asnjë ose disa grupe/mësimdhënës,
+sallë opsionale dhe zhvillim fizik ose online. “Publik” vlen vetëm për synimin e
+njoftimit me email; **nuk dërgohet email** dhe hollësitë e të gjitha rezervimeve
+mbeten publike në oraret e burimeve të përzgjedhura. Një aktivitet pa asnjë burim
+ruhet te “Rezervimet e mia”, por nuk i përket ndonjë kalendari salle/grupi/mësimdhënësi.
+
+Modeli aktiv:
+- `resourceCatalog/current`: emrat dhe identifikuesit e sallave, grupeve dhe mësimdhënësve.
+- `weeklyResources/{weekday}`: intervalet e zëna sipas tre eksporteve zyrtare HTML.
+- `eventDays/{date}`: hartë `resourceId__periodId → reservationId`, për mbrojtje atomike nga mbivendosjet.
+- `reservations` dhe `publicBookings`: hollësitë e aktivitetit; vetëm dokumenti privat përmban `ownerUid`.
+- `settings/control`: `slotStorage: resources-v2`, `periodOrder`, `validPeriodRanges`; datat dhe përjashtimet mbeten në `calendarDays`.
+
+Për migrim ose përditësim të orarit, përdorni të njëjtat tri HTML si faqja publike:
+
+```sh
+node scripts/migrate-resources.mjs /path/to/public-schedule
+node scripts/migrate-resources.mjs /path/to/public-schedule --apply
+firebase deploy --only firestore:rules --project filozofiku
+# Publikoni aplikacionin dhe skedarët public-schedule në dy faqet GitHub Pages.
+node scripts/migrate-resources.mjs /path/to/public-schedule --reopen
+```
+
+Kërkohet `GOOGLE_APPLICATION_CREDENTIALS`. Kontrolli paraprak nuk shkruan asgjë.
+`--apply` pezullon rezervimet, kontrollon konfliktet ekzistuese, ruan kopje rezervë
+me leje private në `/tmp` dhe përgatit të dhënat. Nëse dështon, rezervimet mbeten
+pezull derisa problemi të zgjidhet. `--reopen` rikthen gjendjen e mëparshme pasi të
+jenë publikuar rregullat dhe të dyja faqet. Eksportet duhet të kenë të njëjtën datë
+gjenerimi dhe të përputhen me periudhat e konfiguruara. Importuesi i vjetër CSV
+refuzon shkrimin kur është aktiv modeli resources-v2.
+
+Testet: `node --test tests/booking-ui.test.mjs tests/booking-model.test.mjs`,
+`tests/booking-app.browser.mjs`, `tests/public-schedule.browser.mjs` dhe
+`tests/public-bookings.rules.mjs` me emulatorin Firestore. Testet e sigurisë
+përfshijnë 1–16 periudha, të gjitha grupet/mësimdhënësit, burime opsionale,
+konflikte FET/rezervimesh, anulim, publikim atomik dhe rezervime të njëkohshme.
+
+---
+
+Udhëzimet e mëposhtme përshkruajnë konfigurimin fillestar dhe modelin historik.
+Për instalimin ekzistues resources-v2 përdorni procedurën më sipër.
+
 # Daily occupancy upgrade (1–16 periods)
 
 The booking interface is in Albanian. Start/end selectors show boundary times,
@@ -187,7 +231,7 @@ Firebase docs on rules emulator: https://firebase.google.com/docs/firestore/secu
 
 ## Limitations / next steps
 
-- Room conflicts are protected; teacher and student subgroup conflicts **are not yet implemented**.
+- Room, teacher and student subgroup conflicts are protected in resources-v2 (see above).
 - Bookings may be created only within the configured semester range; no recurring teacher bookings.
 - Bookings support 1–16 consecutive periods. Daily occupancy maps keep security checks below Firestore access limits.
 - The FET importer models room occupancy, not the full student/teacher activity hierarchy. Store extra metadata separately if you want unified public timetable views.

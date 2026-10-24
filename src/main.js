@@ -1,6 +1,7 @@
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, query, where, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { BookingError, selectPeriods, reservationTime, errorText, MAX_PERIODS } from './booking-ui.js';
+import { EVENT_TYPES, slotKeys, conflictMessage } from './booking-resources.js';
 import { auth, db } from './firebase.js';
 
 const $ = (id) => document.getElementById(id);
@@ -11,6 +12,7 @@ let currentUser = null;
 let rooms = [];
 let periods = [];
 let settings = null;
+let catalog = null;
 let occupied = new Map();
 const errText = errorText;
 function message(text, isError = false) {
@@ -59,18 +61,19 @@ async function readAvailability() {
   if (!currentUser || !rooms.length) return;
   const date = $('date').value;
   const roomId = $('room').value;
-  if (!date || !roomId) return;
+  if (!date) return;
+  if (!roomId) { $('slots').textContent = 'Pa sallë të përzgjedhur.'; return; }
   const daySnap = await getDoc(doc(db,'calendarDays',date));
   if (!daySnap.exists()) throw new BookingError('Data nuk është konfiguruar. Kontaktoni administratorin për importimin e semestrit.');
   const day = daySnap.data();
-  const booked = await getDoc(doc(db,'roomDays',`${date}__${roomId}`));
+  const booked = await getDoc(doc(db,'eventDays',date));
   const locks = booked.exists() ? booked.data().bookings : {};
-  const weeklySnap = day.fetActive ? await getDoc(doc(db,'weeklyRooms',`${day.weekday}__${roomId}`)) : null;
+  const weeklySnap = day.fetActive ? await getDoc(doc(db,'weeklyResources',String(day.weekday))) : null;
   const weeklyData = weeklySnap?.exists() ? weeklySnap.data() : null;
   occupied = new Map(periods.map((p,i) => [p.id,
     !day.bookingAllowed ? {source:'closed'} :
-    locks[p.id] ? {source:'booking'} :
-    day.fetActive && weeklyData?.busyPeriods?.includes(p.id) ?
+    locks[`${roomId}__${p.id}`] ? {source:'booking'} :
+    day.fetActive && weeklyData?.busyKeys?.includes(`${roomId}__${p.id}`) ?
       {source:'fet', ...(weeklyData.activities?.[p.id] || {})} : null
   ]));
   $('slots').replaceChildren();
@@ -105,7 +108,7 @@ async function readMyBookings() {
   if (!sorted.length) { wrapper.textContent = 'Ende nuk keni rezervime.'; return; }
   for (const item of sorted) {
     const data = item.data();
-    const roomName = rooms.find(r => r.id === data.roomId)?.name || data.roomId;
+    const roomName = rooms.find(r => r.id === data.roomId)?.name || data.roomId || 'Pa sallë';
     const div = document.createElement('div');
     div.className = 'slot';
     const description = document.createElement('span');
@@ -137,9 +140,18 @@ async function createReservation(event) {
   if (!title) return message('Shkruani titullin e aktivitetit.', true);
   if (date < settings.startDate || date > settings.endDate) return message('Data është jashtë semestrit të konfiguruar.',true);
   if (!settings.bookingOpen) return message('Rezervimet janë pezulluar gjatë përditësimit të orarit.',true);
+  const onlineUrl = $('mode').value === 'online' ? $('online-url').value.trim() : '';
+  if ($('mode').value === 'online') {
+    try { if (!/^https?:$/.test(new URL(onlineUrl).protocol) || onlineUrl.length > 2000) throw Error(); }
+    catch { return message('Vendosni një link të vlefshëm që fillon me https:// ose http://.', true); }
+  }
+  const checked = id => [...$(id).querySelectorAll('input:checked')].map(input => input.value);
+  const data = {title, date, roomId, periodIds, groupIds:checked('groups'), teacherIds:checked('teachers'),
+    eventType:$('event-type').value, isPublic:$('visibility').value === 'public', mode:$('mode').value, onlineUrl,
+    creatorName:currentUser.displayName || 'Mësimdhënës'};
   const reservationRef = doc(collection(db,'reservations'));
   const publicRef = doc(db,'publicBookings',reservationRef.id);
-  const occupancyRef = doc(db,'roomDays',`${date}__${roomId}`);
+  const occupancyRef = doc(db,'eventDays',date);
   try {
     $('booking-form').querySelector('button').disabled = true;
     await runTransaction(db, async tx => {
@@ -149,21 +161,20 @@ async function createReservation(event) {
       const dayRef = doc(db,'calendarDays',date);
       const settingsSnap = await tx.get(settingsRef);
       const daySnap = await tx.get(dayRef);
-      if (!settingsSnap.exists() || !settingsSnap.data().bookingOpen || settingsSnap.data().slotStorage !== 'daily-v1') throw new BookingError('Rezervimet janë pezulluar.');
+      if (!settingsSnap.exists() || !settingsSnap.data().bookingOpen || settingsSnap.data().slotStorage !== 'resources-v2') throw new BookingError('Rezervimet janë pezulluar.');
       if (!daySnap.exists() || !daySnap.data().bookingAllowed) throw new BookingError('Rezervimet janë të mbyllura për këtë datë.');
       const day = daySnap.data();
-      const weeklyRef = doc(db,'weeklyRooms',`${day.weekday}__${roomId}`);
+      const weeklyRef = doc(db,'weeklyResources',String(day.weekday));
       const occupancy = await tx.get(occupancyRef);
       const locks = occupancy.exists() ? {...occupancy.data().bookings} : {};
       const weeklySnap = day.fetActive ? await tx.get(weeklyRef) : null;
-      if (periodIds.some(p=>locks[p]) ||
-          (weeklySnap?.exists() && weeklySnap.data().busyPeriods.some(p=>periodIds.includes(p)))) {
-        throw new BookingError('Një ose më shumë periudha janë të zëna nga mësimi ose një rezervim.');
-      }
-      tx.set(reservationRef, { title, date, roomId, periodIds, ownerUid: currentUser.uid, createdAt: serverTimestamp() });
-      tx.set(publicRef, {title, date, roomId, periodIds, creatorName:currentUser.displayName || 'Mësimdhënës', createdAt:serverTimestamp()});
-      for (const p of periodIds) locks[p] = reservationRef.id;
-      tx.set(occupancyRef, {bookings:locks, changedReservationId:reservationRef.id});
+      const conflict = conflictMessage(data, locks, weeklySnap?.exists() ? weeklySnap.data().busyKeys : []);
+      if (conflict) throw new BookingError(conflict);
+      tx.set(reservationRef, {...data, ownerUid:currentUser.uid, createdAt:serverTimestamp()});
+      tx.set(publicRef, {...data, createdAt:serverTimestamp()});
+      const keys = slotKeys(data);
+      for (const key of keys) locks[key] = reservationRef.id;
+      if (keys.length) tx.set(occupancyRef, {bookings:locks, changedReservationId:reservationRef.id});
     });
     $('title').value = '';
     message('Rezervimi u krijua me sukses.');
@@ -178,12 +189,12 @@ async function cancelReservation(id) {
     if (!existing.exists()) throw new BookingError('Rezervimi nuk ekziston më.');
     const booking = existing.data();
     if (booking.ownerUid !== currentUser.uid) throw new BookingError('Ky rezervim nuk ju përket juve.');
-    const occupancyRef = doc(db,'roomDays',`${booking.date}__${booking.roomId}`);
+    const occupancyRef = doc(db,'eventDays',booking.date);
     const occupancy = await tx.get(occupancyRef);
     const locks = occupancy.exists() ? {...occupancy.data().bookings} : {};
-    if (booking.periodIds.some(p => locks[p] !== id)) throw new BookingError('Të dhënat e rezervimit nuk përputhen. Kontaktoni administratorin.');
-    booking.periodIds.forEach(p => delete locks[p]);
-    tx.set(occupancyRef, {bookings:locks, changedReservationId:id});
+    if (slotKeys(booking).some(p => locks[p] !== id)) throw new BookingError('Të dhënat e rezervimit nuk përputhen. Kontaktoni administratorin.');
+    slotKeys(booking).forEach(p => delete locks[p]);
+    if (slotKeys(booking).length) tx.set(occupancyRef, {bookings:locks, changedReservationId:id});
     tx.delete(reservationRef);
     tx.delete(doc(db,'publicBookings',id));
   });
@@ -195,17 +206,30 @@ async function loadApp() {
     message(`Keni hyrë me llogarinë Google, por ajo ende nuk është miratuar. Dërgojani administratorit këtë identifikues të llogarisë: ${currentUser.uid}`,true);
     return;
   }
-  const [settingsSnap,roomSnap,periodSnap] = await Promise.all([
+  const [settingsSnap,roomSnap,periodSnap,catalogSnap] = await Promise.all([
     getDoc(doc(db,'settings','control')),
     getDocs(collection(db,'rooms')),
-    getDocs(collection(db,'periods'))
+    getDocs(collection(db,'periods')),
+    getDoc(doc(db,'resourceCatalog','current'))
   ]);
   if (!settingsSnap.exists()) throw new BookingError('Administratori duhet të importojë fillimisht orarin.');
   settings = settingsSnap.data();
-  if (settings.slotStorage !== 'daily-v1') throw new BookingError('Rezervimet po përditësohen. Provoni përsëri së shpejti.');
+  if (settings.slotStorage !== 'resources-v2') throw new BookingError('Rezervimet po përditësohen. Provoni përsëri së shpejti.');
   rooms = roomSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.name.localeCompare(b.name));
   periods = periodSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.id.localeCompare(b.id));
-  fillOptions($('room'),rooms,r=>r.id,r=>r.name);
+  if (!catalogSnap.exists()) throw new BookingError('Orari i grupeve dhe i mësimdhënësve nuk është konfiguruar.');
+  catalog = catalogSnap.data();
+  fillOptions($('room'),[{id:'',name:'Pa sallë'},...rooms],r=>r.id,r=>r.name);
+  if (rooms.length) $('room').value = rooms[0].id;
+  fillOptions($('event-type'),EVENT_TYPES,t=>t,t=>t);
+  for (const kind of ['groups','teachers']) {
+    $(kind).replaceChildren();
+    for (const [id,name] of Object.entries(catalog[kind]).sort((a,b)=>a[1].localeCompare(b[1],'sq'))) {
+      const label = document.createElement('label'), input = document.createElement('input');
+      input.type = 'checkbox'; input.value = id;
+      label.append(input, safeText(name)); $(kind).appendChild(label);
+    }
+  }
   fillOptions($('from'),periods,p=>p.id,p=>p.start);
   fillOptions($('through'),periods,p=>p.id,p=>p.end);
   const dayParts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {timeZone:'Europe/Tirane',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).map(p=>[p.type,p.value]));
@@ -222,6 +246,8 @@ $('logout').onclick = async () => { try { await signOut(auth); } catch(e) {messa
 $('date').onchange = () => readAvailability().catch(e => message(errText(e),true));
 $('room').onchange = () => readAvailability().catch(e => message(errText(e),true));
 $('booking-form').onsubmit = createReservation;
+$('visibility').onchange = () => { $('email-notice').hidden = $('visibility').value !== 'public'; };
+$('mode').onchange = () => { $('online-field').hidden = $('mode').value !== 'online'; };
 for (const id of ['from','through']) $(id).addEventListener('change', () => { $('selection-hint').textContent = ''; });
 onAuthStateChanged(auth,async user => {
   currentUser = user;

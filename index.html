@@ -3,6 +3,7 @@
 :root{font-family:system-ui,Arial,sans-serif;color-scheme:light;background:#f5f7fb;color:#172032}
 body{max-width:850px;margin:2rem auto;padding:0 1rem}header,.row{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}h1{font-size:1.65rem}section{background:#fff;padding:1.2rem;border-radius:14px;margin:1rem 0;box-shadow:0 2px 12px #162a4212}label{display:block;margin:.65rem 0 .25rem;font-weight:600}select,input,button{font:inherit;padding:.55rem .65rem;border-radius:7px;border:1px solid #a8b2bf;max-width:100%}button{background:#144cbd;color:white;cursor:pointer;border:0}button:disabled{opacity:.5;cursor:not-allowed}button.secondary{background:#4d5a73}button.danger{background:#a62e39}#message{white-space:pre-wrap}.error{color:#a22030}.ok{color:#126335}.slot{display:flex;gap:1rem;align-items:center;padding:.65rem;border-bottom:1px solid #e5e9f2}.slot time{min-width:120px;font-variant-numeric:tabular-nums}.busy{color:#9a2d3b}.free{color:#117641}li{margin:.6rem 0}small{color:#607080}
 #slots .slot{flex-wrap:wrap}#slots .reserve-from{margin-left:auto}#booking-form{scroll-margin-top:1rem}#selection-hint:empty{display:none}
+fieldset{margin:1rem 0;border:1px solid #a8b2bf;border-radius:7px}.choices{max-height:180px;overflow:auto}.choices label{font-weight:400;display:flex;align-items:center;gap:.5rem}.choices input{flex-shrink:0}
 @media(max-width:480px){#slots .reserve-from{margin-left:0}}
 </style></head><body>
 <header><h1>Rezervimi i sallave të fakultetit</h1><div><span id="identity"></span> <button id="login">Hyni me Google</button> <button id="logout" class="secondary" hidden>Dilni</button></div></header>
@@ -10,7 +11,15 @@ body{max-width:850px;margin:2rem auto;padding:0 1rem}header,.row{display:flex;al
 <section id="app" hidden>
 <div class="row"><div><label for="date">Data</label><input type="date" id="date"></div><div><label for="room">Salla</label><select id="room"></select></div></div>
 <h2>Disponueshmëria e sallës</h2><div id="slots"></div>
-<h2>Rezervoni një sallë</h2><form id="booking-form" novalidate>
+<h2>Rezervoni një aktivitet</h2><form id="booking-form" novalidate>
+<label for="event-type">Lloji i aktivitetit</label><select id="event-type"></select>
+<fieldset><legend>Grupet e studentëve</legend><p><small>Mund të zgjidhni një ose më shumë grupe. Pa përzgjedhje: pa grup të studentëve.</small></p><div id="groups" class="choices"></div></fieldset>
+<fieldset><legend>Mësimdhënësit</legend><p><small>Mund të zgjidhni një ose më shumë mësimdhënës. Pa përzgjedhje: pa mësimdhënës.</small></p><div id="teachers" class="choices"></div></fieldset>
+<label for="visibility">Njoftimi për aktivitetin</label><select id="visibility"><option value="private">Jo publik</option><option value="public">Publik</option></select>
+<p id="email-notice" hidden>Stafit do t’i dërgohet një email për njoftimin rreth ngjarjes kur ky shërbim të aktivizohet. Aktualisht dërgimi i emailit nuk është aktiv.</p>
+<p><small>Hollësitë e çdo rezervimi shfaqen në orar. Kjo zgjedhje vlen vetëm për njoftimin me email.</small></p>
+<label for="mode">Mënyra e zhvillimit</label><select id="mode"><option value="physical">Fizik</option><option value="online">Online</option></select>
+<div id="online-field" hidden><label for="online-url">Linku i ngjarjes online</label><input type="url" id="online-url" placeholder="https://…" maxlength="2000" style="width:90%"></div>
 <label for="title">Titulli i aktivitetit (publikohet me emrin tuaj dhe kohën e rezervimit)</label><input id="title" placeholder="Mbledhje e departamentit" maxlength="120" required style="width:90%">
 <div class="row"><div><label for="from">Ora e fillimit</label><select id="from"></select></div><div><label for="through">Ora e përfundimit</label><select id="through"></select></div></div>
 <p id="selection-hint" role="status"></p>

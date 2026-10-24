@@ -8,6 +8,7 @@ const db = admin.firestore(), control = db.doc('settings/control');
 const apply = process.argv.includes('--apply'), reopen = process.argv.includes('--reopen');
 const current = await control.get();
 if (!current.exists) throw Error('Missing settings/control');
+if (current.data().slotStorage === 'resources-v2') throw Error('Use scripts/migrate-resources.mjs; daily-v1 is obsolete.');
 if (reopen) {
   if (current.data().slotStorage !== 'daily-v1') throw Error('Migration not complete');
   await control.update({bookingOpen:current.data().migrationWasOpen === true});

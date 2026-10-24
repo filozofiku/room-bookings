@@ -53,6 +53,20 @@ try {
   await page.locator('#agendaView .reservation-event').click();
   assert.match(await page.locator('#modalDetails').textContent(),/Test Teacher/);
   await page.click('#closeDialog');
+  for (const kind of ['subgroups','teachers']) {
+    await page.selectOption('#category',kind);
+    const name=await page.locator('#entity').inputValue();
+    const selected={...booking,title:'Konferencë online',eventType:'Konferencë',room:'',groups:kind==='subgroups'?[name]:[],groupNames:kind==='subgroups'?[name]:[],teachers:kind==='teachers'?[name]:[],isPublic:false,mode:'online',onlineUrl:'https://example.test/event'};
+    await page.evaluate(value=>window.testReport(value),{...result,rows:[selected]});
+    assert.equal(await page.locator('#agendaView .reservation-event').count(),1);
+    await page.locator('#agendaView .reservation-event').click();
+    assert.match(await page.locator('#modalDetails').textContent(),/Pa sallë/);
+    assert.equal(await page.locator('#modalDetails a').getAttribute('href'),'https://example.test/event');
+    assert.equal(await page.locator('#modalDetails a').getAttribute('rel'),'noopener noreferrer');
+    await page.click('#closeDialog');
+    await page.click('#viewWeek');assert.equal(await page.locator('#weekBody .reservation-event').count(),1);await page.click('#viewList');
+  }
+  await page.selectOption('#category','rooms');
   await page.locator('#bookingDate').fill('2026-10-30');
   await page.locator('#bookingDate').dispatchEvent('change');
   assert.equal(await page.locator('.reservation-event').count(),0);

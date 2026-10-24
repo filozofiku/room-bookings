@@ -8,8 +8,9 @@ is unavailable or the date is not configured. It uses only room names shared by
 Firebase and the HTML schedule. Keep the HTML exports and Firebase FET import in
 sync; changing one does not update the other.
 
-Reservations currently have no teacher or student-group identity. They appear in
-the selected room’s calendar and list, not in teacher/student views. The date
+Reservations appear in the calendars and lists of every selected room, teacher and
+student group. Rooms, groups and teachers are optional. Reservations without any
+selected resource remain in “Rezervimet e mia”. The date
 selector chooses a Monday–Sunday calendar week; reservations never repeat in
 other weeks. Clicking a reservation shows the reserver’s Google display name and
 the original server timestamp, formatted in Europe/Tirane time. Existing names
@@ -17,7 +18,16 @@ are backfilled from Firebase Authentication; missing historical data is labeled
 as unavailable. Adjacent periods display as one time range.
 Dates do not repeat weekly. The three generated FET HTML files need no edits.
 
-## Publish
+## Upgrading to resources-v2
+
+Follow the migration/deployment order at the top of the booking repository README.
+The new public adapter reads `resourceCatalog/current` in addition to the existing
+feed. Every reservation remains visible regardless of `isPublic`; that flag only
+records the email-notification choice, and no email is sent. The event modal shows
+its type, selected resources, physical/online mode and safe HTTP(S) meeting link.
+Legacy room-only bookings continue to render.
+
+## Initial publication (historical setup)
 
 1. Review and deploy the updated `firestore.rules` from the booking repository:
    `firebase deploy --only firestore:rules --project YOUR_PROJECT_ID`.

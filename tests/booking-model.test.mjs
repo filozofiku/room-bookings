@@ -36,3 +36,13 @@ test('reservations merge adjacent periods and stay within their calendar week an
  assert.equal(reservationEvents([row],'Salla 2',dates,[],[]).length,0);
  assert.match(bookingTimestamp(null),/disponueshme/);
 });
+
+test('roomless reservations and non-public details appear for every selected group and teacher',()=>{
+ const catalog={groups:{g1:'Grupi 1',g2:'Grupi 2'},groupNames:{g1:'Grupi 1 Automatic Subgroup',g2:'Grupi 2 Automatic Subgroup'},teachers:{t1:'Mësimdhënësi 1',t2:'Mësimdhënësi 2'}};
+ const rows=bookingRows([{title:'Konferencë',roomId:'',date:'2026-10-23',periodIds:['p01','p02'],groupIds:['g1','g2'],teacherIds:['t1','t2'],isPublic:false,eventType:'Konferencë',mode:'online',onlineUrl:'https://example.test'}],rooms,periods,catalog);
+ for(const [kind,name] of [['subgroups','Grupi 1'],['subgroups','Grupi 2 Automatic Subgroup'],['teachers','Mësimdhënësi 1'],['teachers','Mësimdhënësi 2']]){
+  const events=reservationEvents(rows,name,weekDates('2026-10-23'),['E premte'],['08:00','08:15','08:30'],kind);
+  assert.equal(events.length,1);assert.equal(events[0].a,'Konferencë');assert.equal(events[0].r,'Pa sallë');assert.equal(events[0].onlineUrl,'https://example.test');
+ }
+ assert.equal(reservationEvents(rows,'Salla 1',weekDates('2026-10-23'),[],[]).length,0);
+});
