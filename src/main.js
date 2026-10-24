@@ -129,21 +129,29 @@ async function readMyBookings() {
     wrapper.appendChild(div);
   }
 }
+function bookingMessage(text, isError = false) {
+  message(text, isError);
+  const feedback = $('booking-message');
+  feedback.textContent = text;
+  feedback.className = isError ? 'error' : 'ok';
+  feedback.scrollIntoView({block:'nearest'});
+}
 async function createReservation(event) {
   event.preventDefault();
+  $('booking-message').textContent = '';
   if (!currentUser) return;
   const date = $('date').value;
   const roomId = $('room').value;
   const title = $('title').value.trim();
   let periodIds;
-  try { periodIds = selectedPeriodIds(); } catch(e) { return message(errText(e),true); }
-  if (!title) return message('Shkruani titullin e aktivitetit.', true);
-  if (date < settings.startDate || date > settings.endDate) return message('Data është jashtë semestrit të konfiguruar.',true);
-  if (!settings.bookingOpen) return message('Rezervimet janë pezulluar gjatë përditësimit të orarit.',true);
+  try { periodIds = selectedPeriodIds(); } catch(e) { return bookingMessage(errText(e),true); }
+  if (!title) return bookingMessage('Shkruani titullin e aktivitetit.', true);
+  if (date < settings.startDate || date > settings.endDate) return bookingMessage('Data është jashtë semestrit të konfiguruar.',true);
+  if (!settings.bookingOpen) return bookingMessage('Rezervimet janë pezulluar gjatë përditësimit të orarit.',true);
   const onlineUrl = $('mode').value === 'online' ? $('online-url').value.trim() : '';
   if ($('mode').value === 'online') {
     try { if (!/^https?:$/.test(new URL(onlineUrl).protocol) || onlineUrl.length > 2000) throw Error(); }
-    catch { return message('Vendosni një link të vlefshëm që fillon me https:// ose http://.', true); }
+    catch { return bookingMessage('Vendosni një link të vlefshëm që fillon me https:// ose http://.', true); }
   }
   const checked = id => [...$(id).querySelectorAll('input:checked')].map(input => input.value);
   const data = {title, date, roomId, periodIds, groupIds:checked('groups'), teacherIds:checked('teachers'),
@@ -177,9 +185,9 @@ async function createReservation(event) {
       if (keys.length) tx.set(occupancyRef, {bookings:locks, changedReservationId:reservationRef.id});
     });
     $('title').value = '';
-    message('Rezervimi u krijua me sukses.');
+    bookingMessage('Rezervimi u krijua me sukses.');
     await Promise.all([readAvailability(),readMyBookings()]);
-  } catch (e) { message(errText(e),true); }
+  } catch (e) { bookingMessage(errText(e),true); }
   finally { $('booking-form').querySelector('button').disabled = false; }
 }
 async function cancelReservation(id) {

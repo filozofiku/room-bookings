@@ -119,6 +119,9 @@ for(const [selector,key,error] of [['#groups input[value="g_one"]','g_one','Grup
   await page.evaluate(({source,key})=>{window.testStore.set('weeklyResources/5',{busyKeys:source==='fet'?[key+'__p01']:[]});window.testStore.set('eventDays/2026-10-23',{bookings:source==='booking'?{[key+'__p01']:'occupied'}:{}})},{source,key});
   await page.locator('#booking-form button').click();
   assert.equal(await page.locator('#message').textContent(),error+' nuk është i lirë në intervalin e përzgjedhur.');
+  assert.equal(await page.locator('#booking-message').textContent(),error+' nuk është i lirë në intervalin e përzgjedhur.');
+  assert.equal(await page.locator('#booking-message').isVisible(),true);
+  assert.ok(await page.locator('#booking-message').evaluate(el=>{const r=el.getBoundingClientRect();return r.top>=0 && r.bottom<=innerHeight}));
  }
  await page.locator(selector).uncheck();
 }
