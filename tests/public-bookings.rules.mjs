@@ -30,6 +30,7 @@ test('resource reservations: atomic publication, optional resources, conflicts, 
    const context=options.db||db, ref=doc(context,'eventDays',date), snap=await tx.get(ref), booking=await tx.get(doc(context,'reservations',id));
    const bookings=snap.exists()?{...snap.data().bookings}:{}, keys=slotKeys(booking.data());
    keys.forEach(key=>delete bookings[key]);
+   if (context===manager && options.notification!==false) tx.set(doc(context,'cancellationNotifications',id),{booking:booking.data(),reason:options.reason ?? 'Anulim për nevoja të fakultetit.',cancelledBy:'manager',createdAt:serverTimestamp(),status:'pending',...options.notice});
    tx.delete(doc(context,'reservations',id));
    if(options.publish!==false)tx.delete(doc(context,'publicBookings',id));
    if(keys.length && options.locks!==false)tx.set(ref,{bookings,changedReservationId:id});
@@ -51,7 +52,18 @@ test('resource reservations: atomic publication, optional resources, conflicts, 
   await assertSucceeds(create('keep',{periodIds:['p17']}));
   await assertFails(cancel('managed',{db:manager,locks:false}));
   await assertFails(cancel('managed',{db:manager,publish:false}));
+  await assertFails(cancel('managed',{db:manager,notification:false}));
+  await assertFails(cancel('managed',{db:manager,reason:''}));
+  await assertFails(cancel('managed',{db:manager,reason:' \n\t '}));
+  await assertFails(cancel('managed',{db:manager,notice:{cancelledBy:'teacher'}}));
+  await assertFails(cancel('managed',{db:manager,notice:{status:'sent'}}));
+  await assertFails(cancel('managed',{db:manager,notice:{booking:{...base,ownerUid:'someone-else'}}}));
+  await assertFails(setDoc(doc(manager,'cancellationNotifications','managed'),{booking:base,reason:'Fake',cancelledBy:'manager',createdAt:serverTimestamp(),status:'pending'}));
   await assertSucceeds(cancel('managed',{db:manager}));
+  assert.equal((await getDoc(doc(db,'cancellationNotifications','managed'))).data().reason,'Anulim për nevoja të fakultetit.');
+  await assertFails(getDoc(doc(anon,'cancellationNotifications','managed')));
+  await assertFails(getDoc(doc(other,'cancellationNotifications','managed')));
+  await assertFails(setDoc(doc(manager,'cancellationNotifications','managed'),{reason:'Changed'},{merge:true}));
   assert.ok(Object.values((await getDoc(doc(db,'eventDays',date))).data().bookings).every(id=>id==='keep'));
   await assertFails(setDoc(doc(db,'users','teacher'),{active:true,role:'admin',canCancelAll:true}));
   await assertFails(create('forged-owner',{}, {db:manager}));

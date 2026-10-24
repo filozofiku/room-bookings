@@ -31,7 +31,7 @@ fieldset{margin:1rem 0;border:1px solid #a8b2bf;border-radius:7px}.choices{max-h
 </section>
 <dialog id="cancel-dialog" aria-labelledby="cancel-heading">
 <h2 id="cancel-heading">Anulimi i rezervimit</h2><p id="cancel-question"></p>
-<form method="dialog"><button value="keep" class="secondary">Mbajeni rezervimin</button> <button value="cancel" class="danger">Anuloni rezervimin</button></form>
+<form id="cancel-form" method="dialog" novalidate><div id="cancel-reason-field" hidden><label for="cancel-reason">Arsyeja e anulimit (e detyrueshme)</label><textarea id="cancel-reason" rows="4" maxlength="2000" style="width:90%" aria-describedby="cancel-error"></textarea><p>Arsyeja do të përfshihet në njoftimin për krijuesin e rezervimit.</p></div><p id="cancel-error" class="error" role="alert"></p><button value="keep" class="secondary">Mbajeni rezervimin</button> <button value="cancel" class="danger">Anuloni rezervimin</button></form>
 </dialog>
 <script type="module" src="/src/main.js"></script>
 </body></html>

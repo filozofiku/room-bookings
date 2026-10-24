@@ -13,6 +13,11 @@ service cloud.firestore {
         get(userPath()).data.active == true &&
         get(userPath()).data.role in ['teacher', 'admin'];
     }
+    function cancellationRecorded(id, booking) {
+      return booking.ownerUid == request.auth.uid ||
+        (!exists(/databases/$(database)/documents/cancellationNotifications/$(id)) &&
+         existsAfter(/databases/$(database)/documents/cancellationNotifications/$(id)));
+    }
     function mayCancel(booking) {
       return booking.ownerUid == request.auth.uid || get(userPath()).data.get('canCancelAll', false) == true;
     }
@@ -136,10 +141,25 @@ service cloud.firestore {
         publicMatches(reservationId, request.resource.data);
       allow update: if false;
       allow delete: if approved() && controls().bookingOpen == true &&
-        mayCancel(resource.data) &&
+        mayCancel(resource.data) && cancellationRecorded(reservationId, resource.data) &&
         controls().slotStorage == 'resources-v2' &&
         (resources(resource.data).size() == 0 || occupancyWritten(reservationId, resource.data)) &&
         !existsAfter(/databases/$(database)/documents/publicBookings/$(reservationId));
+    }
+    match /cancellationNotifications/{id} {
+      function validCancellation() {
+        let d = request.resource.data;
+        let path = /databases/$(database)/documents/reservations/$(id);
+        let booking = get(path).data;
+        return d.keys().hasOnly(['booking','reason','cancelledBy','createdAt','status']) &&
+          booking.ownerUid != request.auth.uid && mayCancel(booking) &&
+          d.booking == booking && !existsAfter(path) &&
+          d.cancelledBy == request.auth.uid && d.createdAt == request.time && d.status == 'pending' &&
+          d.reason is string && d.reason.size() <= 2000 && d.reason.matches('(?s).*\\S.*');
+      }
+      allow create: if approved() && controls().bookingOpen && validCancellation();
+      allow read: if approved() && (resource.data.booking.ownerUid == request.auth.uid || get(userPath()).data.get('canCancelAll',false));
+      allow update, delete: if false;
     }
     match /publicBookings/{id} {
       allow read: if true;

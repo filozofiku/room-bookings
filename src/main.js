@@ -42,9 +42,14 @@ function prepareReservation(period) {
 function confirmCancellation(data) {
   const dialog = $('cancel-dialog');
   $('cancel-question').textContent = `Ta anuloni rezervimin "${data.title}" më ${data.date}?`;
+  const otherOwner = data.ownerUid !== currentUser.uid;
+  $('cancel-reason-field').hidden = !otherOwner;
+  $('cancel-reason').required = otherOwner;
+  $('cancel-reason').value = '';
+  $('cancel-error').textContent = '';
   dialog.returnValue = 'keep';
   return new Promise(resolve => {
-    dialog.addEventListener('close', () => resolve(dialog.returnValue === 'cancel'), {once:true});
+    dialog.addEventListener('close', () => resolve({confirmed:dialog.returnValue === 'cancel',reason:otherOwner ? $('cancel-reason').value.trim() : ''}), {once:true});
     dialog.showModal();
   });
 }
@@ -121,12 +126,13 @@ async function readMyBookings() {
     button.className = 'danger';
     button.textContent = 'Anuloni';
     button.onclick = async () => {
-      if (!await confirmCancellation(data)) return;
+      const confirmation = await confirmCancellation(data);
+      if (!confirmation.confirmed) return;
       button.disabled = true;
       try {
-        await cancelReservation(item.id);
+        await cancelReservation(item.id, confirmation.reason);
         await Promise.all([readMyBookings(), readAvailability()]);
-        message('Rezervimi u anulua.');
+        message(data.ownerUid === currentUser.uid ? 'Rezervimi u anulua.' : 'Rezervimi u anulua. Njoftimi me email është në pritje të dërgimit.');
       } catch(e) { message(errText(e), true); button.disabled = false; }
     };
     div.append(description,button);
@@ -198,19 +204,22 @@ async function createReservation(event) {
   } catch (e) { bookingMessage(errText(e),true); }
   finally { $('booking-form').querySelector('button').disabled = false; }
 }
-async function cancelReservation(id) {
+async function cancelReservation(id, reason = '') {
   const reservationRef = doc(db,'reservations',id);
   await runTransaction(db, async tx => {
     const existing = await tx.get(reservationRef);
     if (!existing.exists()) throw new BookingError('Rezervimi nuk ekziston më.');
     const booking = existing.data();
     if (!canCancelAll && booking.ownerUid !== currentUser.uid) throw new BookingError('Ky rezervim nuk ju përket juve.');
+    const otherOwner = booking.ownerUid !== currentUser.uid;
+    if (otherOwner && (!reason.trim() || reason.length > 2000)) throw new BookingError('Shkruani arsyen e anulimit (deri në 2000 karaktere).');
     const occupancyRef = doc(db,'eventDays',booking.date);
     const occupancy = await tx.get(occupancyRef);
     const locks = occupancy.exists() ? {...occupancy.data().bookings} : {};
     if (slotKeys(booking).some(p => locks[p] !== id)) throw new BookingError('Të dhënat e rezervimit nuk përputhen. Kontaktoni administratorin.');
     slotKeys(booking).forEach(p => delete locks[p]);
     if (slotKeys(booking).length) tx.set(occupancyRef, {bookings:locks, changedReservationId:id});
+    if (otherOwner) tx.set(doc(db,'cancellationNotifications',id), {booking,reason:reason.trim(),cancelledBy:currentUser.uid,createdAt:serverTimestamp(),status:'pending'});
     tx.delete(reservationRef);
     tx.delete(doc(db,'publicBookings',id));
   });
@@ -277,6 +286,17 @@ $('logout').onclick = async () => { try { await signOut(auth); } catch(e) {messa
 $('date').onchange = () => readAvailability().catch(e => message(errText(e),true));
 $('room').onchange = () => readAvailability().catch(e => message(errText(e),true));
 $('booking-form').onsubmit = createReservation;
+$('cancel-form').onsubmit = event => {
+  event.preventDefault();
+  if (event.submitter?.value !== 'cancel') { $('cancel-dialog').close('keep'); return; }
+  const reason = $('cancel-reason').value.trim();
+  if ($('cancel-reason').required && (!reason || reason.length > 2000)) {
+    $('cancel-error').textContent = 'Shkruani arsyen e anulimit (deri në 2000 karaktere).';
+    $('cancel-reason').focus();
+    return;
+  }
+  $('cancel-dialog').close('cancel');
+};
 $('visibility').onchange = () => {
   $('email-notice').hidden = $('description-field').hidden = $('visibility').value !== 'public';
 };
