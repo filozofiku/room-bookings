@@ -3,8 +3,8 @@
 Formulari mbështet katër llojet e aktivitetit, asnjë ose disa grupe/mësimdhënës,
 sallë opsionale dhe zhvillim fizik ose online. “Publik” vlen vetëm për synimin e
 njoftimit me email; **nuk dërgohet email** dhe hollësitë e të gjitha rezervimeve
-mbeten publike në oraret e burimeve të përzgjedhura. Një aktivitet pa asnjë burim
-ruhet te “Rezervimet e mia”, por nuk i përket ndonjë kalendari salle/grupi/mësimdhënësi.
+mbeten publike në oraret e burimeve të përzgjedhura. Çdo aktivitet pa sallë shfaqet edhe te “Ngjarjet e tjera” në orarin publik,
+përfshirë aktivitetet pa grupe ose mësimdhënës.
 
 Modeli aktiv:
 - `resourceCatalog/current`: emrat dhe identifikuesit e sallave, grupeve dhe mësimdhënësve.

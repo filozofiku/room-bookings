@@ -161,13 +161,14 @@
   <section id="schedulesPanel" aria-labelledby="scheduleHeading">
     <div class="card filters">
       <h2 class="section-heading" id="scheduleHeading">Gjej orarin që të duhet</h2>
-      <p class="subheading">Zgjidh kategorinë dhe më pas personin, grupin e studentëve ose sallën.</p>
+      <p class="subheading">Zgjidh personin, grupin e studentëve, sallën ose “Ngjarjet e tjera” për rezervimet pa sallë.</p>
       <div class="fields">
         <div><label for="category">Kategoria</label>
           <select id="category">
             <option value="subgroups">Grupet e studentëve</option>
             <option value="teachers">Mësimdhënësit</option>
             <option value="rooms">Sallat</option>
+            <option value="other">Ngjarjet e tjera</option>
           </select>
         </div>
         <div><label for="lookup">Kërko sipas emrit</label>
@@ -297,7 +298,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     'Salla 204': [36, true, true],
     'Salla 302': [30, true, true]
   };
-  const categoryLabel = {subgroups:"Grupi i studentëve",teachers:"Mësimdhënës",rooms:"Sallë"};
+  const categoryLabel = {subgroups:"Grupi i studentëve",teachers:"Mësimdhënës",rooms:"Sallë",other:"Pa sallë"};
   const state = {page:"schedules",type:"subgroups",item:null,view:matchMedia("(max-width: 750px)").matches ? "list":"week",query:""};
   // The three source files can be overwritten on GitHub Pages without changing this page.
   const FILENAMES = {
@@ -396,6 +397,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     if(update) setHash();
   }
   function options(){
+    for (const id of ["lookup","entity"]) $(id).parentElement.hidden = state.type === "other";
     const filtered = ordered[state.type].filter(e => normal(e.l).includes(normal(state.query)) || normal(e.n).includes(normal(state.query)));
     const previous = state.item?.n;
     if(previous && !filtered.some(e=>e.n===previous)) state.item = null;
@@ -569,7 +571,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
   function routeFromHash(){
     let hash; try{hash=decodeURIComponent(location.hash.slice(1));}catch{hash="";}
     if(hash==="sallat-e-lira"){switchPage("free",false);return;}
-    const m=hash.match(/^orari\/(rooms|teachers|subgroups)\/(.*)$/);
+    const m=hash.match(/^orari\/(rooms|teachers|subgroups|other)\/(.*)$/);
     if(m){state.type=m[1];state.query="";$("category").value=state.type;$("lookup").value="";
       state.item=ordered[state.type].find(e=>e.n===m[2])||null;options();}
     switchPage("schedules",false);
@@ -582,6 +584,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
         if(dayIndex(data.days,weekday)<0) data.days.push(label);
       }
       for(const kind of ["subgroups","teachers","rooms"])ordered[kind]=[...data[kind]].sort(niceSort);
+      ordered.other=[{n:"pa-salle",l:"Ngjarjet e tjera",e:[]}];
       if(!data.rooms.length)throw Error("Nuk ka salla në orarin zyrtar. Nuk mund të llogaritet disponueshmëria.");
       document.documentElement.style.setProperty("--day-count",data.days.length);
       document.documentElement.style.setProperty("--timetable-height",`${(data.times.length-1)*15}px`);

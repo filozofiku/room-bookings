@@ -32,7 +32,7 @@ export function weekDates(date) {
   });
 }
 export function reservationEvents(rows, room, dates, days, times, kind = 'rooms') {
-  return rows.filter(b => (kind === 'rooms' ? b.room === room : kind === 'teachers' ? b.teachers?.includes(room) : b.groupNames?.includes(room) || b.groups?.includes(room)) && dates.includes(b.date)).flatMap(b => {
+  return rows.filter(b => (kind === 'other' ? b.roomId === '' : kind === 'rooms' ? b.room === room : kind === 'teachers' ? b.teachers?.includes(room) : b.groupNames?.includes(room) || b.groups?.includes(room)) && dates.includes(b.date)).flatMap(b => {
     const runs = [];
     for (const slot of b.slots) {
       const last = runs.at(-1);
