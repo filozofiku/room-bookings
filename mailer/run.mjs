@@ -36,4 +36,9 @@ try {
  }
  console.log(`Processed ${queue.length} notifications; ${errors} need a retry or attention.`);
  if(errors)process.exitCode=1;
-} catch {console.error('SMTP verification or delivery failed. Check the mail settings; credentials are not logged.');process.exitCode=1;}
+} catch(error) {
+ const code=['EAUTH','ECONNECTION','ETIMEDOUT','ESOCKET','EDNS','ETLS'].includes(error.code)?error.code:'UNKNOWN';
+ const responseCode=Number.isInteger(error.responseCode)?error.responseCode:'none';
+ console.error(`SMTP verification or delivery failed (code=${code}, response=${responseCode}). Credentials are not logged.`);
+ process.exitCode=1;
+}
