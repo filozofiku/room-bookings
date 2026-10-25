@@ -7,6 +7,10 @@ service cloud.firestore {
     function controls() {
       return get(/databases/$(database)/documents/settings/control).data;
     }
+    function mailWorker() {
+      return request.auth != null && request.auth.uid == 'cancellation-mail-worker' &&
+        request.auth.token.get('cancellationMailWorker',false) == true;
+    }
     function approved() {
       return request.auth != null &&
         exists(userPath()) &&
@@ -110,7 +114,7 @@ service cloud.firestore {
     match /resourceCatalog/{id} { allow read: if true; allow write: if false; }
     match /weeklyResources/{id} { allow read: if approved(); allow write: if false; }
     match /users/{uid} {
-      allow get: if request.auth != null && request.auth.uid == uid;
+      allow get: if (request.auth != null && request.auth.uid == uid) || mailWorker();
       allow list, create, update, delete: if false;
     }
     match /settings/{key} {
@@ -158,8 +162,11 @@ service cloud.firestore {
           d.reason is string && d.reason.size() <= 2000 && d.reason.matches('(?s).*\\S.*');
       }
       allow create: if approved() && controls().bookingOpen && validCancellation();
-      allow read: if approved() && (resource.data.booking.ownerUid == request.auth.uid || get(userPath()).data.get('canCancelAll',false));
-      allow update, delete: if false;
+      allow read: if mailWorker() || (approved() && (resource.data.booking.ownerUid == request.auth.uid || get(userPath()).data.get('canCancelAll',false)));
+      allow update: if mailWorker() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'status','attempts','leaseToken','leaseUntil','sentAt','lastErrorCode','lastAttemptAt'
+      ]) && request.resource.data.status in ['sending','sent','retrying','failed'];
+      allow delete: if false;
     }
     match /publicBookings/{id} {
       allow read: if true;

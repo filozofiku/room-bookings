@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {cancellationEmail,deliverCancellation} from '../functions/cancellation-email.js';
+import {cancellationEmail,deliverCancellation} from '../mailer/cancellation-email.js';
 const booking={title:'Paneli',date:'2026-10-26',roomId:'r1',periodIds:['p01','p02'],ownerUid:'owner'};
 const periods=[{id:'p01',start:'13:00',end:'13:15'},{id:'p02',start:'13:15',end:'13:30'}];
 const reason='Salla nevojitet për provim.\nJu lutemi zgjidhni një orë tjetër.';

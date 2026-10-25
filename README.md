@@ -19,7 +19,7 @@ Admin SDK; roli `admin` pa këtë leje nuk jep automatikisht anulim për të tje
 Anulimi heq në të njëjtin transaksion rezervimin, publikimin dhe zënien e burimeve.
 Për rezervimet e të tjerëve kërkohet edhe arsyeja e anulimit dhe ruhet njoftimi
 privat për krijuesin. Shërbimi i emailit dhe hapat e aktivizimit për Google Workspace
-përshkruhen te [functions/README.md](functions/README.md). Pa konfigurimin e këtij
+përshkruhen te [mailer/README.md](mailer/README.md). Pa konfigurimin e këtij
 shërbimi, njoftimet ruhen në pritje dhe nuk dërgohen.
 
 Për aktivizim llogarie: `node scripts/manage-booking-user.mjs EMAIL teacher --apply`.

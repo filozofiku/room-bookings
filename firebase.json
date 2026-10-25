@@ -6,17 +6,5 @@
     "firestore": {
       "port": 8080
     }
-  },
-  "functions": [
-    {
-      "source": "functions",
-      "codebase": "cancellation-notifications",
-      "ignore": [
-        "node_modules",
-        ".git",
-        "*.log",
-        ".env*"
-      ]
-    }
-  ]
+  }
 }

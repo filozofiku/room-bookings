@@ -1,0 +1,36 @@
+name: Send cancellation emails
+on:
+  schedule:
+    - cron: '2-57/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Delivery mode
+        type: choice
+        default: check
+        options: [check, verify-smtp, send]
+permissions:
+  contents: read
+concurrency:
+  group: cancellation-emails
+  cancel-in-progress: false
+jobs:
+  send:
+    if: vars.CANCELLATION_EMAIL_ENABLED == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mailer/package-lock.json
+      - run: npm ci --prefix mailer --ignore-scripts --no-audit --no-fund
+      - run: node mailer/run.mjs "$MAIL_MODE"
+        env:
+          MAIL_MODE: ${{ inputs.mode || 'send' }}
+          CANCELLATION_FIREBASE_REFRESH_TOKEN: ${{ secrets.CANCELLATION_FIREBASE_REFRESH_TOKEN }}
+          CANCELLATION_SMTP_PASSWORD: ${{ secrets.CANCELLATION_SMTP_PASSWORD }}
