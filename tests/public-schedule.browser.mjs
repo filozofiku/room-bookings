@@ -77,26 +77,30 @@ try {
     await page.click('#viewWeek');assert.equal(await page.locator('#weekBody .reservation-event').count(),1);await page.click('#viewList');
   }
   await page.selectOption('#category','rooms');
-  await page.selectOption('#category','other');
-  assert.equal(await page.locator('#selectedTitle').textContent(),'Ngjarjet e tjera');
+  await page.selectOption('#category','reservations');
+  assert.equal(await page.locator('#selectedTitle').textContent(),'Rezervimet');
   assert.equal(await page.locator('#entity').isVisible(),false);
   assert.equal(await page.locator('#lookup').isVisible(),false);
   const roomless={...booking,title:'Ngjarje pa sallë',roomId:'',room:'',groups:[],teachers:[],isPublic:false};
   const roomlessGroup={...roomless,title:'Ngjarje me grup',groups:['Grupi 1'],teachers:['Mësimdhënësi 1']};
   await page.evaluate(value=>window.testReport(value),{...result,rows:[booking,roomless,roomlessGroup,{...roomless,title:'Javën tjetër',date:'2026-10-30'}]});
-  assert.equal(await page.locator('#agendaView .reservation-event').count(),2);
+  assert.equal(await page.locator('#agendaView .reservation-event').count(),3);
   await page.locator('#agendaView .reservation-event').filter({hasText:'Ngjarje pa sallë'}).click();
   assert.match(await page.locator('#modalDetails').textContent(),/Pa sallë/);
   assert.match(await page.locator('#modalDetails').textContent(),/Test Teacher/);
   await page.click('#closeDialog');
-  await page.click('#viewWeek');assert.equal(await page.locator('#weekBody .reservation-event').count(),2);
+  await page.click('#viewWeek');assert.equal(await page.locator('#weekBody .reservation-event').count(),3);
+  const boxes=await page.locator('#weekBody .reservation-event').evaluateAll(nodes=>nodes.map(n=>{const b=n.getBoundingClientRect();return {left:b.left,right:b.right}}));
+  boxes.sort((a,b)=>a.left-b.left);
+  assert.ok(boxes.every((b,i)=>i===0 || b.left>=boxes[i-1].right));
+  for(const button of await page.locator('#weekBody .reservation-event').all()){await button.click();assert.equal(await page.locator('#modalDetails').isVisible(),true);await page.click('#closeDialog');}
   const otherHash=new URL(page.url()).hash;
-  assert.equal(otherHash,'#orari/other/pa-salle');
+  assert.equal(otherHash,'#orari/reservations/te-gjitha');
   await page.selectOption('#category','rooms');
   assert.equal(await page.locator('#entity').isVisible(),true);
   await page.evaluate(hash=>{location.hash=hash},otherHash);
-  await page.waitForFunction(()=>document.getElementById('category').value==='other');
-  assert.equal(await page.locator('#weekBody .reservation-event').count(),2);
+  await page.waitForFunction(()=>document.getElementById('category').value==='reservations');
+  assert.equal(await page.locator('#weekBody .reservation-event').count(),3);
   await page.evaluate(value=>window.testReport(value),result);
   assert.equal(await page.locator('.reservation-event').count(),0);
   await page.selectOption('#category','rooms');

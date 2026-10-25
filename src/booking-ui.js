@@ -3,7 +3,8 @@ export class BookingError extends Error {}
 export function selectPeriods(periods, fromId, throughId) {
   const from = periods.findIndex(p => p.id === fromId);
   const through = periods.findIndex(p => p.id === throughId);
-  if (from < 0 || through < from || through - from >= MAX_PERIODS) {
+  if (through - from >= MAX_PERIODS) throw new BookingError('Nuk mund të rezervoni më shumë se 16 periudha (4 orë). Zgjidhni një interval më të shkurtër.');
+  if (from < 0 || through < from) {
     throw new BookingError('Zgjidhni 1–16 periudha të njëpasnjëshme.');
   }
   return periods.slice(from, through + 1).map(p => p.id);

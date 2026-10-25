@@ -3,8 +3,9 @@
 Formulari mbështet katër llojet e aktivitetit, asnjë ose disa grupe/mësimdhënës,
 sallë opsionale dhe zhvillim fizik ose online. “Publik” vlen vetëm për synimin e
 njoftimit me email; **nuk dërgohet email** dhe hollësitë e të gjitha rezervimeve
-mbeten publike në oraret e burimeve të përzgjedhura. Çdo aktivitet pa sallë shfaqet edhe te “Ngjarjet e tjera” në orarin publik,
-përfshirë aktivitetet pa grupe ose mësimdhënës.
+mbeten publike në oraret e burimeve të përzgjedhura. Të gjitha rezervimet shfaqen te “Rezervimet” në orarin publik,
+dhe vazhdojnë të shfaqen në sallat, grupet dhe mësimdhënësit përkatës.
+Rezervimet që mbivendosen shfaqen krah për krah në pamjen javore.
 
 Konfliktet për grupe, sallë dhe mësimdhënës shfaqen së bashku pranë butonit të
 rezervimit. Aktivitetet publike mund të kenë përshkrim deri në 500 fjalë, i cili

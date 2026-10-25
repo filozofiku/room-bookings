@@ -46,3 +46,19 @@ test('roomless reservations and non-public details appear for every selected gro
  }
  assert.equal(reservationEvents(rows,'Salla 1',weekDates('2026-10-23'),[],[]).length,0);
 });
+
+test('all reservations include rooms and roomless events without changing resource views',()=>{
+ const rows=[{title:'Room',roomId:'r1',room:'Salla 1',groups:['G'],teachers:['T'],date:'2026-10-23',slots:periods},{title:'Roomless',roomId:'',room:'',date:'2026-10-23',slots:periods}];
+ const args=[weekDates('2026-10-23'),['E premte'],['08:00','08:15','08:30']];
+ assert.equal(reservationEvents(rows,'',...args,'reservations').length,2);
+ for(const [kind,name] of [['rooms','Salla 1'],['subgroups','G'],['teachers','T']])assert.equal(reservationEvents(rows,name,...args,kind).length,1);
+});
+test('overlap lanes handle nested events, adjacent boundaries and separate clusters',async()=>{
+ const {eventLanes}=await import('../public-schedule/booking-model.js');
+ const events=[{s:0,e:8},{s:1,e:3},{s:3,e:5},{s:4,e:6},{s:8,e:9}];
+ const lanes=eventLanes(events);
+ assert.equal(lanes.get(events[0]).count,3);
+ assert.equal(lanes.get(events[1]).lane,lanes.get(events[2]).lane);
+ assert.equal(lanes.get(events[4]).count,1);
+ for(const a of events)for(const b of events)if(a!==b && a.s<b.e && b.s<a.e)assert.notEqual(lanes.get(a).lane,lanes.get(b).lane);
+});

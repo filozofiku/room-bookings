@@ -32,7 +32,7 @@ export function weekDates(date) {
   });
 }
 export function reservationEvents(rows, room, dates, days, times, kind = 'rooms') {
-  return rows.filter(b => (kind === 'other' ? b.roomId === '' : kind === 'rooms' ? b.room === room : kind === 'teachers' ? b.teachers?.includes(room) : b.groupNames?.includes(room) || b.groups?.includes(room)) && dates.includes(b.date)).flatMap(b => {
+  return rows.filter(b => (['reservations','other'].includes(kind) ? true : kind === 'rooms' ? b.room === room : kind === 'teachers' ? b.teachers?.includes(room) : b.groupNames?.includes(room) || b.groups?.includes(room)) && dates.includes(b.date)).flatMap(b => {
     const runs = [];
     for (const slot of b.slots) {
       const last = runs.at(-1);
@@ -54,4 +54,21 @@ export function bookingTimestamp(value) {
   return date && Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat('sq-AL', {
     timeZone:'Europe/Tirane',dateStyle:'medium',timeStyle:'short'
   }).format(date) : 'Koha nuk është e disponueshme';
+}
+
+// Partition each connected overlap cluster into reusable, non-overlapping lanes.
+export function eventLanes(events) {
+  const result = new Map();
+  let cluster = [], ends = [], boundary = -1;
+  const finish = () => { for (const item of cluster) result.set(item.event,{lane:item.lane,count:ends.length}); };
+  for (const event of [...events].sort((a,b)=>a.s-b.s || b.e-a.e)) {
+    if (event.s >= boundary) { finish(); cluster=[]; ends=[]; }
+    let lane=ends.findIndex(end=>end<=event.s);
+    if(lane<0)lane=ends.length;
+    ends[lane]=event.e;
+    cluster.push({event,lane});
+    boundary=Math.max(...ends);
+  }
+  finish();
+  return result;
 }

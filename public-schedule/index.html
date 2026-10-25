@@ -165,14 +165,14 @@
   <section id="schedulesPanel" aria-labelledby="scheduleHeading">
     <div class="card filters">
       <h2 class="section-heading" id="scheduleHeading">Gjej orarin që të duhet</h2>
-      <p class="subheading">Zgjidh personin, grupin e studentëve, sallën ose “Ngjarjet e tjera” për rezervimet pa sallë.</p>
+      <p class="subheading">Zgjidh personin, grupin e studentëve, sallën ose “Rezervimet” për të gjitha rezervimet.</p>
       <div class="fields">
         <div><label for="category">Kategoria</label>
           <select id="category">
             <option value="subgroups">Grupet e studentëve</option>
             <option value="teachers">Mësimdhënësit</option>
             <option value="rooms">Sallat</option>
-            <option value="other">Ngjarjet e tjera</option>
+            <option value="reservations">Rezervimet</option>
           </select>
         </div>
         <div><label for="lookup">Kërko sipas emrit</label>
@@ -237,7 +237,7 @@
 </dialog>
 <!-- Timetables are loaded directly from three files in the same folder. -->
 <script type="module">
-import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTimestamp} from './booking-model.js';
+import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTimestamp, eventLanes} from './booking-model.js';
 (() => {
   "use strict";
   let data;
@@ -319,7 +319,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     'Salla 204': [36, true, true],
     'Salla 302': [30, true, true]
   };
-  const categoryLabel = {subgroups:"Grupi i studentëve",teachers:"Mësimdhënës",rooms:"Sallë",other:"Pa sallë"};
+  const categoryLabel = {subgroups:"Grupi i studentëve",teachers:"Mësimdhënës",rooms:"Sallë",reservations:"Rezervimet"};
   const state = {page:"schedules",type:"subgroups",item:null,view:matchMedia("(max-width: 750px)").matches ? "list":"week",query:""};
   // The three source files can be overwritten on GitHub Pages without changing this page.
   const FILENAMES = {
@@ -420,7 +420,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     if(update) setHash();
   }
   function options(){
-    for (const id of ["lookup","entity"]) $(id).parentElement.hidden = state.type === "other";
+    for (const id of ["lookup","entity"]) $(id).parentElement.hidden = state.type === "reservations";
     const filtered = ordered[state.type].filter(e => normal(e.l).includes(normal(state.query)) || normal(e.n).includes(normal(state.query)));
     const previous = state.item?.n;
     if(previous && !filtered.some(e=>e.n===previous)) state.item = null;
@@ -448,7 +448,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
   function hours(e){return `${data.times[e.s]}–${data.times[e.e]}`;}
   function colorClass(subject){let hash=0;for(const c of subject)hash=((hash<<5)-hash+c.charCodeAt(0))|0;return "tone-"+(Math.abs(hash)%6);}
   function extraForEvent(event){
-    if(event.booking) return `Rezervim · ${event.creatorName}`;
+    if(event.booking) return `${event.r} · ${event.creatorName}`;
     if(state.type==="subgroups") return [event.p,event.r].filter(Boolean).join(" · ");
     if(state.type==="teachers") return [event.g,event.r].filter(Boolean).join(" · ");
     return [event.g,event.p].filter(Boolean).join(" · ");
@@ -467,11 +467,18 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     let times=`<div class="time-axis">`;
     for(let s=0;s<data.times.length-1;s++){if(parseMinutes(data.times[s])%60===0)times+=`<div class="time-label" style="top:${s*15}px">${esc(data.times[s])}</div>`;}
     times+=`<div class="time-label" style="top:${(data.times.length-1)*15}px">${esc(data.times.at(-1))}</div></div>`;
-    const columns = days.map(({day,d})=>{
+    const layouts = days.map(({d})=>eventLanes(evs.filter(e=>e.d===d)));
+    const tracks = layouts.map(layout=>`${Math.max(170,170*Math.max(1,...[...layout.values()].map(v=>v.count)))}px`);
+    const template = `64px ${tracks.map(width=>`minmax(${width},1fr)`).join(' ')}`;
+    $('weekHeader').style.gridTemplateColumns=template;
+    $('weekBody').style.gridTemplateColumns=template;
+    document.querySelector('.calendar-inner').style.minWidth=`${64+tracks.reduce((sum,width)=>sum+parseInt(width),0)}px`;
+    const columns = days.map(({day,d},dayPosition)=>{
       const cells=evs.filter(e=>e.d===d).map(event=>{
         const index = evs.indexOf(event);
         const ht=(event.e-event.s)*15-3;
-        return `<button class="event ${colorClass(event.t)} ${event.booking?"reservation-event":""} ${ht<=48?"tiny":""}" data-event="${index}" type="button" aria-label="${esc(event.t)} – ${esc(day)} ${hours(event)}" style="top:${event.s*15+2}px;height:${ht}px"><span class="event-title">${esc(event.t)}</span><span class="event-sub">${esc(extraForEvent(event))}</span></button>`;
+        const {lane,count}=layouts[dayPosition].get(event);
+        return `<button class="event ${colorClass(event.t)} ${event.booking?"reservation-event":""} ${ht<=48?"tiny":""}" data-event="${index}" type="button" aria-label="${esc(event.t)} – ${esc(day)} ${hours(event)}" title="${esc(event.t)} · ${hours(event)} · ${esc(extraForEvent(event))}" style="left:calc(${lane/count*100}% + 3px);right:auto;width:calc(${100/count}% - 6px);top:${event.s*15+2}px;height:${ht}px"><span class="event-title">${esc(event.t)}</span><span class="event-sub">${esc(extraForEvent(event))}</span></button>`;
       }).join("");
       return `<div class="day-column" aria-label="${esc(day)}">${cells}</div>`;
     }).join("");
@@ -596,8 +603,8 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
   function routeFromHash(){
     let hash; try{hash=decodeURIComponent(location.hash.slice(1));}catch{hash="";}
     if(hash==="sallat-e-lira"){switchPage("free",false);return;}
-    const m=hash.match(/^orari\/(rooms|teachers|subgroups|other)\/(.*)$/);
-    if(m){state.type=m[1];state.query="";$("category").value=state.type;$("lookup").value="";
+    const m=hash.match(/^orari\/(rooms|teachers|subgroups|reservations|other)\/(.*)$/);
+    if(m){state.type=m[1]==="other"?"reservations":m[1];state.query="";$("category").value=state.type;$("lookup").value="";
       state.item=ordered[state.type].find(e=>e.n===m[2])||null;options();}
     switchPage("schedules",false);
   }
@@ -609,7 +616,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
         if(dayIndex(data.days,weekday)<0) data.days.push(label);
       }
       for(const kind of ["subgroups","teachers","rooms"])ordered[kind]=[...data[kind]].sort(niceSort);
-      ordered.other=[{n:"pa-salle",l:"Ngjarjet e tjera",e:[]}];
+      ordered.reservations=[{n:"te-gjitha",l:"Rezervimet",e:[]}];
       if(!data.rooms.length)throw Error("Nuk ka salla në orarin zyrtar. Nuk mund të llogaritet disponueshmëria.");
       document.documentElement.style.setProperty("--day-count",data.days.length);
       document.documentElement.style.setProperty("--timetable-height",`${(data.times.length-1)*15}px`);

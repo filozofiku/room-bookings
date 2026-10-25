@@ -9,7 +9,7 @@ Firebase and the HTML schedule. Keep the HTML exports and Firebase FET import in
 sync; changing one does not update the other.
 
 Reservations appear in the calendars and lists of every selected room, teacher and
-student group. Rooms, groups and teachers are optional. All reservations with “Pa sallë” also appear under “Ngjarjet e tjera”, including
+student group. Rooms, groups and teachers are optional. All reservations appear under “Rezervimet”, with or without a room, including
 those without any selected group or teacher. This category supports both weekly
 and list views for the selected week and preserves the normal event details. The date
 selector chooses a Monday–Sunday calendar week; reservations never repeat in
