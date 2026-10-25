@@ -1,10 +1,15 @@
 // Store only a restricted Firebase refresh token in GitHub, never Admin credentials.
 import admin from 'firebase-admin';
+import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import config from '../public-schedule/firebase-config.js';
 if(process.argv.slice(2).some(a=>a!=='--apply'))throw Error('Use --apply to configure the worker');
 const apply=process.argv.includes('--apply'), uid='cancellation-mail-worker';
-admin.initializeApp({credential:admin.credential.applicationDefault(),projectId:config.projectId});
+const file=process.env.GOOGLE_APPLICATION_CREDENTIALS;
+const credentials=file ? JSON.parse(readFileSync(file,'utf8')) : null;
+const credential=credentials?.type==='service_account' && credentials.private_key
+ ? admin.credential.cert(credentials) : admin.credential.applicationDefault();
+admin.initializeApp({credential,projectId:config.projectId});
 try {
  const db=admin.firestore(), auth=admin.auth();
  const users=await db.collection('users').get();
@@ -21,7 +26,9 @@ try {
   const customToken=await auth.createCustomToken(uid);
   const response=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${config.apiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:customToken,returnSecureToken:true}),signal:AbortSignal.timeout(30000)});
   const result=await response.json();
-  if(!response.ok || result.localId!==uid || !result.refreshToken)throw Error('Worker token exchange failed');
+  if(!response.ok || !result.idToken || !result.refreshToken)throw Error('Worker token exchange failed');
+  const identity=await auth.verifyIdToken(result.idToken);
+  if(identity.uid!==uid || identity.cancellationMailWorker!==true)throw Error('Unexpected worker identity');
   execFileSync('gh',['secret','set','CANCELLATION_FIREBASE_REFRESH_TOKEN','--repo','filozofiku/room-bookings'],{input:result.refreshToken,stdio:['pipe','pipe','pipe']});
   console.log('Restricted worker token stored in GitHub Actions. No email sent.');
  }
