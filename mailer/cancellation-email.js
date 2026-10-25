@@ -14,7 +14,8 @@ export function cancellationEmail(booking, reason, periods, roomName) {
       `Salla: ${roomName || 'Pa sallë'}`, '',
       'Arsyeja e anulimit:', reason, '',
       'Fakulteti Filozofik',
-      'Universiteti i Prishtinës'
+      'Universiteti i Prishtinës', '',
+      'Ky është një njoftim automatik. Ju lutemi, mos iu përgjigjni këtij emaili, sepse përgjigjet nuk do të lexohen.'
     ].join('\n')
   };
 }
