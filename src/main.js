@@ -39,6 +39,34 @@ function prepareReservation(period) {
   $('booking-form').scrollIntoView({behavior:'smooth', block:'start'});
   $('title').focus({preventScroll:true});
 }
+function confirmReservation(data) {
+  const dialog = $('reservation-dialog');
+  const summary = $('reservation-summary');
+  summary.replaceChildren();
+  const fields = [
+    ['Titulli',data.title], ['Lloji i aktivitetit',data.eventType],
+    ['Data',data.date], ['Ora',reservationTime(data.periodIds,periods)],
+    ['Salla',rooms.find(room=>room.id===data.roomId)?.name || 'Pa sallë'],
+    ['Grupet e studentëve',data.groupIds.map(id=>catalog.groups[id] || id).join(', ') || 'Pa grup të studentëve'],
+    ['Mësimdhënësit',data.teacherIds.map(id=>catalog.teachers[id] || id).join(', ') || 'Pa mësimdhënës'],
+    ['Njoftimi për aktivitetin',data.isPublic ? 'Publik (njoftimi i stafit me email nuk është aktiv)' : 'Jo publik'],
+    ['Mënyra e zhvillimit',data.mode==='online' ? 'Online' : 'Fizik'],
+    ['Rezervuar nga',data.creatorName]
+  ];
+  if(data.onlineUrl)fields.push(['Linku i ngjarjes online',data.onlineUrl]);
+  if(data.description)fields.push(['Përshkrimi',data.description]);
+  for(const [label,value] of fields){
+    const term=document.createElement('dt'),detail=document.createElement('dd');
+    term.textContent=label;term.style.fontWeight='600';
+    detail.textContent=value;detail.style.margin='0 0 .75rem';
+    summary.append(term,detail);
+  }
+  dialog.returnValue='back';
+  return new Promise(resolve=>{
+    dialog.addEventListener('close',()=>resolve(dialog.returnValue==='confirm'),{once:true});
+    dialog.showModal();
+  });
+}
 function confirmCancellation(data) {
   const dialog = $('cancel-dialog');
   $('cancel-question').textContent = `Ta anuloni rezervimin "${data.title}" më ${data.date}?`;
@@ -169,11 +197,14 @@ async function createReservation(event) {
   const data = {title, date, roomId, periodIds, description, groupIds:checked('groups'), teacherIds:checked('teachers'),
     eventType:$('event-type').value, isPublic:$('visibility').value === 'public', mode:$('mode').value, onlineUrl,
     creatorName:currentUser.displayName || 'Mësimdhënës'};
+  const ownerUid=currentUser.uid;
   const reservationRef = doc(collection(db,'reservations'));
   const publicRef = doc(db,'publicBookings',reservationRef.id);
   const occupancyRef = doc(db,'eventDays',date);
   try {
     $('booking-form').querySelector('button').disabled = true;
+    if(!await confirmReservation(data))return;
+    if(currentUser?.uid!==ownerUid)throw new BookingError('Llogaria ndryshoi. Provoni përsëri.');
     await runTransaction(db, async tx => {
       // Read all relevant documents first; writes must follow all transaction reads.
       // Reading settings also makes a concurrent administrative import fail/retry safely.
@@ -190,7 +221,7 @@ async function createReservation(event) {
       const weeklySnap = day.fetActive ? await tx.get(weeklyRef) : null;
       const conflict = conflictMessage(data, locks, weeklySnap?.exists() ? weeklySnap.data().busyKeys : []);
       if (conflict) throw new BookingError(conflict);
-      tx.set(reservationRef, {...data, ownerUid:currentUser.uid, createdAt:serverTimestamp()});
+      tx.set(reservationRef, {...data, ownerUid, createdAt:serverTimestamp()});
       tx.set(publicRef, {...data, createdAt:serverTimestamp()});
       const keys = slotKeys(data);
       for (const key of keys) locks[key] = reservationRef.id;

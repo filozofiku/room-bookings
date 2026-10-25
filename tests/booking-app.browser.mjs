@@ -54,6 +54,11 @@ else if(['/src/booking-ui.js','/src/booking-resources.js'].includes(path))body=r
 else return route.abort();
 return route.fulfill({contentType,body});
 });
+async function submitBooking(){
+ await page.locator('#booking-form button').click();
+ if(await page.locator('#reservation-dialog').isVisible())await page.locator('#reservation-dialog button[value="confirm"]').click();
+ await page.waitForFunction(()=>!document.querySelector('#booking-form button').disabled);
+}
 await page.goto('https://booking.test/');
 await page.waitForFunction(()=>document.getElementById('slots').children.length===18);
 assert.equal(await page.locator('html').getAttribute('lang'),'sq');
@@ -99,11 +104,22 @@ assert.match(await page.locator('#selection-hint').textContent(),/12:30/);
 await page.selectOption('#from','p01');
 assert.equal(await page.locator('#selection-hint').textContent(),'');
 await page.fill('#title','Seminar');await page.selectOption('#through','p17');
-await page.locator('#booking-form button').click();
+await submitBooking();
 assert.match(await page.locator('#booking-message').textContent(),/më shumë se 16 periudha/);
 assert.equal(await page.locator('#booking-message').isVisible(),true);
 assert.equal(await page.getByText('Zgjidhni 1–16 periudha të njëpasnjëshme (deri në 4 orë).',{exact:false}).count(),0);
-await page.selectOption('#through','p16');await page.locator('#booking-form button').click();
+await page.selectOption('#through','p16');
+await page.getByRole('button',{name:'Bëni rezervimin',exact:true}).click();
+assert.match(await page.locator('#reservation-summary').textContent(),/Seminar/);
+assert.match(await page.locator('#reservation-summary').textContent(),/08:00–12:00/);
+assert.match(await page.locator('#reservation-summary').textContent(),/Salla 014/);
+assert.equal(await page.evaluate(()=>window.testStore.has('reservations/new')),false);
+await page.locator('#reservation-dialog button[value="back"]').click();
+assert.equal(await page.locator('#title').inputValue(),'Seminar');
+assert.equal(await page.evaluate(()=>window.testStore.has('reservations/new')),false);
+await page.locator('#booking-form button').click();await page.keyboard.press('Escape');
+assert.equal(await page.evaluate(()=>window.testStore.has('reservations/new')),false);
+await submitBooking();
 await page.waitForFunction(()=>document.getElementById('message').textContent.includes('u krijua me sukses'));
 await page.waitForFunction(()=>document.getElementById('my-reservations').textContent.includes('08:00–12:00'));
 assert.equal(await page.evaluate(()=>window.testStore.get('reservations/new').periodIds.length),16);
@@ -119,16 +135,16 @@ await page.selectOption('#event-type','Konferencë');
 await page.selectOption('#visibility','public');assert.equal(await page.locator('#email-notice').isVisible(),true);
 assert.equal(await page.locator('#description-field').isVisible(),true);
 await page.fill('#description',Array(501).fill('fjalë').join(' '));
-await page.locator('#booking-form button').click();
+await submitBooking();
 assert.match(await page.locator('#booking-message').textContent(),/500 fjalë/);
 assert.equal(await page.evaluate(()=>window.testStore.has('reservations/new')),false);
 await page.fill('#description',Array(500).fill('fjalë').join(' '));
 assert.equal(await page.locator('#description-count').textContent(),'500 / 500 fjalë');
 await page.selectOption('#mode','online');assert.equal(await page.locator('#online-field').isVisible(),true);
-await page.fill('#online-url','javascript:alert(1)');await page.locator('#booking-form button').click();
+await page.fill('#online-url','javascript:alert(1)');await submitBooking();
 assert.match(await page.locator('#message').textContent(),/link të vlefshëm/);
 await page.fill('#online-url','https://example.test/event');
-await page.locator('#booking-form button').click();
+await submitBooking();
 await page.waitForFunction(()=>document.getElementById('message').textContent.includes('u krijua me sukses'));
 assert.equal(await page.evaluate(()=>window.testStore.get('reservations/new').description.split(' ').length),500);
 assert.deepEqual(await page.evaluate(()=>{const d=window.testStore.get('reservations/new');return [d.roomId,d.groupIds,d.teacherIds,d.isPublic,d.mode,d.onlineUrl,d.eventType]}),['',[],[],true,'online','https://example.test/event','Konferencë']);
@@ -142,7 +158,7 @@ for(const [selector,key,error] of [['#groups input[value="g_one"]','g_one','Grup
  await page.locator(selector).check();
  for(const source of ['fet','booking']) {
   await page.evaluate(({source,key})=>{window.testStore.set('weeklyResources/5',{busyKeys:source==='fet'?[key+'__p01']:[]});window.testStore.set('eventDays/2026-10-23',{bookings:source==='booking'?{[key+'__p01']:'occupied'}:{}})},{source,key});
-  await page.locator('#booking-form button').click();
+  await submitBooking();
   assert.equal(await page.locator('#message').textContent(),error+' nuk është i lirë në intervalin e përzgjedhur.');
   assert.equal(await page.locator('#booking-message').textContent(),error+' nuk është i lirë në intervalin e përzgjedhur.');
   assert.equal(await page.locator('#booking-message').isVisible(),true);
@@ -152,11 +168,11 @@ for(const [selector,key,error] of [['#groups input[value="g_one"]','g_one','Grup
 }
 await page.selectOption('#room','r_123456abcdef');
 await page.evaluate(()=>window.testStore.set('weeklyResources/5',{busyKeys:['r_123456abcdef__p01']}));
-await page.locator('#booking-form button').click();
+await submitBooking();
 assert.equal(await page.locator('#message').textContent(),'Salla nuk është e lirë në intervalin e përzgjedhur.');
 await page.locator('#groups input').first().check();await page.locator('#teachers input').first().check();
 await page.evaluate(()=>{window.testStore.set('weeklyResources/5',{busyKeys:['g_one__p01','r_123456abcdef__p01']});window.testStore.set('eventDays/2026-10-23',{bookings:{t_one__p01:'occupied'}})});
-await page.locator('#booking-form button').click();
+await submitBooking();
 assert.deepEqual((await page.locator('#booking-message').textContent()).split('\n'),[
  'Grupi i studentëve nuk është i lirë në intervalin e përzgjedhur.',
  'Salla nuk është e lirë në intervalin e përzgjedhur.',
@@ -166,7 +182,7 @@ assert.equal(await page.evaluate(()=>window.testStore.has('reservations/new')),f
 await page.evaluate(()=>{window.testStore.set('weeklyResources/5',{busyKeys:[]});window.testStore.set('eventDays/2026-10-23',{bookings:{}})});
 await page.locator('#groups input').first().check();await page.locator('#groups input').last().check();
 await page.locator('#teachers input').first().check();await page.locator('#teachers input').last().check();
-await page.locator('#booking-form button').click();
+await submitBooking();
 await page.waitForFunction(()=>window.testStore.has('reservations/new'));
 assert.deepEqual(await page.evaluate(()=>{const d=window.testStore.get('reservations/new');return [d.groupIds,d.teacherIds,d.onlineUrl,d.isPublic]}),[['g_one','g_two'],['t_one','t_two'],'',false]);
 assert.equal(await page.evaluate(()=>Object.keys(window.testStore.get('eventDays/2026-10-23').bookings).length),10);
