@@ -49,7 +49,7 @@ function confirmReservation(data) {
     ['Salla',rooms.find(room=>room.id===data.roomId)?.name || 'Pa sallë'],
     ['Grupet e studentëve',data.groupIds.map(id=>catalog.groups[id] || id).join(', ') || 'Pa grup të studentëve'],
     ['Mësimdhënësit',data.teacherIds.map(id=>catalog.teachers[id] || id).join(', ') || 'Pa mësimdhënës'],
-    ['Njoftimi për aktivitetin',data.isPublic ? 'Publik (njoftimi i stafit me email nuk është aktiv)' : 'Jo publik'],
+    ['Njoftimi për aktivitetin',data.isPublic ? 'Publik — email 24 orë para fillimit, ose në ekzekutimin e parë nëse mbeten më pak se 24 orë' : 'Jo publik'],
     ['Mënyra e zhvillimit',data.mode==='online' ? 'Online' : 'Fizik'],
     ['Rezervuar nga',data.creatorName]
   ];

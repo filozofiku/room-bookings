@@ -24,7 +24,7 @@ në repository; kontrolloni Actions dhe riaktivizojeni kur nevojitet.
    https://github.com/filozofiku/room-bookings/settings/secrets/actions/new
    me emrin `CANCELLATION_SMTP_PASSWORD`. Mos e vendosni në chat, Git ose frontend.
    Nëse politika Workspace nuk e lejon, kërkohet autorizim tjetër nga administratori.
-4. Te Actions → Send cancellation emails → Run workflow, përdorni `check` për
+4. Te Actions → Send reservation emails → Run workflow, përdorni `check` për
    lidhjen me Firebase dhe `verify-smtp` për Gmail. Këto nuk dërgojnë email.
 5. Vetëm pasi kontrollet kalojnë, vendosni repository variable
    `CANCELLATION_EMAIL_ENABLED` në `true`. Modaliteti manual `send` dërgon njoftimet
@@ -48,3 +48,37 @@ njëjtin njoftim. SMTP nuk garanton vetëm një dërgim nëse procesi ndalet pas
 të emailit dhe para ruajtjes së statusit. Riprovimet përdorin të njëjtin Message-ID.
 `sent` nënkupton pranimin nga SMTP, jo garanci të mbërritjes në inbox.
 Sekretet dhe arsyet nuk regjistrohen në log. Testet përdorin email të simuluar.
+
+## Njoftimet për aktivitetet publike
+
+Kodi mbështet dërgimin për të gjitha rezervimet `isPublic: true`, pavarësisht
+krijuesit ose sallës. Lista e marrësve ruhet në dokumentin privat
+`mailSettings/publicEvents`; nuk botohet në GitHub ose në shfletues.
+Për ta përditësuar, përdorni:
+
+```
+node scripts/configure-public-event-emails.mjs 'Emails for public events.txt'
+node scripts/configure-public-event-emails.mjs 'Emails for public events.txt' --apply
+```
+
+Rregullat e reja duhen publikuar para përdorimit. Modaliteti `check-public` i
+workflow-t kontrollon konfigurimin dhe numëron ngjarjet për njoftim pa dërguar email.
+Dërgimi publik është i ndarë nga ai i anulimeve: kërkon repository variable
+`PUBLIC_EVENT_EMAIL_ENABLED=true`. Kufizimi i planifikimit është pranuar dhe shfaqet në formularin e rezervimit.
+
+Afati llogaritet si 24 orë reale para fillimit sipas `Europe/Tirane`, përfshirë
+ndryshimet sezonale të orës. Rezervimet e krijuara më vonë janë menjëherë të
+pranueshme për përpunim, por ekzekutimi GitHub mund të vonohet: kjo zgjidhje
+nuk garanton email të menjëhershëm ose saktësisht në afat. Edhe rezervimet publike
+që ekzistonin para aktivizimit përpunohen nëse afati ka ardhur dhe ende nuk kanë
+filluar. Ngjarjet e filluara, private ose të anuluara nuk njoftohen.
+
+Emaili i dërgohet veçmas secilës adresë, me hollësitë, përshkrimin dhe linkun
+online kur ekziston. `publicEventDeliveries` ruan rezultat për çdo çift
+rezervim–marrës. Dështimet riprovohen deri në pesë herë; marrësit me status `sent`
+nuk ridërgohen. Pas korrigjimit të një dështimi, një administrator mund ta kthejë
+vetëm atë dokument në `retrying`, me `attempts: 0`. Kufizimi SMTP për kopje të
+mundshme pas një ndërprerjeje mes pranimit dhe regjistrimit të statusit vlen edhe
+këtu. Anulimi kontrollohet menjëherë para SMTP; emaili i pranuar nga SMTP nuk
+mund të tërhiqet. Ky shërbim nuk njofton listën për anulime: emaili i anulimit
+vazhdon të shkojë vetëm te krijuesi sipas rregullave ekzistuese.

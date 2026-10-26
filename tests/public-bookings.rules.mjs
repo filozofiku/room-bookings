@@ -3,6 +3,7 @@ import {createRequire} from 'node:module';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {firestoreRest,timestamp} from '../mailer/firestore-rest.js';
+import {deliverPublicEvent} from '../mailer/public-event-email.js';
 import {deliverCancellation} from '../mailer/cancellation-email.js';
 import {slotKeys,validPeriodRanges} from '../src/booking-resources.js';
 const require = createRequire(process.env.TEST_MODULES_DIR ? `${process.env.TEST_MODULES_DIR}/package.json` : import.meta.url);
@@ -91,6 +92,27 @@ test('resource reservations: atomic publication, optional resources, conflicts, 
   await deliverCancellation(rest.doc('cancellationNotifications/managed'),delivery);
   await deliverCancellation(rest.doc('cancellationNotifications/managed'),delivery);
   assert.equal(deliveries,1);
+  await seed('mailSettings/publicEvents',{enabled:true,recipients:['recipient@example.test']});
+  for(const context of [anon,db,manager]){
+    await assertFails(getDoc(doc(context,'mailSettings','publicEvents')));
+    await assertFails(setDoc(doc(context,'publicEventDeliveries','forged'),{status:'sent'}));
+  }
+  await assertSucceeds(getDoc(doc(worker,'mailSettings','publicEvents')));
+  await assertFails(setDoc(doc(worker,'mailSettings','publicEvents'),{recipients:['attacker@example.test']}));
+  const publicEvent={...base,isPublic:true,roomId:'',periodIds:['p01'],date:'2026-10-26'};
+  await seed('publicBookings/public-event',publicEvent);
+  let publicEmails=0;
+  const publicDeps={db:rest,periods:[{id:'p01',start:'08:00',end:'08:15'}],rooms:[],catalog:{},now:()=>Date.parse('2026-10-25T12:00:00Z'),token:'public-test',send:async()=>{publicEmails++;}};
+  await deliverPublicEvent('public-event','recipient@example.test',publicDeps);
+  await deliverPublicEvent('public-event','recipient@example.test',publicDeps);
+  assert.equal(publicEmails,1);
+  await assert.rejects(deliverPublicEvent('public-event','attacker@example.test',publicDeps));
+  await assertFails(getDocs(collection(db,'publicEventDeliveries')));
+  const receipts=await getDocs(collection(worker,'publicEventDeliveries'));
+  assert.equal(receipts.size,1);
+  await assertFails(setDoc(doc(worker,'publicEventDeliveries',receipts.docs[0].id),{recipient:'attacker@example.test'},{merge:true}));
+  assert.ok((await rest.upcoming('2026-10-26')).some(d=>d.id==='public-event'));
+
   assert.equal((await rest.doc('cancellationNotifications/managed').get()).data().status,'sent');
   assert.ok(Object.values((await getDoc(doc(db,'eventDays',date))).data().bookings).every(id=>id==='keep'));
   await assertFails(setDoc(doc(db,'users','teacher'),{active:true,role:'admin',canCancelAll:true}));

@@ -1,9 +1,10 @@
 ## Rezervime me grupe dhe mësimdhënës (resources-v2)
 
 Formulari mbështet katër llojet e aktivitetit, asnjë ose disa grupe/mësimdhënës,
-sallë opsionale dhe zhvillim fizik ose online. “Publik” vlen vetëm për synimin e
-njoftimit me email; **nuk dërgohet email** dhe hollësitë e të gjitha rezervimeve
-mbeten publike në oraret e burimeve të përzgjedhura. Të gjitha rezervimet shfaqen te “Rezervimet” në orarin publik,
+sallë opsionale dhe zhvillim fizik ose online. “Publik” aktivizon njoftimin me email për listën e konfiguruar: 24 orë para
+fillimit, ose në ekzekutimin e parë nëse rezervimi bëhet brenda këtij afati.
+GitHub Actions mund të vonohet. Hollësitë e të gjitha rezervimeve, edhe atyre
+jo publike, mbeten të dukshme në oraret e burimeve të përzgjedhura. Të gjitha rezervimet shfaqen te “Rezervimet” në orarin publik,
 dhe vazhdojnë të shfaqen në sallat, grupet dhe mësimdhënësit përkatës.
 Rezervimet që mbivendosen shfaqen krah për krah në pamjen javore.
 

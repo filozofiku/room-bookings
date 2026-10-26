@@ -52,12 +52,15 @@ export function firestoreRest(project, token, request = fetch, origin = 'https:/
           patch=data;
         }});
         if(!patch)return result;
-        if(!version)throw Error('missing-delivery-document');
         try{
-          await call(':commit','POST',{writes:[{update:{name:`projects/${project}/databases/(default)/documents/${readRef.path}`,fields:encode(patch).mapValue.fields},updateMask:{fieldPaths:Object.keys(patch)},currentDocument:{updateTime:version}}]});
+          await call(':commit','POST',{writes:[{update:{name:`projects/${project}/databases/(default)/documents/${readRef.path}`,fields:encode(patch).mapValue.fields},updateMask:{fieldPaths:Object.keys(patch)},currentDocument:version?{updateTime:version}:{exists:false}}]});
           return result;
-        }catch(error){if(!['FAILED_PRECONDITION','ABORTED'].includes(error.code)||attempt===4)throw error;}
+        }catch(error){if(!['FAILED_PRECONDITION','ABORTED','ALREADY_EXISTS'].includes(error.code)||attempt===4)throw error;}
       }
+    },
+    upcoming:async date=>{
+      const rows=await call(':runQuery','POST',{structuredQuery:{from:[{collectionId:'publicBookings'}],where:{fieldFilter:{field:{fieldPath:'date'},op:'GREATER_THAN_OR_EQUAL',value:encode(date)}}}});
+      return rows.filter(r=>r.document).map(r=>snapshot(r.document));
     },
     pending:async()=>{
       const rows=await call(':runQuery','POST',{structuredQuery:{from:[{collectionId:'cancellationNotifications'}],where:{fieldFilter:{field:{fieldPath:'status'},op:'IN',value:encode(['pending','retrying','sending'])}},limit:25}});

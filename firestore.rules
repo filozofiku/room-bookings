@@ -150,6 +150,20 @@ service cloud.firestore {
         (resources(resource.data).size() == 0 || occupancyWritten(reservationId, resource.data)) &&
         !existsAfter(/databases/$(database)/documents/publicBookings/$(reservationId));
     }
+    match /mailSettings/{id} {
+      allow get: if mailWorker() && id == 'publicEvents';
+      allow list, write: if false;
+    }
+    match /publicEventDeliveries/{id} {
+      allow read: if mailWorker();
+      allow create: if mailWorker() &&
+        get(/databases/$(database)/documents/publicBookings/$(request.resource.data.bookingId)).data.isPublic == true &&
+        request.resource.data.recipient in get(/databases/$(database)/documents/mailSettings/publicEvents).data.recipients;
+      allow update: if mailWorker() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'status','attempts','leaseToken','leaseUntil','sentAt','lastErrorCode','lastAttemptAt'
+      ]);
+      allow delete: if false;
+    }
     match /cancellationNotifications/{id} {
       function validCancellation() {
         let d = request.resource.data;

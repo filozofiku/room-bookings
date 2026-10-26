@@ -8,3 +8,4 @@ service-account*.json
 .firebase/
 data/timetable.csv
 data/semester.json
+/Emails for public events.txt
