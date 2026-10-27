@@ -2,6 +2,7 @@ import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from
 import { collection, doc, getDoc, getDocs, query, where, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { BookingError, selectPeriods, reservationTime, errorText, MAX_PERIODS } from './booking-ui.js';
 import { EVENT_TYPES, slotKeys, conflictMessage, wordCount } from './booking-resources.js';
+import {updateReservation} from './update-reservation.js';
 import { auth, db } from './firebase.js';
 
 const $ = (id) => document.getElementById(id);
@@ -15,6 +16,7 @@ let periods = [];
 let settings = null;
 let catalog = null;
 let occupied = new Map();
+let editing = null;
 const errText = errorText;
 function message(text, isError = false) {
   $('message').textContent = text;
@@ -41,6 +43,8 @@ function prepareReservation(period) {
 }
 function confirmReservation(data) {
   const dialog = $('reservation-dialog');
+  $('reservation-heading').textContent=editing?'Konfirmoni ndryshimet':'Konfirmoni rezervimin';
+  dialog.querySelector('[value=confirm]').textContent=editing?'Konfirmo ndryshimet':'Konfirmo rezervimin';
   const summary = $('reservation-summary');
   summary.replaceChildren();
   const fields = [
@@ -133,6 +137,35 @@ async function readAvailability() {
     $('slots').appendChild(item);
   });
 }
+function stopEditing() {
+  editing=null;
+  $('edit-banner').hidden=true;
+  $('booking-heading').textContent='Rezervoni një aktivitet';
+  $('booking-form').querySelector('button').textContent='Bëni rezervimin';
+  $('title').value='';
+  $('booking-message').textContent='';
+}
+function startEditing(id,data) {
+  editing={id,data,revision:data.revision||0};
+  $('date').value=data.date;$('room').value=data.roomId;
+  $('title').value=data.title;$('event-type').value=data.eventType||EVENT_TYPES[0];
+  $('from').value=data.periodIds[0];$('through').value=data.periodIds.at(-1);
+  $('visibility').value=data.isPublic?'public':'private';$('visibility').onchange();
+  $('mode').value=data.mode||'physical';$('mode').onchange();
+  $('online-url').value=data.onlineUrl||'';$('description').value=data.description||'';$('description').oninput();
+  for(const [kind,ids] of [['groups',data.groupIds||[]],['teachers',data.teacherIds||[]]]){
+    $(`${kind}-search`).value='';
+    for(const input of $(kind).querySelectorAll('input'))input.checked=ids.includes(input.value);
+    filterChoices(kind);
+  }
+  $('booking-heading').textContent='Redaktoni rezervimin';
+  $('booking-form').querySelector('button').textContent='Ruani ndryshimet';
+  $('edit-banner').hidden=false;
+  $('edit-notice').textContent=data.ownerUid===currentUser.uid?'Po redaktoni rezervimin tuaj.':'Po redaktoni rezervimin e një përdoruesi tjetër. Krijuesi do të njoftohet me email për ndryshimet.';
+  $('booking-message').textContent='';$('selection-hint').textContent='';
+  readAvailability().catch(e=>message(errText(e),true));
+  $('booking-heading').scrollIntoView({behavior:'smooth'});
+}
 async function readMyBookings() {
   if (!currentUser) return;
   const reservations = collection(db, 'reservations');
@@ -163,7 +196,10 @@ async function readMyBookings() {
         message(data.ownerUid === currentUser.uid ? 'Rezervimi u anulua.' : 'Rezervimi u anulua. Njoftimi me email është në pritje të dërgimit.');
       } catch(e) { message(errText(e), true); button.disabled = false; }
     };
-    div.append(description,button);
+    const edit=document.createElement('button');
+    edit.type='button';edit.className='secondary';edit.textContent='Redaktoni';
+    edit.onclick=()=>startEditing(item.id,data);
+    div.append(description,edit,button);
     wrapper.appendChild(div);
   }
 }
@@ -177,7 +213,8 @@ function bookingMessage(text, isError = false) {
 async function createReservation(event) {
   event.preventDefault();
   $('booking-message').textContent = '';
-  if (!currentUser) return;
+  if (!currentUser || $('reservation-dialog').open || $('booking-form').querySelector('button').disabled) return;
+  const edit=editing;
   const date = $('date').value;
   const roomId = $('room').value;
   const title = $('title').value.trim();
@@ -196,7 +233,10 @@ async function createReservation(event) {
   const checked = id => [...$(id).querySelectorAll('input:checked')].map(input => input.value);
   const data = {title, date, roomId, periodIds, description, groupIds:checked('groups'), teacherIds:checked('teachers'),
     eventType:$('event-type').value, isPublic:$('visibility').value === 'public', mode:$('mode').value, onlineUrl,
-    creatorName:currentUser.displayName || 'Mësimdhënës'};
+    creatorName:edit?.data.creatorName || currentUser.displayName || 'Mësimdhënës'};
+  if(edit && Object.entries(data).every(([key,value])=>JSON.stringify(value)===JSON.stringify(edit.data[key] ?? (Array.isArray(value)?[]:typeof value==='boolean'?false:'')))) {
+    return bookingMessage('Nuk keni bërë ndryshime.');
+  }
   const ownerUid=currentUser.uid;
   const reservationRef = doc(collection(db,'reservations'));
   const publicRef = doc(db,'publicBookings',reservationRef.id);
@@ -205,7 +245,9 @@ async function createReservation(event) {
     $('booking-form').querySelector('button').disabled = true;
     if(!await confirmReservation(data))return;
     if(currentUser?.uid!==ownerUid)throw new BookingError('Llogaria ndryshoi. Provoni përsëri.');
-    await runTransaction(db, async tx => {
+    if(edit) {
+      await updateReservation(db,edit.id,edit.revision,data,currentUser);
+    } else await runTransaction(db, async tx => {
       // Read all relevant documents first; writes must follow all transaction reads.
       // Reading settings also makes a concurrent administrative import fail/retry safely.
       const settingsRef = doc(db,'settings','control');
@@ -230,7 +272,8 @@ async function createReservation(event) {
     $('title').value = '';
     $('description').value = '';
     $('description-count').textContent = '0 / 500 fjalë';
-    bookingMessage('Rezervimi u krijua me sukses.');
+    if(edit)stopEditing();
+    bookingMessage(edit ? (edit.data.ownerUid===ownerUid?'Rezervimi u ndryshua me sukses.':'Rezervimi u ndryshua. Njoftimi me email është në pritje të dërgimit.') : 'Rezervimi u krijua me sukses.');
     await Promise.all([readAvailability(),readMyBookings()]);
   } catch (e) { bookingMessage(errText(e),true); }
   finally { $('booking-form').querySelector('button').disabled = false; }
@@ -317,6 +360,7 @@ $('logout').onclick = async () => { try { await signOut(auth); } catch(e) {messa
 $('date').onchange = () => readAvailability().catch(e => message(errText(e),true));
 $('room').onchange = () => readAvailability().catch(e => message(errText(e),true));
 $('booking-form').onsubmit = createReservation;
+$('stop-editing').onclick = stopEditing;
 $('cancel-form').onsubmit = event => {
   event.preventDefault();
   if (event.submitter?.value !== 'cancel') { $('cancel-dialog').close('keep'); return; }
@@ -339,6 +383,8 @@ $('description').oninput = () => {
 $('mode').onchange = () => { $('online-field').hidden = $('mode').value !== 'online'; };
 for (const id of ['from','through']) $(id).addEventListener('change', () => { $('selection-hint').textContent = ''; });
 onAuthStateChanged(auth,async user => {
+  stopEditing();
+  if($('reservation-dialog').open)$('reservation-dialog').close('back');
   currentUser = user;
   canCancelAll = false;
   $('login').hidden = Boolean(user);

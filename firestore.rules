@@ -13,7 +13,6 @@ service cloud.firestore {
     }
     function approved() {
       return request.auth != null &&
-        exists(userPath()) &&
         get(userPath()).data.active == true &&
         get(userPath()).data.role in ['teacher', 'admin'];
     }
@@ -34,44 +33,44 @@ service cloud.firestore {
       return /databases/$(database)/documents/calendarDays/$(date);
     }
     function dayAllowed(date) {
-      return exists(dayPath(date)) && get(dayPath(date)).data.bookingAllowed == true;
+      return get(dayPath(date)).data.bookingAllowed == true;
     }
     function catalog() { return get(/databases/$(database)/documents/resourceCatalog/current).data; }
     function resources(d) {
       return d.get('groupIds', []).concat(d.get('teacherIds', [])).concat(d.roomId == '' ? [] : [d.roomId]);
     }
-    function periodKeys(ids, periods, index) {
-      return index >= periods.size() ? [] :
-        (ids.join('__' + periods[index] + '|') + '__' + periods[index]).split('[|]');
+    function periodKeys(ids, suffix) {
+      return ids.join(suffix + '|') + suffix;
     }
     function keys(d) {
       let ids = resources(d);
       let p = d.periodIds;
-      return ids.size() == 0 ? [] :
-        periodKeys(ids, p, 0)
-        .concat(periodKeys(ids, p, 1))
-        .concat(periodKeys(ids, p, 2))
-        .concat(periodKeys(ids, p, 3))
-        .concat(periodKeys(ids, p, 4))
-        .concat(periodKeys(ids, p, 5))
-        .concat(periodKeys(ids, p, 6))
-        .concat(periodKeys(ids, p, 7))
-        .concat(periodKeys(ids, p, 8))
-        .concat(periodKeys(ids, p, 9))
-        .concat(periodKeys(ids, p, 10))
-        .concat(periodKeys(ids, p, 11))
-        .concat(periodKeys(ids, p, 12))
-        .concat(periodKeys(ids, p, 13))
-        .concat(periodKeys(ids, p, 14))
-        .concat(periodKeys(ids, p, 15));
+      let n = p.size();
+      return ids.size() == 0 ? [] : [
+        n > 0 ? periodKeys(ids, '__' + p[0]) : '',
+        n > 1 ? periodKeys(ids, '__' + p[1]) : '',
+        n > 2 ? periodKeys(ids, '__' + p[2]) : '',
+        n > 3 ? periodKeys(ids, '__' + p[3]) : '',
+        n > 4 ? periodKeys(ids, '__' + p[4]) : '',
+        n > 5 ? periodKeys(ids, '__' + p[5]) : '',
+        n > 6 ? periodKeys(ids, '__' + p[6]) : '',
+        n > 7 ? periodKeys(ids, '__' + p[7]) : '',
+        n > 8 ? periodKeys(ids, '__' + p[8]) : '',
+        n > 9 ? periodKeys(ids, '__' + p[9]) : '',
+        n > 10 ? periodKeys(ids, '__' + p[10]) : '',
+        n > 11 ? periodKeys(ids, '__' + p[11]) : '',
+        n > 12 ? periodKeys(ids, '__' + p[12]) : '',
+        n > 13 ? periodKeys(ids, '__' + p[13]) : '',
+        n > 14 ? periodKeys(ids, '__' + p[14]) : '',
+        n > 15 ? periodKeys(ids, '__' + p[15]) : ''
+      ].join('|').split('[|]').removeAll(['']);
     }
     function freeOfFet(d, expected) {
       let day = get(dayPath(d.date)).data;
       return !day.fetActive || !get(/databases/$(database)/documents/weeklyResources/$(day.weekday)).data.busyKeys.hasAny(expected);
     }
     function valid(d) {
-      return d.keys().hasOnly(['title','date','roomId','periodIds','ownerUid','creatorName','createdAt','groupIds','teacherIds','eventType','isPublic','mode','onlineUrl','description']) &&
-        d.ownerUid == request.auth.uid && d.creatorName == request.auth.token.get('name','Mësimdhënës') &&
+      return d.keys().hasOnly(['title','date','roomId','periodIds','ownerUid','creatorName','createdAt','groupIds','teacherIds','eventType','isPublic','mode','onlineUrl','description','revision','updatedAt']) &&
         d.title is string && d.title.size() > 0 && d.title.size() <= 120 &&
         d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
         d.roomId is string && (d.roomId == '' || d.roomId in catalog().rooms) &&
@@ -84,8 +83,7 @@ service cloud.firestore {
         d.get('description','').split('\\s+').removeAll(['']).size() <= 500 &&
         (d.isPublic || d.get('description','') == '') &&
         d.isPublic is bool && d.mode in ['physical','online'] && d.onlineUrl is string &&
-        (d.mode == 'physical' ? d.onlineUrl == '' : (d.onlineUrl.size() <= 2000 && d.onlineUrl.matches('^https?://[^ /]+.*$'))) &&
-        d.createdAt == request.time;
+        (d.mode == 'physical' ? d.onlineUrl == '' : (d.onlineUrl.size() <= 2000 && d.onlineUrl.matches('^https?://[^ /]+.*$')));
     }
     function occupancyChange(id, d, creating, expected) {
       let path = /databases/$(database)/documents/eventDays/$(d.date);
@@ -106,6 +104,34 @@ service cloud.firestore {
       let path = /databases/$(database)/documents/eventDays/$(d.date);
       return getAfter(path).data.changedReservationId == id &&
         (!exists(path) || getAfter(path).data.bookings != get(path).data.bookings);
+    }
+    function sameSlots(a,b) {
+      return a.date == b.date && a.roomId == b.roomId && a.periodIds == b.periodIds &&
+        a.get('groupIds',[]).toSet() == b.groupIds.toSet() && a.get('teacherIds',[]).toSet() == b.teacherIds.toSet();
+    }
+    function modificationRecorded(id, before, after) {
+      let path = /databases/$(database)/documents/modificationNotifications/$(id + '__' + string(after.revision));
+      return existsAfter(path);
+    }
+    function editOccupancy(id, before, after) {
+      return sameSlots(before,after) ||
+        ((resources(before).size() == 0 || occupancyWritten(id,before)) &&
+         (resources(after).size() == 0 || occupancyWritten(id,after)));
+    }
+    function occupancyEdit(id, before, after, date) {
+      let notice = /databases/$(database)/documents/modificationNotifications/$(id + '__' + string(after.revision));
+      let oldKeys = before.date == date ? getAfter(notice).data.previousKeys.toSet() : [].toSet();
+      let newList = after.date == date ? keys(after) : [];
+      let newKeys = newList.toSet();
+      let path = /databases/$(database)/documents/eventDays/$(date);
+      let oldMap = exists(path) ? get(path).data.bookings : {};
+      let newMap = getAfter(path).data.bookings;
+      let diff = newMap.diff(oldMap);
+      return (date == before.date || date == after.date) &&
+        diff.addedKeys() == newKeys.difference(oldKeys) && diff.removedKeys() == oldKeys.difference(newKeys) &&
+        diff.changedKeys().size() == 0 &&
+        newMap.values().removeAll([id]).size() == oldMap.values().removeAll([id]).size() &&
+        (date != after.date || freeOfFet(after, newList));
     }
     function publicMatches(id, d) {
       let p = getAfter(/databases/$(database)/documents/publicBookings/$(id)).data;
@@ -141,14 +167,41 @@ service cloud.firestore {
     match /reservations/{reservationId} {
       allow read: if approved();
       allow create: if canBook(request.resource.data.date) && valid(request.resource.data) &&
+        request.resource.data.ownerUid == request.auth.uid && request.resource.data.creatorName == request.auth.token.get('name','Mësimdhënës') &&
+        request.resource.data.createdAt == request.time && !request.resource.data.keys().hasAny(['revision','updatedAt']) &&
         (resources(request.resource.data).size() == 0 || occupancyWritten(reservationId, request.resource.data)) &&
         publicMatches(reservationId, request.resource.data);
-      allow update: if false;
+      allow update: if canBook(request.resource.data.date) && mayCancel(resource.data) && valid(request.resource.data) &&
+        request.resource.data.ownerUid == resource.data.ownerUid && request.resource.data.creatorName == resource.data.creatorName &&
+        request.resource.data.createdAt == resource.data.createdAt && request.resource.data.updatedAt == request.time &&
+        request.resource.data.revision is int && request.resource.data.revision == resource.data.get('revision',0)+1 &&
+        editOccupancy(reservationId,resource.data,request.resource.data) &&
+        modificationRecorded(reservationId,resource.data,request.resource.data) && publicMatches(reservationId,request.resource.data);
       allow delete: if approved() && controls().bookingOpen == true &&
         mayCancel(resource.data) && cancellationRecorded(reservationId, resource.data) &&
         controls().slotStorage == 'resources-v2' &&
         (resources(resource.data).size() == 0 || occupancyWritten(reservationId, resource.data)) &&
         !existsAfter(/databases/$(database)/documents/publicBookings/$(reservationId));
+    }
+    match /modificationNotifications/{id} {
+      function validModification() {
+        let d = request.resource.data;
+        let path = /databases/$(database)/documents/reservations/$(d.reservationId);
+        let before = get(path).data;
+        let after = getAfter(path).data;
+        return d.keys().hasOnly(['reservationId','before','booking','previousKeys','modifiedBy','modifierName','createdAt','status']) &&
+          mayCancel(before) && d.previousKeys is list && d.previousKeys.toSet() == keys(before).toSet() &&
+          d.before == before && d.booking == after && after.revision == before.get('revision',0)+1 &&
+          id == d.reservationId + '__' + string(after.revision) && d.modifiedBy == request.auth.uid &&
+          d.modifierName == request.auth.token.get('name','Mësimdhënës') && d.createdAt == request.time &&
+          d.status == (before.ownerUid == request.auth.uid ? 'recorded' : 'pending');
+      }
+      allow create: if approved() && controls().bookingOpen && validModification();
+      allow read: if mailWorker() || (approved() && (resource.data.booking.ownerUid == request.auth.uid || get(userPath()).data.get('canCancelAll',false)));
+      allow update: if mailWorker() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'status','attempts','leaseToken','leaseUntil','sentAt','lastErrorCode','lastAttemptAt'
+      ]) && request.resource.data.status in ['sending','sent','retrying','failed'];
+      allow delete: if false;
     }
     match /mailSettings/{id} {
       allow get: if mailWorker() && id == 'publicEvents';
@@ -187,13 +240,27 @@ service cloud.firestore {
       allow create: if approved() &&
         getAfter(/databases/$(database)/documents/reservations/$(id)).data.ownerUid == request.auth.uid &&
         publicMatches(id, getAfter(/databases/$(database)/documents/reservations/$(id)).data);
-      allow update: if false;
+      allow update: if approved() && mayCancel(get(/databases/$(database)/documents/reservations/$(id)).data) &&
+        getAfter(/databases/$(database)/documents/reservations/$(id)).data.revision == get(/databases/$(database)/documents/reservations/$(id)).data.get('revision',0)+1 &&
+        publicMatches(id,getAfter(/databases/$(database)/documents/reservations/$(id)).data);
       allow delete: if approved() && controls().bookingOpen == true &&
         mayCancel(get(/databases/$(database)/documents/reservations/$(id)).data) &&
         !existsAfter(/databases/$(database)/documents/reservations/$(id));
     }
     match /eventDays/{key} {
       allow read: if approved();
+      function editing() {
+        let id = request.resource.data.changedReservationId;
+        let path = /databases/$(database)/documents/reservations/$(id);
+        return exists(path) && existsAfter(path);
+      }
+      function validEdit() {
+        let id = request.resource.data.changedReservationId;
+        let path = /databases/$(database)/documents/reservations/$(id);
+        let before = get(path).data;
+        let after = getAfter(path).data;
+        return mayCancel(before) && after.revision == before.get('revision',0)+1 && occupancyEdit(id,before,after,key);
+      }
       function validChange() {
         let id = request.resource.data.changedReservationId;
         let path = /databases/$(database)/documents/reservations/$(id);
@@ -209,7 +276,7 @@ service cloud.firestore {
         controls().slotStorage == 'resources-v2' &&
         request.resource.data.keys().hasOnly(['bookings', 'changedReservationId']) &&
         request.resource.data.bookings is map &&
-        request.resource.data.changedReservationId is string && validChange();
+        request.resource.data.changedReservationId is string && (editing() ? validEdit() : validChange());
       allow delete: if false;
     }
     match /roomDays/{key} { allow read: if approved(); allow write: if false; }

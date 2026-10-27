@@ -62,9 +62,9 @@ export function firestoreRest(project, token, request = fetch, origin = 'https:/
       const rows=await call(':runQuery','POST',{structuredQuery:{from:[{collectionId:'publicBookings'}],where:{fieldFilter:{field:{fieldPath:'date'},op:'GREATER_THAN_OR_EQUAL',value:encode(date)}}}});
       return rows.filter(r=>r.document).map(r=>snapshot(r.document));
     },
-    pending:async()=>{
-      const rows=await call(':runQuery','POST',{structuredQuery:{from:[{collectionId:'cancellationNotifications'}],where:{fieldFilter:{field:{fieldPath:'status'},op:'IN',value:encode(['pending','retrying','sending'])}},limit:25}});
-      return rows.filter(r=>r.document).map(r=>db.doc('cancellationNotifications/'+r.document.name.split('/').at(-1)));
+    pending:async(collection='cancellationNotifications')=>{
+      const rows=await call(':runQuery','POST',{structuredQuery:{from:[{collectionId:collection}],where:{fieldFilter:{field:{fieldPath:'status'},op:'IN',value:encode(['pending','retrying','sending'])}},limit:25}});
+      return rows.filter(r=>r.document).map(r=>db.doc(collection+'/'+r.document.name.split('/').at(-1)));
     }
   };
   return db;

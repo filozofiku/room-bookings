@@ -16,8 +16,10 @@ const response=await fetch(`https://securetoken.googleapis.com/v1/token?key=${en
 const auth=await response.json();
 if(!response.ok || auth.user_id!=='cancellation-mail-worker')throw Error('Mail worker authentication failed');
 const db=firestoreRest(config.projectId,auth.id_token);
-const queue=await db.pending();
-console.log(`Pending cancellation notifications: ${queue.length}`);
+const cancellations=await db.pending();
+const modifications=await db.pending('modificationNotifications');
+const queue=[...cancellations,...modifications];
+console.log(`Pending owner notifications: ${queue.length} (${modifications.length} modifications)`);
 let publicWork=null;
 if((process.env.PUBLIC_EVENT_EMAIL_ENABLED==='true' || mode==='check-public')){
  const settings=(await db.doc('mailSettings/publicEvents').get()).data();

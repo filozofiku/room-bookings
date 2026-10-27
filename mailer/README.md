@@ -82,3 +82,12 @@ mundshme pas një ndërprerjeje mes pranimit dhe regjistrimit të statusit vlen 
 këtu. Anulimi kontrollohet menjëherë para SMTP; emaili i pranuar nga SMTP nuk
 mund të tërhiqet. Ky shërbim nuk njofton listën për anulime: emaili i anulimit
 vazhdon të shkojë vetëm te krijuesi sipas rregullave ekzistuese.
+
+## Njoftimet për ndryshimin e rezervimeve
+
+Worker-i lexon edhe `modificationNotifications` me status `pending`, `retrying`
+ose `sending`. Për çdo version të ndryshuar nga një përdorues tjetër, i dërgon
+pronarit origjinal një email me vlerat para/pas ndryshimit dhe hollësitë e reja.
+Marrësi merret nga profili privat i pronarit. Regjistrat `recorded` për ndryshimet
+e rezervimit të vet nuk përpunohen. Riprovimi dhe bllokimi kundër dërgimeve të
+njëkohshme përdorin të njëjtin mekanizëm si emaili i anulimit.

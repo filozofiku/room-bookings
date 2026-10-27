@@ -283,3 +283,26 @@ The completed public feed integration lives in [public-schedule/README.md](publi
 It includes the updated public HTML, live date-specific reservations, free-room
 filtering, stricter atomic publication rules, and a dry-run-first backfill for
 existing bookings. Follow its deployment order when upgrading both websites.
+
+## Redaktimi i rezervimeve
+
+Përdoruesi mund të zgjedhë “Redaktoni” për rezervimet e veta. Përdoruesit me
+`canCancelAll: true` mund të redaktojnë edhe rezervimet e të tjerëve. Formulari
+plotësohet me të dhënat ekzistuese dhe kërkon konfirmim para ruajtjes.
+Krijuesi, pronari dhe koha origjinale e krijimit ruhen. Ndryshimet në datë,
+interval dhe burime kontrollohen dhe ruhen në të njëjtin transaksion me
+publikimin dhe lirimin/zënien e burimeve. Në rast konflikti, rezervimi origjinal
+mbetet i pandryshuar. Redaktimi i një versioni të vjetruar refuzohet.
+
+Çdo redaktim ka një `revision` dhe një regjistër privat në
+`modificationNotifications/{reservationId}__{revision}`. `previousKeys` verifikohet
+kundrejt rezervimit të vjetër në rregullat e regjistrit; çelësat e rinj verifikohen
+në rregullat e `eventDays`. Kjo ndarje mban kontrollet e 16 periudhave nën kufirin
+e vlerësimit të Firebase. Regjistri për redaktimin e rezervimit të vet ka statusin
+`recorded` dhe nuk krijon email. Për rezervimin e dikujt tjetër, statusi `pending`
+e fut njoftimin në shërbimin ekzistues të emailit. Emaili në shqip tregon autorin,
+ndryshimet para/pas dhe të dhënat e reja. Zbatohen vonesat e GitHub Actions.
+
+Njoftimet publike ende të padërguara përdorin të dhënat më të fundit të rezervimit.
+Ky ndryshim nuk ridërgon njoftim te e gjithë lista publike nëse ai është dërguar
+më parë; emaili i redaktimit i drejtohet krijuesit të rezervimit.
