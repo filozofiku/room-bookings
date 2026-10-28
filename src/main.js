@@ -3,6 +3,7 @@ import { collection, doc, getDoc, getDocs, query, where, runTransaction, serverT
 import { BookingError, selectPeriods, reservationTime, errorText, MAX_PERIODS } from './booking-ui.js';
 import { EVENT_TYPES, slotKeys, conflictMessage, wordCount } from './booking-resources.js';
 import {updateReservation} from './update-reservation.js';
+import {isSpecialRoom,submitReservationRequest,decideReservationRequest} from './reservation-requests.js';
 import { auth, db } from './firebase.js';
 
 const $ = (id) => document.getElementById(id);
@@ -43,8 +44,9 @@ function prepareReservation(period) {
 }
 function confirmReservation(data) {
   const dialog = $('reservation-dialog');
-  $('reservation-heading').textContent=editing?'Konfirmoni ndryshimet':'Konfirmoni rezervimin';
-  dialog.querySelector('[value=confirm]').textContent=editing?'Konfirmo ndryshimet':'Konfirmo rezervimin';
+  const requestOnly=!editing&&!canCancelAll&&isSpecialRoom(data.roomId);
+  $('reservation-heading').textContent=editing?'Konfirmoni ndryshimet':requestOnly?'Konfirmoni kërkesën për rezervim':'Konfirmoni rezervimin';
+  dialog.querySelector('[value=confirm]').textContent=editing?'Konfirmo ndryshimet':requestOnly?'Dërgo kërkesën':'Konfirmo rezervimin';
   const summary = $('reservation-summary');
   summary.replaceChildren();
   const fields = [
@@ -57,6 +59,7 @@ function confirmReservation(data) {
     ['Mënyra e zhvillimit',data.mode==='online' ? 'Online' : 'Fizik'],
     ['Rezervuar nga',data.creatorName]
   ];
+  if(requestOnly)fields.push(['Miratimi','Kërkesa nuk rezervon sallën. Rezervimi dhe njoftimet publike bëhen vetëm pas miratimit.']);
   if(data.onlineUrl)fields.push(['Linku i ngjarjes online',data.onlineUrl]);
   if(data.description)fields.push(['Përshkrimi',data.description]);
   for(const [label,value] of fields){
@@ -97,6 +100,7 @@ function fillOptions(element, values, getValue, getLabel) {
 }
 async function readAvailability() {
   if (!currentUser || !rooms.length) return;
+  updateRequestHint();
   const date = $('date').value;
   const roomId = $('room').value;
   if (!date) return;
@@ -144,6 +148,7 @@ function stopEditing() {
   $('booking-form').querySelector('button').textContent='Bëni rezervimin';
   $('title').value='';
   $('booking-message').textContent='';
+  updateRequestHint();
 }
 function startEditing(id,data) {
   editing={id,data,revision:data.revision||0};
@@ -165,6 +170,65 @@ function startEditing(id,data) {
   $('booking-message').textContent='';$('selection-hint').textContent='';
   readAvailability().catch(e=>message(errText(e),true));
   $('booking-heading').scrollIntoView({behavior:'smooth'});
+}
+function updateRequestHint() {
+  const special=!canCancelAll&&isSpecialRoom($('room').value);
+  $('request-hint').hidden=!special;
+  $('request-hint').textContent=editing
+    ? 'Për ndryshimin e sallës, datës, orës ose pjesëmarrësve të një rezervimi në sallë të posaçme nevojitet një kërkesë e re. Rezervimi ekzistues mbetet në fuqi.'
+    : 'Kjo sallë kërkon miratim. Kërkesa nuk e zë sallën dhe nuk shfaqet në orarin publik deri në miratim.';
+  $('booking-form').querySelector('button').textContent=editing?'Ruani ndryshimet':special?'Dërgoni kërkesën për rezervim':'Bëni rezervimin';
+}
+function requestDetails(data) {
+  const lines=[`${data.date} · ${rooms.find(r=>r.id===data.roomId)?.name||data.roomId} · ${reservationTime(data.periodIds,periods)}`,data.title,
+    `Kërkuesi: ${data.creatorName}`,`Lloji: ${data.eventType}`,
+    `Grupet: ${data.groupIds.map(id=>catalog.groups[id]||id).join(', ')||'Pa grup'}`,
+    `Mësimdhënësit: ${data.teacherIds.map(id=>catalog.teachers[id]||id).join(', ')||'Pa mësimdhënës'}`,
+    `Njoftimi: ${data.isPublic?'Publik':'Jo publik'} · ${data.mode==='online'?'Online':'Fizik'}`];
+  if(data.onlineUrl)lines.push(data.onlineUrl);
+  if(data.description)lines.push(data.description);
+  return lines.join('\n');
+}
+function confirmRequestDecision(data,outcome) {
+  $('request-decision-heading').textContent=outcome==='approved'?'Miratoni kërkesën':'Refuzoni kërkesën';
+  $('request-decision-summary').textContent=requestDetails(data);
+  $('request-decision-reason').value='';$('request-decision-error').textContent='';
+  const dialog=$('request-decision-dialog');dialog.returnValue='back';
+  return new Promise(resolve=>{
+    dialog.addEventListener('close',()=>resolve(dialog.returnValue==='confirm'?$('request-decision-reason').value.trim():null),{once:true});
+    dialog.showModal();
+  });
+}
+async function readRequests() {
+  if(!currentUser)return;
+  const own=path=>canCancelAll?collection(db,path):query(collection(db,path),where(path==='requestDecisions'?'booking.ownerUid':'ownerUid','==',currentUser.uid));
+  const [pending,decisions]=await Promise.all([getDocs(own('reservationRequests')),getDocs(own('requestDecisions'))]);
+  $('requests-heading').textContent=canCancelAll?'Kërkesat për miratim':'Kërkesat e mia';
+  const wrapper=$('reservation-requests');wrapper.replaceChildren();
+  if(!pending.docs.length)wrapper.textContent='Nuk ka kërkesa në pritje.';
+  for(const item of pending.docs.sort((a,b)=>a.data().date.localeCompare(b.data().date))){
+    const data=item.data(),card=document.createElement('div');card.className='request-card';
+    const details=document.createElement('p');details.style.whiteSpace='pre-wrap';details.textContent=requestDetails(data)+'\nNë pritje të miratimit';card.append(details);
+    const feedback=document.createElement('p');feedback.setAttribute('role','status');feedback.style.whiteSpace='pre-wrap';
+    if(canCancelAll)for(const [outcome,label] of [['approved','Miratoni'],['rejected','Refuzoni']]){
+      const button=document.createElement('button');button.type='button';button.textContent=label;button.className=outcome==='rejected'?'danger':'';
+      button.onclick=async()=>{
+        const reason=await confirmRequestDecision(data,outcome);if(reason===null)return;
+        card.querySelectorAll('button').forEach(b=>b.disabled=true);
+        try{
+          await decideReservationRequest(db,item.id,outcome,reason,currentUser);
+          await Promise.all([readRequests(),readMyBookings(),readAvailability()]);
+          message(outcome==='approved'?'Kërkesa u miratua dhe rezervimi u publikua.':'Kërkesa u refuzua dhe u fshi.');
+        }catch(e){feedback.textContent=errText(e);feedback.className='error';card.querySelectorAll('button').forEach(b=>b.disabled=false);}
+      };card.append(button,document.createTextNode(' '));
+    }
+    card.append(feedback);wrapper.append(card);
+  }
+  const history=$('request-decisions');history.replaceChildren();
+  for(const item of decisions.docs.sort((a,b)=>(b.data().createdAt?.seconds||0)-(a.data().createdAt?.seconds||0))){
+    const d=item.data(),p=document.createElement('p');p.style.whiteSpace='pre-wrap';
+    p.textContent=`${d.booking.date} · ${d.booking.title} · ${d.outcome==='approved'?'Miratuar':'Refuzuar'}\n${d.deciderName}: ${d.reason}`;history.append(p);
+  }
 }
 async function readMyBookings() {
   if (!currentUser) return;
@@ -237,6 +301,8 @@ async function createReservation(event) {
   if(edit && Object.entries(data).every(([key,value])=>JSON.stringify(value)===JSON.stringify(edit.data[key] ?? (Array.isArray(value)?[]:typeof value==='boolean'?false:'')))) {
     return bookingMessage('Nuk keni bërë ndryshime.');
   }
+  const requestOnly=!edit&&!canCancelAll&&isSpecialRoom(roomId);
+  if(edit&&!canCancelAll&&isSpecialRoom(roomId)&&['date','roomId','periodIds','groupIds','teacherIds'].some(key=>JSON.stringify(data[key])!==JSON.stringify(edit.data[key]||[])))return bookingMessage('Ky ndryshim kërkon miratim. Hiqni dorë nga redaktimi dhe dërgoni një kërkesë të re; rezervimi ekzistues mbetet në fuqi.',true);
   const ownerUid=currentUser.uid;
   const reservationRef = doc(collection(db,'reservations'));
   const publicRef = doc(db,'publicBookings',reservationRef.id);
@@ -247,6 +313,8 @@ async function createReservation(event) {
     if(currentUser?.uid!==ownerUid)throw new BookingError('Llogaria ndryshoi. Provoni përsëri.');
     if(edit) {
       await updateReservation(db,edit.id,edit.revision,data,currentUser);
+    } else if(requestOnly) {
+      await submitReservationRequest(db,data,currentUser);
     } else await runTransaction(db, async tx => {
       // Read all relevant documents first; writes must follow all transaction reads.
       // Reading settings also makes a concurrent administrative import fail/retry safely.
@@ -273,8 +341,8 @@ async function createReservation(event) {
     $('description').value = '';
     $('description-count').textContent = '0 / 500 fjalë';
     if(edit)stopEditing();
-    bookingMessage(edit ? (edit.data.ownerUid===ownerUid?'Rezervimi u ndryshua me sukses.':'Rezervimi u ndryshua. Njoftimi me email është në pritje të dërgimit.') : 'Rezervimi u krijua me sukses.');
-    await Promise.all([readAvailability(),readMyBookings()]);
+    bookingMessage(edit ? (edit.data.ownerUid===ownerUid?'Rezervimi u ndryshua me sukses.':'Rezervimi u ndryshua. Njoftimi me email është në pritje të dërgimit.') : requestOnly?'Kërkesa u dërgua për miratim. Salla ende nuk është rezervuar.':'Rezervimi u krijua me sukses.');
+    await Promise.all([readAvailability(),readMyBookings(),readRequests()]);
   } catch (e) { bookingMessage(errText(e),true); }
   finally { $('booking-form').querySelector('button').disabled = false; }
 }
@@ -340,7 +408,7 @@ async function loadApp() {
   $('date').max = settings.endDate;
   $('app').hidden = false;
   message(settings.bookingOpen ? 'Keni hyrë me sukses. Mund të rezervoni një sallë.' : 'Rezervimet janë pezulluar përkohësisht gjatë përditësimit të orarit.');
-  await Promise.all([readAvailability(), readMyBookings()]);
+  await Promise.all([readAvailability(), readMyBookings(), readRequests()]);
 }
 function filterChoices(kind) {
   const normalize = text => text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('sq').trim();
@@ -361,6 +429,14 @@ $('date').onchange = () => readAvailability().catch(e => message(errText(e),true
 $('room').onchange = () => readAvailability().catch(e => message(errText(e),true));
 $('booking-form').onsubmit = createReservation;
 $('stop-editing').onclick = stopEditing;
+$('refresh-requests').onclick=()=>readRequests().catch(e=>message(errText(e),true));
+$('request-decision-form').onsubmit=event=>{
+  event.preventDefault();
+  if(event.submitter?.value!=='confirm')return $('request-decision-dialog').close('back');
+  const reason=$('request-decision-reason').value.trim();
+  if(!reason||reason.length>2000){$('request-decision-error').textContent='Shkruani arsyen e vendimit (deri në 2000 karaktere).';return;}
+  $('request-decision-dialog').close('confirm');
+};
 $('cancel-form').onsubmit = event => {
   event.preventDefault();
   if (event.submitter?.value !== 'cancel') { $('cancel-dialog').close('keep'); return; }
@@ -385,6 +461,7 @@ for (const id of ['from','through']) $(id).addEventListener('change', () => { $(
 onAuthStateChanged(auth,async user => {
   stopEditing();
   if($('reservation-dialog').open)$('reservation-dialog').close('back');
+  if($('request-decision-dialog').open)$('request-decision-dialog').close('back');
   currentUser = user;
   canCancelAll = false;
   $('login').hidden = Boolean(user);

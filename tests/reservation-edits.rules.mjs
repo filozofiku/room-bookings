@@ -87,6 +87,17 @@ test('reservation edits are atomic, conflict-safe and require owner notification
   await deliverCancellation(rest.doc('modificationNotifications/edit__2'),delivery);
   await deliverCancellation(rest.doc('modificationNotifications/edit__2'),delivery);
   assert.equal(sent,1);
+  // A regular user cannot bypass special-room approval by editing an ordinary booking.
+  const special='r_a8ae63f60a13';
+  await seed('resourceCatalog/current',{rooms:{[roomId]:'Salla',[special]:'Salla 127'},groups,teachers});
+  await setup({...initial,revision:30,updatedAt:new Date()});
+  await assertFails(edit(owner,{roomId:special}));
+  await assertSucceeds(edit(manager,{roomId:special}));
+  await assertSucceeds(edit(owner,{title:'Metadata only'}));
+  await assertFails(edit(owner,{periodIds:['p02']}));
+  await assertFails(edit(owner,{date:next}));
+  await assertFails(edit(owner,{groupIds:[Object.keys(groups)[0]]}));
+  await assertSucceeds(edit(manager,{periodIds:['p02']}));
   await seed('users/manager',{active:true,role:'admin',canCancelAll:false});await assertFails(edit(manager,{title:'Not delegated'}));
   await seed('settings/control',{bookingOpen:false,slotStorage:'resources-v2'});await assertFails(edit(owner,{title:'Paused'}));
  }finally{await env.cleanup();}

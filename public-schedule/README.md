@@ -64,3 +64,22 @@ Run `node --test tests/booking-model.test.mjs` and `npm run build` in the bookin
 repository. Security integration tests are in `tests/public-bookings.rules.mjs`;
 they require Firebase CLI, Java 21+, and `@firebase/rules-unit-testing`. Run them
 against the local Firestore emulator, never the production project.
+
+### Requests for special rooms
+
+Salla 102 and Salla 127 require approval for regular users. Pending
+`reservationRequests` are private and do not occupy any resource or appear in
+`publicBookings`. Users with `canCancelAll` can book these rooms directly or
+review requests in the booking app. Both decisions require a reason.
+Approval atomically rechecks availability, creates the reservation under the
+requester's identity, publishes it, locks the resources, and deletes the request.
+Rejection deletes the request without creating a reservation. Private immutable
+`requestDecisions` retain the reason for the requester and administrators.
+No decision emails are sent. Existing public-event notifications apply only after
+approval, because only then is a public booking created.
+
+Regular users may edit an approved reservation's descriptive details, but changes
+to its special room, date, periods, groups, or teachers require administrator
+handling or a new request. A new request does not replace or cancel an existing
+reservation. The room IDs are listed in `src/reservation-requests.js` and enforced
+independently in `firestore.rules`.

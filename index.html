@@ -24,9 +24,11 @@ fieldset{margin:1rem 0;border:1px solid #a8b2bf;border-radius:7px}.choices{max-h
 <div id="online-field" hidden><label for="online-url">Linku i ngjarjes online</label><input type="url" id="online-url" placeholder="https://…" maxlength="2000" style="width:90%"></div>
 <label for="title">Titulli i aktivitetit (publikohet me emrin tuaj dhe kohën e rezervimit)</label><input id="title" placeholder="Mbledhje e departamentit" maxlength="120" required style="width:90%">
 <div class="row"><div><label for="from">Ora e fillimit</label><select id="from"></select></div><div><label for="through">Ora e përfundimit</label><select id="through"></select></div></div>
+<p id="request-hint" role="status" hidden></p>
 <p id="selection-hint" role="status"></p>
 <div class="booking-actions"><button type="submit" aria-describedby="booking-message">Bëni rezervimin</button><p id="booking-message" role="status" aria-live="polite" aria-atomic="true"></p></div>
 </form>
+<div class="row"><h2 id="requests-heading">Kërkesat e mia</h2><button type="button" id="refresh-requests" class="secondary">Rifreskoni kërkesat</button></div><div id="reservation-requests"></div><details><summary>Vendimet për kërkesat</summary><div id="request-decisions"></div></details>
 <h2 id="reservations-heading">Rezervimet e mia</h2><div id="my-reservations"></div>
 </section>
 <dialog id="reservation-dialog" aria-labelledby="reservation-heading" style="max-width:640px;width:calc(100% - 4rem);max-height:85vh;overflow:auto">
@@ -38,6 +40,10 @@ fieldset{margin:1rem 0;border:1px solid #a8b2bf;border-radius:7px}.choices{max-h
 <dialog id="cancel-dialog" aria-labelledby="cancel-heading">
 <h2 id="cancel-heading">Anulimi i rezervimit</h2><p id="cancel-question"></p>
 <form id="cancel-form" method="dialog" novalidate><div id="cancel-reason-field" hidden><label for="cancel-reason">Arsyeja e anulimit (e detyrueshme)</label><textarea id="cancel-reason" rows="4" maxlength="2000" style="width:90%" aria-describedby="cancel-error"></textarea><p>Arsyeja do të përfshihet në njoftimin për krijuesin e rezervimit.</p></div><p id="cancel-error" class="error" role="alert"></p><button value="keep" class="secondary">Mbajeni rezervimin</button> <button value="cancel" class="danger">Anuloni rezervimin</button></form>
+</dialog>
+<dialog id="request-decision-dialog" aria-labelledby="request-decision-heading" style="max-width:640px;width:calc(100% - 4rem);max-height:85vh;overflow:auto">
+<h2 id="request-decision-heading"></h2><p id="request-decision-summary" style="white-space:pre-wrap;overflow-wrap:anywhere"></p>
+<form id="request-decision-form" method="dialog" novalidate><label for="request-decision-reason">Arsyeja e vendimit (e detyrueshme)</label><textarea id="request-decision-reason" rows="4" maxlength="2000" style="width:90%"></textarea><p id="request-decision-error" class="error" role="alert"></p><button value="back" class="secondary">Kthehu</button> <button value="confirm">Konfirmoni vendimin</button></form>
 </dialog>
 <script type="module" src="/src/main.js"></script>
 </body></html>

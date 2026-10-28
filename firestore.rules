@@ -24,6 +24,18 @@ service cloud.firestore {
     function mayCancel(booking) {
       return booking.ownerUid == request.auth.uid || get(userPath()).data.get('canCancelAll', false) == true;
     }
+    function elevated() { return get(userPath()).data.get('canCancelAll',false) == true; }
+    function specialRoom(id) { return id in ['r_9c3ca97a27ce','r_a8ae63f60a13']; }
+    function approvedRequest(id, booking) {
+      let path = /databases/$(database)/documents/reservationRequests/$(id);
+      let decision = /databases/$(database)/documents/requestDecisions/$(id);
+      return elevated() && getAfter(decision).data.outcome == 'approved' &&
+        !existsAfter(path) && booking.diff(get(path).data).affectedKeys().hasOnly(['createdAt']);
+    }
+    function mayCreate(id, booking) {
+      return (booking.ownerUid == request.auth.uid && booking.creatorName == request.auth.token.get('name','Mësimdhënës') &&
+        (!specialRoom(booking.roomId) || elevated())) || approvedRequest(id,booking);
+    }
     function canBook(date) {
       return approved() && controls().bookingOpen == true && controls().slotStorage == 'resources-v2' &&
         date >= controls().startDate && date <= controls().endDate &&
@@ -167,11 +179,12 @@ service cloud.firestore {
     match /reservations/{reservationId} {
       allow read: if approved();
       allow create: if canBook(request.resource.data.date) && valid(request.resource.data) &&
-        request.resource.data.ownerUid == request.auth.uid && request.resource.data.creatorName == request.auth.token.get('name','Mësimdhënës') &&
+        mayCreate(reservationId,request.resource.data) &&
         request.resource.data.createdAt == request.time && !request.resource.data.keys().hasAny(['revision','updatedAt']) &&
         (resources(request.resource.data).size() == 0 || occupancyWritten(reservationId, request.resource.data)) &&
         publicMatches(reservationId, request.resource.data);
       allow update: if canBook(request.resource.data.date) && mayCancel(resource.data) && valid(request.resource.data) &&
+        (!specialRoom(request.resource.data.roomId) || elevated() || sameSlots(resource.data,request.resource.data)) &&
         request.resource.data.ownerUid == resource.data.ownerUid && request.resource.data.creatorName == resource.data.creatorName &&
         request.resource.data.createdAt == resource.data.createdAt && request.resource.data.updatedAt == request.time &&
         request.resource.data.revision is int && request.resource.data.revision == resource.data.get('revision',0)+1 &&
@@ -182,6 +195,31 @@ service cloud.firestore {
         controls().slotStorage == 'resources-v2' &&
         (resources(resource.data).size() == 0 || occupancyWritten(reservationId, resource.data)) &&
         !existsAfter(/databases/$(database)/documents/publicBookings/$(reservationId));
+    }
+    match /reservationRequests/{id} {
+      allow read: if approved() && (elevated() || resource.data.ownerUid == request.auth.uid);
+      allow create: if canBook(request.resource.data.date) && !elevated() && valid(request.resource.data) &&
+        specialRoom(request.resource.data.roomId) && request.resource.data.ownerUid == request.auth.uid &&
+        request.resource.data.creatorName == request.auth.token.get('name','Mësimdhënës') &&
+        request.resource.data.createdAt == request.time && !request.resource.data.keys().hasAny(['revision','updatedAt']);
+      allow update: if false;
+      allow delete: if approved() && elevated() && existsAfter(/databases/$(database)/documents/requestDecisions/$(id));
+    }
+    match /requestDecisions/{id} {
+      function validDecision() {
+        let d = request.resource.data;
+        let path = /databases/$(database)/documents/reservationRequests/$(id);
+        let reservation = /databases/$(database)/documents/reservations/$(id);
+        return d.keys().hasOnly(['booking','outcome','reason','decidedBy','deciderName','createdAt']) &&
+          d.booking == get(path).data && !existsAfter(path) &&
+          d.decidedBy == request.auth.uid && d.deciderName == request.auth.token.get('name','Mësimdhënës') && d.createdAt == request.time &&
+          d.reason is string && d.reason.size() <= 2000 && d.reason.matches('(?s).*\\S.*') &&
+          (d.outcome == 'approved' ? (!exists(reservation) && getAfter(reservation).data.diff(d.booking).affectedKeys().hasOnly(['createdAt'])) :
+           (d.outcome == 'rejected' && !existsAfter(reservation)));
+      }
+      allow read: if approved() && (resource.data.booking.ownerUid == request.auth.uid || elevated());
+      allow create: if approved() && elevated() && validDecision();
+      allow update, delete: if false;
     }
     match /modificationNotifications/{id} {
       function validModification() {
@@ -238,7 +276,7 @@ service cloud.firestore {
     match /publicBookings/{id} {
       allow read: if true;
       allow create: if approved() &&
-        getAfter(/databases/$(database)/documents/reservations/$(id)).data.ownerUid == request.auth.uid &&
+        mayCreate(id,getAfter(/databases/$(database)/documents/reservations/$(id)).data) &&
         publicMatches(id, getAfter(/databases/$(database)/documents/reservations/$(id)).data);
       allow update: if approved() && mayCancel(get(/databases/$(database)/documents/reservations/$(id)).data) &&
         getAfter(/databases/$(database)/documents/reservations/$(id)).data.revision == get(/databases/$(database)/documents/reservations/$(id)).data.get('revision',0)+1 &&
@@ -268,7 +306,7 @@ service cloud.firestore {
         let booking = creating ? getAfter(path).data : get(path).data;
         let expected = keys(booking);
         return key == booking.date && resources(booking).size() > 0 &&
-          (creating ? booking.ownerUid == request.auth.uid : mayCancel(booking)) &&
+          (creating ? (booking.ownerUid == request.auth.uid || elevated()) : mayCancel(booking)) &&
           (creating ? existsAfter(path) : !existsAfter(path)) &&
           occupancyChange(id, booking, creating, expected) && (!creating || freeOfFet(booking, expected));
       }
