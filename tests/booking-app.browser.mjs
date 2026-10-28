@@ -128,7 +128,7 @@ await page.locator('#cancel-dialog button[value="cancel"]').click();
 await page.waitForFunction(()=>document.getElementById('message').textContent.includes('u anulua'));
 assert.equal(await page.evaluate(()=>window.testStore.has('reservations/new')),false);
 // Optional resources, metadata, and exact conflict messages.
-assert.deepEqual(await page.locator('#event-type option').allTextContents(),['Zëvendësim i mësimit','Konferencë','Panel','Mbrojtje publike']);
+assert.deepEqual(await page.locator('#event-type option').allTextContents(),['Zëvendësim i mësimit','Konferencë','Panel','Mbrojtje publike','Mbledhje','Tryezë','Diskutim','Punëtori','Ligjëratë e ftuar','Ceremoni']);
 await page.selectOption('#room','');
 await page.fill('#title','Ngjarje online');await page.selectOption('#through','p02');
 await page.selectOption('#event-type','Konferencë');

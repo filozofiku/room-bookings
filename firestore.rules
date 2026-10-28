@@ -90,7 +90,7 @@ service cloud.firestore {
         d.teacherIds is list && d.teacherIds.toSet().size() == d.teacherIds.size() && catalog().teachers.keys().hasAll(d.teacherIds) &&
         d.periodIds is list && d.periodIds.size() > 0 && d.periodIds.size() <= 16 &&
         controls().periodOrder.keys().hasAll(d.periodIds) && d.periodIds.join(',') in controls().validPeriodRanges &&
-        d.eventType in ['Zëvendësim i mësimit','Konferencë','Panel','Mbrojtje publike'] &&
+        d.eventType in ['Zëvendësim i mësimit','Konferencë','Panel','Mbrojtje publike','Mbledhje','Tryezë','Diskutim','Punëtori','Ligjëratë e ftuar','Ceremoni'] &&
         d.get('description','') is string &&
         d.get('description','').split('\\s+').removeAll(['']).size() <= 500 &&
         (d.isPublic || d.get('description','') == '') &&
