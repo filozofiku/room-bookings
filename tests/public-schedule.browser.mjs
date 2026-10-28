@@ -65,12 +65,15 @@ try {
   for (const kind of ['subgroups','teachers']) {
     await page.selectOption('#category',kind);
     const name=await page.locator('#entity').inputValue();
-    const selected={...booking,title:'Konferencë online',description:'Përshkrimi i konferencës',eventType:'Konferencë',room:'',groups:kind==='subgroups'?[name]:[],groupNames:kind==='subgroups'?[name]:[],teachers:kind==='teachers'?[name]:[],isPublic:false,mode:'online',onlineUrl:'https://example.test/event'};
+    const selected={...booking,title:'Konferencë online',description:'Përshkrimi i konferencës\n\nParagrafi i dytë.',eventType:'Konferencë',room:'',groups:kind==='subgroups'?[name]:[],groupNames:kind==='subgroups'?[name]:[],teachers:kind==='teachers'?[name]:[],isPublic:false,mode:'online',onlineUrl:'https://example.test/event'};
     await page.evaluate(value=>window.testReport(value),{...result,rows:[selected]});
     assert.equal(await page.locator('#agendaView .reservation-event').count(),1);
     await page.locator('#agendaView .reservation-event').click();
     assert.match(await page.locator('#modalDetails').textContent(),/Pa sallë/);
     assert.match(await page.locator('#modalDetails').textContent(),/Përshkrimi i konferencës/);
+    const description=page.locator('#modalDetails dd').filter({hasText:'Përshkrimi i konferencës'});
+    assert.equal(await description.textContent(),'Përshkrimi i konferencës\n\nParagrafi i dytë.');
+    assert.equal(await description.evaluate(el=>getComputedStyle(el).whiteSpace),'pre-wrap');
     assert.equal(await page.locator('#modalDetails a').getAttribute('href'),'https://example.test/event');
     assert.equal(await page.locator('#modalDetails a').getAttribute('rel'),'noopener noreferrer');
     await page.click('#closeDialog');

@@ -292,7 +292,7 @@ async function createReservation(event) {
     try { if (!/^https?:$/.test(new URL(onlineUrl).protocol) || onlineUrl.length > 2000) throw Error(); }
     catch { return bookingMessage('Vendosni një link të vlefshëm që fillon me https:// ose http://.', true); }
   }
-  const description = $('visibility').value === 'public' ? $('description').value.trim().replace(/\s+/gu, ' ') : '';
+  const description = $('visibility').value === 'public' ? $('description').value.trim() : '';
   if (wordCount(description) > 500) return bookingMessage('Përshkrimi i aktivitetit nuk mund të ketë më shumë se 500 fjalë.', true);
   const checked = id => [...$(id).querySelectorAll('input:checked')].map(input => input.value);
   const data = {title, date, roomId, periodIds, description, groupIds:checked('groups'), teacherIds:checked('teachers'),
