@@ -280,6 +280,7 @@ await page.waitForFunction(()=>!window.testStore.has('reservationRequests/new'))
 assert.equal(await page.evaluate(()=>window.testStore.get('reservations/new').ownerUid),'teacher');
 assert.equal(await page.evaluate(()=>window.testStore.get('publicBookings/new').title),'Kërkesa për sallën 127');
 assert.equal(await page.evaluate(()=>window.testStore.get('requestDecisions/new').outcome),'approved');
+assert.equal(await page.evaluate(()=>window.testStore.get('requestDecisions/new').status),'pending');
 await page.evaluate(()=>{
  const booking={...window.testStore.get('reservations/new'),title:'Kërkesa e dytë'};
  window.testStore.set('reservationRequests/reject',booking);
@@ -291,6 +292,7 @@ await page.fill('#request-decision-reason','Salla nevojitet për një aktivitet 
 await page.locator('#request-decision-dialog button[value="confirm"]').click();
 await page.waitForFunction(()=>!window.testStore.has('reservationRequests/reject'));
 assert.equal(await page.evaluate(()=>window.testStore.has('reservations/reject')),false);
+assert.equal(await page.evaluate(()=>window.testStore.get('requestDecisions/reject').status),'pending');
 await page.locator('#reservation-requests').getByRole('button',{name:'Miratoni',exact:true}).click();
 await page.fill('#request-decision-reason','Miratim');
 await page.locator('#request-decision-dialog button[value="confirm"]').click();

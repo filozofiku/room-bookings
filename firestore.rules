@@ -210,16 +210,19 @@ service cloud.firestore {
         let d = request.resource.data;
         let path = /databases/$(database)/documents/reservationRequests/$(id);
         let reservation = /databases/$(database)/documents/reservations/$(id);
-        return d.keys().hasOnly(['booking','outcome','reason','decidedBy','deciderName','createdAt']) &&
-          d.booking == get(path).data && !existsAfter(path) &&
+        return d.keys().hasOnly(['booking','outcome','reason','decidedBy','deciderName','createdAt','status']) &&
+          d.booking == get(path).data && !existsAfter(path) && d.status == 'pending' &&
           d.decidedBy == request.auth.uid && d.deciderName == request.auth.token.get('name','Mësimdhënës') && d.createdAt == request.time &&
           d.reason is string && d.reason.size() <= 2000 && d.reason.matches('(?s).*\\S.*') &&
           (d.outcome == 'approved' ? (!exists(reservation) && getAfter(reservation).data.diff(d.booking).affectedKeys().hasOnly(['createdAt'])) :
            (d.outcome == 'rejected' && !existsAfter(reservation)));
       }
-      allow read: if approved() && (resource.data.booking.ownerUid == request.auth.uid || elevated());
+      allow read: if mailWorker() || (approved() && (resource.data.booking.ownerUid == request.auth.uid || elevated()));
       allow create: if approved() && elevated() && validDecision();
-      allow update, delete: if false;
+      allow update: if mailWorker() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'status','attempts','leaseToken','leaseUntil','sentAt','lastErrorCode','lastAttemptAt'
+      ]) && request.resource.data.status in ['sending','sent','retrying','failed'];
+      allow delete: if false;
     }
     match /modificationNotifications/{id} {
       function validModification() {

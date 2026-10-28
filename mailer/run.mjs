@@ -18,8 +18,9 @@ if(!response.ok || auth.user_id!=='cancellation-mail-worker')throw Error('Mail w
 const db=firestoreRest(config.projectId,auth.id_token);
 const cancellations=await db.pending();
 const modifications=await db.pending('modificationNotifications');
-const queue=[...cancellations,...modifications];
-console.log(`Pending owner notifications: ${queue.length} (${modifications.length} modifications)`);
+const decisions=await db.pending('requestDecisions');
+const queue=[...cancellations,...modifications,...decisions];
+console.log(`Pending owner notifications: ${queue.length} (${modifications.length} modifications, ${decisions.length} request decisions)`);
 let publicWork=null;
 if((process.env.PUBLIC_EVENT_EMAIL_ENABLED==='true' || mode==='check-public')){
  const settings=(await db.doc('mailSettings/publicEvents').get()).data();

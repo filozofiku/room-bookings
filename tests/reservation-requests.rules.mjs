@@ -2,6 +2,8 @@ import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {firestoreRest,timestamp} from '../mailer/firestore-rest.js';
+import {deliverCancellation} from '../mailer/cancellation-email.js';
 import {slotKeys,validPeriodRanges} from '../src/booking-resources.js';
 const require=createRequire(process.env.TEST_MODULES_DIR?`${process.env.TEST_MODULES_DIR}/package.json`:import.meta.url);
 const {initializeTestEnvironment,assertSucceeds,assertFails}=require('@firebase/rules-unit-testing');
@@ -25,7 +27,7 @@ test('special rooms require private requests and atomic elevated decisions',asyn
   const data=(await getDoc(doc(db,'reservationRequests',id))).data();
   const batch=writeBatch(db);
   if(options.delete!==false)batch.delete(doc(db,'reservationRequests',id));
-  if(options.decision!==false)batch.set(doc(db,'requestDecisions',id),{booking:data,outcome,reason:'Arsyeja e vendimit',decidedBy:db===manager?'manager':'owner',deciderName:db===manager?'Manager':'Owner',createdAt:serverTimestamp(),...options.decision});
+  if(options.decision!==false)batch.set(doc(db,'requestDecisions',id),{booking:data,outcome,status:'pending',reason:'Arsyeja e vendimit',decidedBy:db===manager?'manager':'owner',deciderName:db===manager?'Manager':'Owner',createdAt:serverTimestamp(),...options.decision});
   if(outcome==='approved'&&options.reserve!==false){
    const booking={...data,createdAt:serverTimestamp(),...options.booking},{ownerUid,...published}=booking;
    batch.set(doc(db,'reservations',id),booking);
@@ -54,7 +56,7 @@ test('special rooms require private requests and atomic elevated decisions',asyn
   await assertFails(setDoc(doc(owner,'reservationRequests',rooms[0]),{title:'Edited'},{merge:true}));
   await assertFails(deleteDoc(doc(manager,'reservationRequests',rooms[0])));
   await assertFails(decide(owner,rooms[0]));
-  for(const options of [{delete:false},{decision:false},{reserve:false},{publish:false},{locks:false},{decision:{reason:'   '}},{decision:{reason:'a'.repeat(2001)}},{booking:{title:'Tampered'}},{booking:{ownerUid:'manager',creatorName:'Manager'}}])await assertFails(decide(manager,rooms[0],'approved',options));
+  for(const options of [{delete:false},{decision:false},{reserve:false},{publish:false},{locks:false},{decision:{status:'sent'}},{decision:{reason:'   '}},{decision:{reason:'a'.repeat(2001)}},{booking:{title:'Tampered'}},{booking:{ownerUid:'manager',creatorName:'Manager'}}])await assertFails(decide(manager,rooms[0],'approved',options));
   await seed('weeklyResources/3',{busyKeys:[`${rooms[0]}__p01`]});await assertFails(decide(manager,rooms[0]));
   assert.equal((await getDoc(doc(owner,'reservationRequests',rooms[0]))).exists(),true);
   await seed('weeklyResources/3',{busyKeys:[]});
@@ -77,5 +79,28 @@ test('special rooms require private requests and atomic elevated decisions',asyn
   await seed(`eventDays/${date}`,{bookings:{},changedReservationId:'reset'});
   await assertSucceeds(setDoc(doc(owner,'reservationRequests','maximum'),{...base,periodIds:periods.map(p=>p.id),groupIds:Object.keys(groups),teacherIds:Object.keys(teachers)}));
   await assertSucceeds(decide(manager,'maximum'));
+  // Exercise the real restricted-worker REST path after both request documents are deleted.
+  const worker=env.authenticatedContext('cancellation-mail-worker',{cancellationMailWorker:true}).firestore();
+  await assertFails(setDoc(doc(worker,'requestDecisions',rooms[0]),{reason:'Tampered'},{merge:true}));
+  await assertFails(setDoc(doc(worker,'requestDecisions',rooms[0]),{deciderName:'Forged'},{merge:true}));
+  await assertFails(setDoc(doc(worker,'requestDecisions',rooms[0]),{outcome:'rejected'},{merge:true}));
+  await assertFails(setDoc(doc(manager,'requestDecisions',rooms[0]),{status:'sent'},{merge:true}));
+  await assertFails(deleteDoc(doc(worker,'requestDecisions',rooms[0])));
+  await seed('users/owner',{active:true,role:'teacher',email:'requester@example.test'});
+  for(const p of periods)await seed(`periods/${p.id}`,{start:'13:00',end:'13:15'});
+  for(const room of rooms)await seed(`rooms/${room}`,{name:room===rooms[0]?'Salla 102':'Salla 127'});
+  const part=v=>Buffer.from(JSON.stringify(v)).toString('base64url');
+  const token=part({alg:'none',typ:'JWT'})+'.'+part({sub:'cancellation-mail-worker',user_id:'cancellation-mail-worker',aud:'demo-fet-requests',iss:'https://securetoken.google.com/demo-fet-requests',iat:Math.floor(Date.now()/1000),exp:Math.floor(Date.now()/1000)+3600,cancellationMailWorker:true,firebase:{sign_in_provider:'custom',identities:{}}})+'.';
+  const rest=firestoreRest('demo-fet-requests',token,fetch,`http://${process.env.FIRESTORE_EMULATOR_HOST}`);
+  const pending=await rest.pending('requestDecisions');
+  assert.ok(rooms.every(id=>pending.some(ref=>ref.id===id)));
+  const messages=[];
+  const deps={db:rest,auth:{getUser:async uid=>(await rest.doc(`users/${uid}`).get()).data()},send:async mail=>messages.push(mail),now:Date.now,timestamp,token:'lease'};
+  for(const id of rooms){await deliverCancellation(rest.doc('requestDecisions/'+id),deps);await deliverCancellation(rest.doc('requestDecisions/'+id),deps);}
+  assert.equal(messages.length,2);
+  for(const mail of messages){assert.equal(mail.to,'requester@example.test');assert.match(mail.text,/Manager/);assert.match(mail.text,/Arsyeja e vendimit/);}
+  assert.match(messages[0].subject,/miratuar/);assert.match(messages[1].subject,/refuzuar/);
+  assert.ok(!(await rest.pending('requestDecisions')).some(ref=>rooms.includes(ref.id)));
+
  }finally{await env.cleanup();}
 });

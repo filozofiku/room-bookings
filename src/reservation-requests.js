@@ -44,7 +44,7 @@ export async function decideReservationRequest(db,id,outcome,reason,user){
    slotKeys(data).forEach(key=>locks[key]=id);
    tx.set(occupancyRef,{bookings:locks,changedReservationId:id});
   }
-  tx.set(doc(db,'requestDecisions',id),{booking:data,outcome,reason,decidedBy:user.uid,deciderName:user.displayName||'Mësimdhënës',createdAt:serverTimestamp()});
+  tx.set(doc(db,'requestDecisions',id),{booking:data,outcome,reason,status:'pending',decidedBy:user.uid,deciderName:user.displayName||'Mësimdhënës',createdAt:serverTimestamp()});
   tx.delete(ref);
  });
 }

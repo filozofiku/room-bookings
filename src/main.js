@@ -218,7 +218,7 @@ async function readRequests() {
         try{
           await decideReservationRequest(db,item.id,outcome,reason,currentUser);
           await Promise.all([readRequests(),readMyBookings(),readAvailability()]);
-          message(outcome==='approved'?'Kërkesa u miratua dhe rezervimi u publikua.':'Kërkesa u refuzua dhe u fshi.');
+          message(outcome==='approved'?'Kërkesa u miratua dhe rezervimi u publikua. Njoftimi me email është në pritje të dërgimit.':'Kërkesa u refuzua dhe u fshi. Njoftimi me email është në pritje të dërgimit.');
         }catch(e){feedback.textContent=errText(e);feedback.className='error';card.querySelectorAll('button').forEach(b=>b.disabled=false);}
       };card.append(button,document.createTextNode(' '));
     }

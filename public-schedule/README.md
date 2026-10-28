@@ -75,7 +75,11 @@ Approval atomically rechecks availability, creates the reservation under the
 requester's identity, publishes it, locks the resources, and deletes the request.
 Rejection deletes the request without creating a reservation. Private immutable
 `requestDecisions` retain the reason for the requester and administrators.
-No decision emails are sent. Existing public-event notifications apply only after
+Approval and rejection decisions queue an Albanian email to the requester with
+the reason and reviewer’s name. The existing scheduled worker sends these on its
+next available run, with the same retry and duplicate-suppression mechanism as
+cancellation notifications. Decisions made before this feature was enabled are
+not emailed retrospectively. Existing public-event notifications apply only after
 approval, because only then is a public booking created.
 
 Regular users may edit an approved reservation's descriptive details, but changes
