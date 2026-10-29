@@ -131,7 +131,7 @@ test('resource reservations: atomic publication, optional resources, conflicts, 
   await assertFails(create('bad',{}, {db:other}));
   await assertFails(setDoc(doc(anon,'publicBookings','fake'),base));
   await assertFails(setDoc(doc(db,'publicBookings','fake'),base));
-  for(const eventType of ['Mbledhje','Tryezë','Diskutim','Punëtori','Ligjëratë e ftuar','Ceremoni']){
+  for(const eventType of ['Mbledhje','Tryezë','Diskutim','Punëtori','Ligjëratë e ftuar','Ceremoni','Kolokium','Ekspozitë']){
     await assertSucceeds(create('new-type',{eventType}));
     await assertSucceeds(cancel('new-type'));
   }

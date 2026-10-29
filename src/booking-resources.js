@@ -1,4 +1,4 @@
-export const EVENT_TYPES = ['Zëvendësim i mësimit', 'Konferencë', 'Panel', 'Mbrojtje publike','Mbledhje','Tryezë','Diskutim','Punëtori','Ligjëratë e ftuar','Ceremoni'];
+export const EVENT_TYPES = ['Zëvendësim i mësimit', 'Konferencë', 'Panel', 'Mbrojtje publike','Mbledhje','Tryezë','Diskutim','Punëtori','Ligjëratë e ftuar','Ceremoni','Kolokium','Ekspozitë'];
 export function resourceIds(booking) {
   return [...(booking.groupIds || []), ...(booking.teacherIds || []), ...(booking.roomId ? [booking.roomId] : [])];
 }
