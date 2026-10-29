@@ -79,12 +79,14 @@
     .event.tiny{padding:3px 5px}
     .event.tiny .event-title{font-size:10px;-webkit-line-clamp:2}
     .event.tiny .event-sub{display:none}
-    .tone-0{--event-bg:#dcf0ef;--event-border:#179b93}
-    .tone-1{--event-bg:#e5eafb;--event-border:#6686d4}
-    .tone-2{--event-bg:#fae9de;--event-border:#db8d4b}
-    .tone-3{--event-bg:#efe5f5;--event-border:#a27bc0}
-    .tone-4{--event-bg:#e4f1df;--event-border:#75a961}
-    .tone-5{--event-bg:#f9ebee;--event-border:#d08298}
+    .category-lecture{--event-bg:#dbeafe;--event-border:#2563eb}
+    .category-exercise{--event-bg:#dcfce7;--event-border:#15803d}
+    .category-elective{--event-bg:#f3e8ff;--event-border:#9333ea}
+    .category-public-reservation{--event-bg:#fef3c7;--event-border:#b45309}
+    .category-private-reservation{--event-bg:#e2e8f0;--event-border:#475569}
+    .legend-items{display:flex;flex-wrap:wrap;gap:10px 20px;color:var(--ink-soft)}
+    .legend-item{display:inline-flex;align-items:center;gap:7px}
+    .legend-swatch{display:inline-block;width:18px;height:18px;border:1px solid var(--event-border);border-left-width:4px;border-radius:4px;background:var(--event-bg);flex-shrink:0}
     .agenda{padding:10px 20px 22px}
     .agenda-day{border-bottom:1px solid #e6edf3;padding:17px 0}
     .agenda-day:last-child{border-bottom:0}
@@ -123,9 +125,9 @@
     .close-dialog:hover{background:#eef2f5}
     @media (max-width:830px){.fields{grid-template-columns:1fr 1fr}.fields>:last-child{grid-column:1/-1}.free-filters{grid-template-columns:repeat(3,1fr)}.filters{padding:19px}}
     @media (max-width:600px){.hero{padding:22px 0 30px}.brand{margin-bottom:26px}.page{padding-top:16px}.navigation{display:grid;grid-template-columns:1fr 1fr}.nav-btn{padding:10px 7px}.refresh-btn{grid-column:1/-1}.fields,.free-filters{grid-template-columns:1fr;gap:12px}.fields>:last-child{grid-column:auto}.filters{padding:17px}.result-title{font-size:18px}.tools{width:100%}.agenda{padding:4px 13px 15px}.agenda-row{grid-template-columns:86px minmax(0,1fr);gap:7px}.agenda-time{font-size:11px}.room-list{grid-template-columns:repeat(2,minmax(0,1fr))}.room-choice{padding:12px;font-size:13px}.count{font-size:11px}.micro{width:100%}}
-    @media print{body{background:#fff}.hero{background:white!important;color:#15293e;padding:0 0 10px}.hero-p,.hero-bottom,.brand-mark,.navigation,.filters,.tools,.legend,.footnote,.hint,.load-status{display:none!important}.brand{margin:0 0 10px}.brand-name,.brand-sub,.eyebrow{color:#15293e}.page{padding:0}.calendar-box{border:0;box-shadow:none}.calendar-scroll{display:none!important}.agenda{display:block!important}.agenda-row{break-inside:avoid}.agenda-day{break-inside:avoid}.result-title{font-size:19px}}
+    @media print{body{background:#fff}.hero{background:white!important;color:#15293e;padding:0 0 10px}.hero-p,.hero-bottom,.brand-mark,.navigation,.filters,.tools,.footnote,.hint,.load-status{display:none!important}.brand{margin:0 0 10px}.brand-name,.brand-sub,.eyebrow{color:#15293e}.page{padding:0}.calendar-box{border:0;box-shadow:none}.calendar-scroll{display:none!important}.agenda{display:block!important}.agenda-row{break-inside:avoid}.agenda-day{break-inside:avoid}.result-title{font-size:19px}}
     @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
-  .reservation-event{border-left:4px solid #b45309!important;background:#fff2d5!important;color:#713f12!important}
+  .reservation-event{border-left-width:4px}
 </style>
 </head>
 <body>
@@ -200,7 +202,7 @@
         </div>
       </div>
       <div class="agenda" id="agendaView" hidden></div>
-      <div class="legend" id="calendarNote">Kliko një aktivitet për të parë të gjitha hollësitë.</div>
+      <div class="legend" id="calendarNote"><div class="legend-items" aria-label="Kuptimi i ngjyrave"><span class="legend-item category-lecture"><span class="legend-swatch" aria-hidden="true"></span>Ligjërata obligative</span><span class="legend-item category-exercise"><span class="legend-swatch" aria-hidden="true"></span>Ushtrime obligative</span><span class="legend-item category-elective"><span class="legend-swatch" aria-hidden="true"></span>Aktivitete zgjedhore</span><span class="legend-item category-public-reservation"><span class="legend-swatch" aria-hidden="true"></span>Rezervime publike</span><span class="legend-item category-private-reservation"><span class="legend-swatch" aria-hidden="true"></span>Rezervime jo publike</span></div><p>Kliko një aktivitet për të parë të gjitha hollësitë.</p></div>
     </div>
   </section>
 
@@ -221,7 +223,7 @@
           <div><div id="freeCount" class="availability-count"></div><div id="freeSummary" class="availability-meta"></div></div>
         </div>
         <div id="roomResults" class="room-list"></div>
-        <p class="hint">Disponueshmëria për datën e zgjedhur përfshin orarin zyrtar dhe rezervimet në aplikacion. Rezervimi përfundimtar bëhet në aplikacionin e rezervimeve. Kliko një sallë për ta parë orarin e saj.</p>
+        <p class="hint">Disponueshmëria për datën e zgjedhur përfshin orarin zyrtar dhe rezervimet në aplikacion. Rezervimi përfundimtar bëhet në aplikacionin e rezervimeve. Kliko një sallë për të hapur formularin e rezervimit me datën dhe orët e përzgjedhura.</p>
       </div>
     </div>
   </section>
@@ -237,7 +239,7 @@
 </dialog>
 <!-- Timetables are loaded directly from three files in the same folder. -->
 <script type="module">
-import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTimestamp, eventLanes} from './booking-model.js';
+import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTimestamp, eventLanes, eventCategory, EVENT_CATEGORY_LABELS} from './booking-model.js';
 (() => {
   "use strict";
   let data;
@@ -447,7 +449,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     return [...e].sort((a,b)=>a.d-b.d||a.s-b.s||a.t.localeCompare(b.t,"sq"));
   }
   function hours(e){return `${data.times[e.s]}–${data.times[e.e]}`;}
-  function colorClass(subject){let hash=0;for(const c of subject)hash=((hash<<5)-hash+c.charCodeAt(0))|0;return "tone-"+(Math.abs(hash)%6);}
+  function colorClass(event){return "category-"+eventCategory(event);}
   function extraForEvent(event){
     if(event.booking) return `${event.r} · ${event.creatorName}`;
     if(state.type==="subgroups") return [event.p,event.r].filter(Boolean).join(" · ");
@@ -479,7 +481,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
         const index = evs.indexOf(event);
         const ht=(event.e-event.s)*15-3;
         const {lane,count}=layouts[dayPosition].get(event);
-        return `<button class="event ${colorClass(event.t)} ${event.booking?"reservation-event":""} ${ht<=48?"tiny":""}" data-event="${index}" type="button" aria-label="${esc(event.t)} – ${esc(day)} ${hours(event)}" title="${esc(event.t)} · ${hours(event)} · ${esc(extraForEvent(event))}" style="left:calc(${lane/count*100}% + 3px);right:auto;width:calc(${100/count}% - 6px);top:${event.s*15+2}px;height:${ht}px"><span class="event-title">${esc(event.t)}</span><span class="event-sub">${esc(extraForEvent(event))}</span></button>`;
+        return `<button class="event ${colorClass(event)} ${event.booking?"reservation-event":""} ${ht<=48?"tiny":""}" data-event="${index}" type="button" aria-label="${esc(event.t)} · ${esc(EVENT_CATEGORY_LABELS[eventCategory(event)])} – ${esc(day)} ${hours(event)}" title="${esc(event.t)} · ${esc(EVENT_CATEGORY_LABELS[eventCategory(event)])} · ${hours(event)} · ${esc(extraForEvent(event))}" style="left:calc(${lane/count*100}% + 3px);right:auto;width:calc(${100/count}% - 6px);top:${event.s*15+2}px;height:${ht}px"><span class="event-title">${esc(event.t)}</span><span class="event-sub">${esc(extraForEvent(event))}</span></button>`;
       }).join("");
       return `<div class="day-column" aria-label="${esc(day)}">${cells}</div>`;
     }).join("");
@@ -493,7 +495,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
       return `<section class="agenda-day"><h3>${esc(dayHeading(d))}</h3>${rows.length?
         rows.map((e)=>{
           const index=evs.indexOf(e);
-          return `<div class="agenda-row"><div class="agenda-time">${hours(e)}</div><button class="agenda-entry ${colorClass(e.t)} ${e.booking?"reservation-event":""}" data-agenda="${index}" type="button"><strong>${esc(e.t)}</strong><span>${esc(e.a)}${e.a&&extraForEvent(e)?" · ":""}${esc(extraForEvent(e))}</span></button></div>`;
+          return `<div class="agenda-row"><div class="agenda-time">${hours(e)}</div><button class="agenda-entry ${colorClass(e)} ${e.booking?"reservation-event":""}" data-agenda="${index}" type="button" aria-label="${esc(e.t)} · ${esc(EVENT_CATEGORY_LABELS[eventCategory(e)])} · ${hours(e)}"><strong>${esc(e.t)}</strong><span>${esc(e.a)}${e.a&&extraForEvent(e)?" · ":""}${esc(extraForEvent(e))}</span></button></div>`;
         }).join(""):`<p class="no-events">Nuk ka aktivitete të planifikuara.</p>`}</section>`;
     }).join("");
     $("agendaView").querySelectorAll("[data-agenda]").forEach(button=>button.addEventListener("click",()=>showEvent(evs[Number(button.dataset.agenda)])));
@@ -533,7 +535,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
   function showEvent(e){
     $("modalTitle").textContent=e.t;
     $("modalTag").textContent=e.a || "Aktivitet mësimor";
-    const pairs=[["Dita",data.days[e.d]],["Ora",hours(e)],["Studentët / Grupi",e.g],["Mësimdhënësi",e.p],["Salla",e.r]];
+    const pairs=[["Kategoria e aktivitetit",EVENT_CATEGORY_LABELS[eventCategory(e)]],["Dita",data.days[e.d]],["Ora",hours(e)],["Studentët / Grupi",e.g],["Mësimdhënësi",e.p],["Salla",e.r]];
     if(e.booking) pairs.push(["Përshkrimi",e.description],["Data",e.date],["Rezervuar nga",e.creatorName],["Rezervimi u krijua më",bookingTimestamp(e.createdAt)],["Mënyra e zhvillimit",e.mode === "online" ? "Online" : e.mode === "physical" ? "Fizik" : ""]);
     $("modalDetails").innerHTML=pairs.filter(([,v])=>v).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
     if(e.booking && e.mode === 'online' && /^https?:\/\//i.test(e.onlineUrl || '')) {

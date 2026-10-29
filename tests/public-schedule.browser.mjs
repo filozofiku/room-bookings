@@ -52,6 +52,21 @@ try {
    assert.equal(link.searchParams.get('start'),await page.locator('#freeStart option:checked').textContent());
    assert.equal(link.searchParams.get('end'),await page.locator('#freeEnd option:checked').textContent());}
   const booking = {title:'<img src=x onerror=alert(1)>',date:result.date,room:roomName,creatorName:'Test Teacher',createdAt:{seconds:1792706400},slots:[{start:'12:00',end:'12:15'},{start:'12:15',end:'12:30'}]};
+  assert.equal(await page.locator('.legend-swatch').count(),5);
+  for(const entry of await page.locator('.agenda-entry:not(.reservation-event)').all()){
+    const tag=await entry.locator('span').textContent();
+    const category=tag.includes('Zgjedhore')?'elective':tag.includes('Ushtrime')?'exercise':'lecture';
+    assert.ok((await entry.getAttribute('class')).includes('category-'+category));
+  }
+  for(const [isPublic,category,color] of [[true,'public-reservation','rgb(254, 243, 199)'],[false,'private-reservation','rgb(226, 232, 240)']]){
+    await page.evaluate(value=>window.testReport(value),{...result,rows:[{...booking,isPublic}]});
+    for(const selector of ['.event.reservation-event','.agenda-entry.reservation-event']){
+      const event=page.locator(selector).first();
+      assert.ok((await event.getAttribute('class')).includes('category-'+category));
+      assert.equal(await event.evaluate(el=>getComputedStyle(el).backgroundColor),color);
+    }
+  }
+
   await page.evaluate(value => window.testReport(value),{...result,rows:[booking]});
   assert.equal(await page.locator('.room-choice').count(),0);
   await page.click('#navSchedules');

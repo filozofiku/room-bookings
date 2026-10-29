@@ -43,7 +43,7 @@ export function reservationEvents(rows, room, dates, days, times, kind = 'rooms'
       const s = times.indexOf(run.start), e = times.indexOf(run.end);
       if (s < 0 || e <= s) throw Error('Orët e rezervimit nuk përputhen me orarin zyrtar.');
       return {d:dayIndex(days,new Date(`${b.date}T12:00:00Z`).getUTCDay()),s,e,
-        t:b.title,r:b.room || 'Pa sallë',a:b.eventType || 'Rezervim',g:b.groups?.join(', ') || 'Pa grup të studentëve',p:b.teachers?.join(', ') || 'Pa mësimdhënës',booking:true,date:b.date,mode:b.mode,onlineUrl:b.onlineUrl,description:b.description,
+        t:b.title,r:b.room || 'Pa sallë',a:b.eventType || 'Rezervim',g:b.groups?.join(', ') || 'Pa grup të studentëve',p:b.teachers?.join(', ') || 'Pa mësimdhënës',booking:true,isPublic:b.isPublic===true,date:b.date,mode:b.mode,onlineUrl:b.onlineUrl,description:b.description,
         creatorName:b.creatorName || 'Emri nuk është i disponueshëm',createdAt:b.createdAt};
     });
   });
@@ -71,4 +71,18 @@ export function eventLanes(events) {
   }
   finish();
   return result;
+}
+
+export const EVENT_CATEGORY_LABELS = {
+  lecture:'Ligjërata obligative',
+  exercise:'Ushtrime obligative',
+  elective:'Aktivitete zgjedhore',
+  'public-reservation':'Rezervime publike',
+  'private-reservation':'Rezervime jo publike'
+};
+export function eventCategory(event) {
+  if(event.booking)return event.isPublic===true?'public-reservation':'private-reservation';
+  const tags=(event.a||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  if(tags.includes('zgjedh'))return 'elective';
+  return tags.includes('ushtrim')?'exercise':'lecture';
 }
