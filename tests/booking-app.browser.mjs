@@ -263,6 +263,8 @@ assert.match(await page.locator('#booking-form button').textContent(),/Dërgoni 
 const beforePublic=await page.evaluate(()=>JSON.stringify([...window.testStore].filter(([k])=>k.startsWith('publicBookings/'))));
 await submitBooking();
 assert.equal(await page.evaluate(()=>window.testStore.has('reservationRequests/new')),true);
+assert.equal(await page.evaluate(()=>window.testStore.get('requestNotifications/new').status),'pending');
+assert.equal(await page.evaluate(()=>window.testStore.get('requestNotifications/new').booking.title),'Kërkesa për sallën 127');
 assert.equal(await page.evaluate(()=>JSON.stringify([...window.testStore].filter(([k])=>k.startsWith('publicBookings/')))),beforePublic);
 assert.match(await page.locator('#reservation-requests').textContent(),/Në pritje/);
 assert.equal(await page.locator('#reservation-requests button').count(),0);

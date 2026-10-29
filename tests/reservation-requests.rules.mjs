@@ -17,6 +17,12 @@ test('special rooms require private requests and atomic elevated decisions',asyn
  const teachers=Object.fromEntries(Array.from({length:93},(_,i)=>['t_'+i,'Teacher '+i]));
  const periods=Array.from({length:16},(_,i)=>({id:`p${String(i+1).padStart(2,'0')}`}));
  const base={title:'Request',date,roomId:rooms[0],periodIds:['p01'],groupIds:[],teacherIds:[],eventType:'Panel',isPublic:false,mode:'physical',onlineUrl:'',description:'',ownerUid:'owner',creatorName:'Owner',createdAt:serverTimestamp()};
+ const submit=async(id,data=base,notice={})=>{
+  const batch=writeBatch(owner);
+  batch.set(doc(owner,'reservationRequests',id),data);
+  batch.set(doc(owner,'requestNotifications',id),{booking:data,kind:'request-submitted',status:'pending',createdAt:serverTimestamp(),...notice});
+  return batch.commit();
+ };
  const create=async(db,id,data=base)=>{
   const batch=writeBatch(db),booking={...data,createdAt:serverTimestamp()}, {ownerUid,...published}=booking;
   batch.set(doc(db,'reservations',id),booking);batch.set(doc(db,'publicBookings',id),published);
@@ -41,9 +47,13 @@ test('special rooms require private requests and atomic elevated decisions',asyn
   await seed('settings/control',{bookingOpen:true,slotStorage:'resources-v2',startDate:'2026-09-01',endDate:'2026-12-31',periodOrder:Object.fromEntries(periods.map((p,i)=>[p.id,i])),validPeriodRanges:validPeriodRanges(periods)});
   await seed('resourceCatalog/current',{rooms:{[rooms[0]]:'Salla 102',[rooms[1]]:'Salla 127',normal:'Salla 014'},groups,teachers});
   await seed(`calendarDays/${date}`,{weekday:'3',bookingAllowed:true,fetActive:true});await seed('weeklyResources/3',{busyKeys:[]});
+  await assertFails(setDoc(doc(owner,'reservationRequests','unqueued'),base));
+  await assertFails(submit('bad-status',base,{status:'sent'}));
+  await assertFails(submit('bad-recipient',base,{recipient:'someone@example.test'}));
+  await assertFails(submit('bad-snapshot',base,{booking:{...base,title:'Forged'}}));
   for(const roomId of rooms){
    await assertFails(create(owner,'direct',{...base,roomId}));
-   await assertSucceeds(setDoc(doc(owner,'reservationRequests',roomId),{...base,roomId}));
+   await assertSucceeds(submit(roomId,{...base,roomId}));
   }
   await assertFails(setDoc(doc(owner,'reservationRequests','invalid'),{...base,roomId:'normal'}));
   await assertFails(setDoc(doc(owner,'reservationRequests','fake'),{...base,ownerUid:'other'}));
@@ -77,7 +87,7 @@ test('special rooms require private requests and atomic elevated decisions',asyn
   await seed(`eventDays/${date}`,{bookings:{},changedReservationId:'reset'});
   await assertSucceeds(create(manager,'manager-direct',{...base,roomId:rooms[1],ownerUid:'manager',creatorName:'Manager'}));
   await seed(`eventDays/${date}`,{bookings:{},changedReservationId:'reset'});
-  await assertSucceeds(setDoc(doc(owner,'reservationRequests','maximum'),{...base,periodIds:periods.map(p=>p.id),groupIds:Object.keys(groups),teacherIds:Object.keys(teachers)}));
+  await assertSucceeds(submit('maximum',{...base,periodIds:periods.map(p=>p.id),groupIds:Object.keys(groups),teacherIds:Object.keys(teachers)}));
   await assertSucceeds(decide(manager,'maximum'));
   // Exercise the real restricted-worker REST path after both request documents are deleted.
   const worker=env.authenticatedContext('cancellation-mail-worker',{cancellationMailWorker:true}).firestore();
@@ -101,6 +111,18 @@ test('special rooms require private requests and atomic elevated decisions',asyn
   for(const mail of messages){assert.equal(mail.to,'requester@example.test');assert.match(mail.text,/Manager/);assert.match(mail.text,/Arsyeja e vendimit/);}
   assert.match(messages[0].subject,/miratuar/);assert.match(messages[1].subject,/refuzuar/);
   assert.ok(!(await rest.pending('requestDecisions')).some(ref=>rooms.includes(ref.id)));
+  await assertFails(getDoc(doc(other,'requestNotifications',rooms[0])));
+  await assertFails(setDoc(doc(worker,'requestNotifications',rooms[0]),{booking:{...base,title:'Forged'}},{merge:true}));
+  await assertFails(setDoc(doc(manager,'requestNotifications',rooms[0]),{status:'sent'},{merge:true}));
+  const pendingRequests=await rest.pending('requestNotifications');
+  assert.ok(rooms.every(id=>pendingRequests.some(ref=>ref.id===id)));
+  const requestMails=[];
+  const reviewerDeps={...deps,auth:{getUser:async()=>{throw Error('Must use fixed reviewer recipient');}},send:async mail=>requestMails.push(mail)};
+  for(const id of rooms){await deliverCancellation(rest.doc('requestNotifications/'+id),reviewerDeps);await deliverCancellation(rest.doc('requestNotifications/'+id),reviewerDeps);}
+  await assertFails(setDoc(doc(owner,'reservationRequests',rooms[0]),base));
+  assert.equal(requestMails.length,2);
+  for(const mail of requestMails){assert.equal(mail.to,'bardhok.bashota@uni-pr.edu');assert.match(mail.text,/Kërkuesi: Owner/);assert.match(mail.text,/Kërkesat për miratim/);assert.match(mail.messageId,/^<request-submitted-/);}
+
 
  }finally{await env.cleanup();}
 });

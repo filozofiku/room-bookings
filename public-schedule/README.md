@@ -87,3 +87,11 @@ to its special room, date, periods, groups, or teachers require administrator
 handling or a new request. A new request does not replace or cancel an existing
 reservation. The room IDs are listed in `src/reservation-requests.js` and enforced
 independently in `firestore.rules`.
+
+New special-room requests atomically queue a private `requestNotifications` entry.
+The existing scheduled mail worker notifies `bardhok.bashota@uni-pr.edu` in Albanian
+with the requester, activity, room, date/time, description and booking-app link.
+The recipient is fixed in the worker, not supplied by the requesting browser.
+The notification survives review/deletion of the request and uses the existing
+retry and duplicate-suppression mechanism. Delivery can be delayed until the next
+worker run. Requests submitted before this change are not backfilled.

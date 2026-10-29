@@ -1,3 +1,4 @@
+import {requestSubmittedEmail,REQUEST_REVIEWER_EMAIL} from './request-submitted-email.js';
 import {requestDecisionEmail} from './request-decision-email.js';
 import {modificationEmail} from './modification-email.js';
 import {createHash} from 'node:crypto';
@@ -42,20 +43,22 @@ export async function deliverCancellation(ref, {db, auth, send, now, timestamp, 
     tx.update(ref,patch);
   });
   try {
-    const owner=await auth.getUser(work.booking.ownerUid);
+    const owner=work.kind==='request-submitted'?{email:REQUEST_REVIEWER_EMAIL}:await auth.getUser(work.booking.ownerUid);
     if(!owner.email) throw Object.assign(Error('missing-recipient'),{code:'missing-recipient'});
     const [periods,room]=await Promise.all([
       db.collection('periods').get(),
       work.booking.roomId ? db.doc(`rooms/${work.booking.roomId}`).get() : null
     ]);
     let content;
-    if(work.outcome){
+    if(work.kind==='request-submitted'){
+      content=requestSubmittedEmail(work.booking,periods.docs.map(p=>({id:p.id,...p.data()})),room?.data()?.name);
+    }else if(work.outcome){
       content=requestDecisionEmail(work,periods.docs.map(p=>({id:p.id,...p.data()})),room?.data()?.name);
     }else if(work.before){
       const [rooms,catalog]=await Promise.all([db.collection('rooms').get(),db.doc('resourceCatalog/current').get()]);
       content=modificationEmail(work,periods.docs.map(p=>({id:p.id,...p.data()})),rooms.docs.map(r=>({id:r.id,...r.data()})),catalog.data()||{});
     }else content=cancellationEmail(work.booking,work.reason,periods.docs.map(p=>({id:p.id,...p.data()})),room?.data()?.name);
-    await send({to:owner.email,...content,messageId:`<${work.outcome?'request-decision':work.before?'modification':'cancellation'}-${createHash('sha256').update(ref.id).digest('hex')}@filozofiku.github.io>`});
+    await send({to:owner.email,...content,messageId:`<${work.kind==='request-submitted'?'request-submitted':work.outcome?'request-decision':work.before?'modification':'cancellation'}-${createHash('sha256').update(ref.id).digest('hex')}@filozofiku.github.io>`});
     await finish({status:'sent',sentAt:timestamp(now())});
   } catch(error) {
     const terminal=['auth/user-not-found','missing-recipient'].includes(error.code) || work.attempts>=5;

@@ -14,7 +14,9 @@ export async function submitReservationRequest(db,data,user){
   const weekly=day.data().fetActive?await tx.get(doc(db,'weeklyResources',String(day.data().weekday))):null;
   const conflict=conflictMessage(data,occupancy.data()?.bookings||{},weekly?.data()?.busyKeys||[]);
   if(conflict)throw new BookingError(conflict);
-  tx.set(ref,{...data,ownerUid:user.uid,creatorName:user.displayName||'Mësimdhënës',createdAt:serverTimestamp()});
+  const booking={...data,ownerUid:user.uid,creatorName:user.displayName||'Mësimdhënës',createdAt:serverTimestamp()};
+  tx.set(ref,booking);
+  tx.set(doc(db,'requestNotifications',ref.id),{booking,kind:'request-submitted',status:'pending',createdAt:serverTimestamp()});
  });
  return ref.id;
 }

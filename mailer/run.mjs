@@ -19,8 +19,9 @@ const db=firestoreRest(config.projectId,auth.id_token);
 const cancellations=await db.pending();
 const modifications=await db.pending('modificationNotifications');
 const decisions=await db.pending('requestDecisions');
-const queue=[...cancellations,...modifications,...decisions];
-console.log(`Pending owner notifications: ${queue.length} (${modifications.length} modifications, ${decisions.length} request decisions)`);
+const requests=await db.pending('requestNotifications');
+const queue=[...cancellations,...modifications,...decisions,...requests];
+console.log(`Pending reservation notifications: ${queue.length} (${modifications.length} modifications, ${decisions.length} request decisions, ${requests.length} new requests)`);
 let publicWork=null;
 if((process.env.PUBLIC_EVENT_EMAIL_ENABLED==='true' || mode==='check-public')){
  const settings=(await db.doc('mailSettings/publicEvents').get()).data();

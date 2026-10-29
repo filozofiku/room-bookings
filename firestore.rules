@@ -201,9 +201,25 @@ service cloud.firestore {
       allow create: if canBook(request.resource.data.date) && !elevated() && valid(request.resource.data) &&
         specialRoom(request.resource.data.roomId) && request.resource.data.ownerUid == request.auth.uid &&
         request.resource.data.creatorName == request.auth.token.get('name','Mësimdhënës') &&
-        request.resource.data.createdAt == request.time && !request.resource.data.keys().hasAny(['revision','updatedAt']);
+        request.resource.data.createdAt == request.time && !request.resource.data.keys().hasAny(['revision','updatedAt']) &&
+        !exists(/databases/$(database)/documents/requestNotifications/$(id)) &&
+        existsAfter(/databases/$(database)/documents/requestNotifications/$(id));
       allow update: if false;
       allow delete: if approved() && elevated() && existsAfter(/databases/$(database)/documents/requestDecisions/$(id));
+    }
+    match /requestNotifications/{id} {
+      allow create: if approved() &&
+        request.resource.data.keys().hasOnly(['booking','kind','status','createdAt']) &&
+        request.resource.data.kind == 'request-submitted' && request.resource.data.status == 'pending' &&
+        request.resource.data.createdAt == request.time &&
+        !exists(/databases/$(database)/documents/reservationRequests/$(id)) &&
+        request.resource.data.booking == getAfter(/databases/$(database)/documents/reservationRequests/$(id)).data &&
+        request.resource.data.booking.ownerUid == request.auth.uid;
+      allow read: if mailWorker() || (approved() && elevated());
+      allow update: if mailWorker() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'status','attempts','leaseToken','leaseUntil','sentAt','lastErrorCode','lastAttemptAt'
+      ]) && request.resource.data.status in ['sending','sent','retrying','failed'];
+      allow delete: if false;
     }
     match /requestDecisions/{id} {
       function validDecision() {
