@@ -104,7 +104,7 @@
     .availability-count{font-size:24px;font-weight:820;line-height:1.3}
     .availability-meta{font-size:13px;color:var(--muted);margin-top:4px}
     .room-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:12px}
-    .room-choice{display:flex;align-items:center;justify-content:space-between;text-align:left;gap:10px;padding:16px;background:#fff;border:1px solid #dfebea;border-radius:12px;color:var(--ink);font-weight:750;min-height:62px}
+    .room-choice{text-decoration:none;display:flex;align-items:center;justify-content:space-between;text-align:left;gap:10px;padding:16px;background:#fff;border:1px solid #dfebea;border-radius:12px;color:var(--ink);font-weight:750;min-height:62px}
     .room-choice:hover{border-color:#85cbcc;background:#eef9f7}
     .arrow{font-size:18px;color:var(--accent);font-weight:500}
     .hint{font-size:12px;color:#728396;margin-top:17px;max-width:850px}
@@ -563,13 +563,15 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
       !publicState.rows.some(b => b.date === publicState.date && overlaps(b,room.n,data.times[s],data.times[e])));
     $("freeCount").textContent=`${free.length} nga ${data.rooms.length} salla të lira`;
     $("freeSummary").textContent=`${publicState.date} · ${data.times[s]}–${data.times[e]}`;
+    const bookingLink=room=>{
+      const url=new URL('https://filozofiku.github.io/room-bookings/');
+      url.search=new URLSearchParams({date:publicState.date,room:room.n,start:data.times[s],end:data.times[e]}).toString();
+      return url.href;
+    };
     $("roomResults").innerHTML=free.length?
-      free.map(room=>`<button type="button" class="room-choice" data-room="${esc(room.n)}"><span>${esc(room.l)}</span><span class="arrow" aria-hidden="true">↗</span></button>`).join("") :
+      free.map(room=>`<a class="room-choice" href="${esc(bookingLink(room))}" aria-label="${esc('Rezervoni '+room.l)}"><span>${esc(room.l)}</span><span class="arrow" aria-hidden="true">↗</span></a>`).join("") :
       `<div class="card empty-state" style="grid-column:1/-1"><strong>Nuk ka salla të lira</strong>Provo një interval më të shkurtër ose një orar tjetër.</div>`;
-    $("roomResults").querySelectorAll("[data-room]").forEach(button=>button.addEventListener("click",()=>{
-      setCategory("rooms");setEntityByName(button.dataset.room);switchPage("schedules");
-      window.scrollTo({top:0,behavior:"smooth"});
-    }));
+
   }
   function initFree(){
     $("freeDay").innerHTML=data.days.map((d,i)=>`<option value="${i}">${esc(d)}</option>`).join("");

@@ -7,7 +7,7 @@ const authModule=`
 export class GoogleAuthProvider{setCustomParameters(){}}
 export const signInWithPopup=async()=>{};
 export const signOut=async()=>window.testAuth(null);
-export function onAuthStateChanged(auth,cb){window.testAuth=cb;cb({uid:'teacher',displayName:'Mësimdhënës',email:'test@example.test'});}
+export function onAuthStateChanged(auth,cb){window.testAuth=cb;cb(new URLSearchParams(location.search).has('signedout')?null:{uid:'teacher',displayName:'Mësimdhënës',email:'test@example.test'});}
 `;
 const firestoreModule=`
 const periods=Array.from({length:18},(_,i)=>{
@@ -303,6 +303,22 @@ assert.equal(await page.evaluate(()=>window.testStore.has('reservationRequests/c
 await page.evaluate(()=>{window.testFail=true});await page.locator('#room').dispatchEvent('change');
 await page.waitForFunction(()=>document.getElementById('message').textContent.includes('Shërbimi nuk është'));
 assert.doesNotMatch(await page.locator('#message').textContent(),/English SDK/);
+// Deep links survive sign-in and map the finishing time to the inclusive last period.
+await page.goto('https://booking.test/?date=2026-10-23&room=Salla%20014&start=08%3A30&end=09%3A30&signedout=1');
+await page.waitForFunction(()=>window.testAuth);
+assert.equal(await page.locator('#app').isVisible(),false);
+await page.evaluate(()=>window.testAuth({uid:'teacher',displayName:'Mësimdhënës',email:'test@example.test'}));
+assert.equal(await page.locator('#date').inputValue(),'2026-10-23');
+assert.equal(await page.locator('#room').inputValue(),'r_123456abcdef');
+assert.equal(await page.locator('#from').inputValue(),'p03');
+assert.equal(await page.locator('#through').inputValue(),'p06');
+await page.selectOption('#from','p04');assert.equal(await page.locator('#from').inputValue(),'p04');
+await page.selectOption('#through','p07');assert.equal(await page.locator('#through').inputValue(),'p07');
+await page.goto('https://booking.test/?date=2026-10-23&room=Unknown&start=08:30&end=09:30');
+await page.waitForFunction(()=>document.getElementById('booking-message').textContent.includes('nuk është e vlefshme'));
+await page.goto('https://booking.test/?date=2026-10-23&room=Salla%20014&start=08:00&end=12:30');
+await page.waitForFunction(()=>document.getElementById('booking-message').textContent.includes('16'));
+assert.equal(await page.locator('#through').inputValue(),'p18');
 assert.deepEqual(errors,[]);
 console.log('Albanian signed-in UI, status labels, boundary times, validation, 16-period booking/cancellation and localized SDK errors passed.');
 }finally{await browser.close();}

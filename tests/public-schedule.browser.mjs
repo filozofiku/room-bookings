@@ -45,6 +45,12 @@ try {
   assert.equal(await page.locator('#agendaView .agenda-day').count(),5);
   await page.click('#navFree');
   assert.equal(await page.locator('.room-choice').count(),1);
+  {const link=new URL(await page.locator('.room-choice').first().getAttribute('href'));
+   assert.equal(link.origin+link.pathname,'https://filozofiku.github.io/room-bookings/');
+   assert.equal(link.searchParams.get('date'),await page.locator('#bookingDate').inputValue());
+   assert.equal(link.searchParams.get('room'),roomName);
+   assert.equal(link.searchParams.get('start'),await page.locator('#freeStart option:checked').textContent());
+   assert.equal(link.searchParams.get('end'),await page.locator('#freeEnd option:checked').textContent());}
   const booking = {title:'<img src=x onerror=alert(1)>',date:result.date,room:roomName,creatorName:'Test Teacher',createdAt:{seconds:1792706400},slots:[{start:'12:00',end:'12:15'},{start:'12:15',end:'12:30'}]};
   await page.evaluate(value => window.testReport(value),{...result,rows:[booking]});
   assert.equal(await page.locator('.room-choice').count(),0);

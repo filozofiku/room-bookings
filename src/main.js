@@ -366,6 +366,22 @@ async function cancelReservation(id, reason = '') {
     tx.delete(doc(db,'publicBookings',id));
   });
 }
+function applyBookingLink() {
+  const params=new URLSearchParams(location.search);
+  if(!['date','room','start','end'].some(key=>params.has(key)))return;
+  const date=params.get('date'),room=rooms.find(r=>r.name===params.get('room'));
+  const from=periods.findIndex(p=>p.start===params.get('start'));
+  const through=periods.findIndex(p=>p.end===params.get('end'));
+  const parsedDate=new Date(`${date}T12:00:00Z`);
+  if(!date || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(parsedDate.getTime()) || parsedDate.toISOString().slice(0,10)!==date || date<settings.startDate || date>settings.endDate || !room || from<0 || through<from){
+    bookingMessage('Përzgjedhja nga lidhja nuk është e vlefshme për orarin aktual. Përzgjidhni datën, sallën dhe orët para rezervimit.',true);
+    return;
+  }
+  $('date').value=date;$('room').value=room.id;
+  $('from').value=periods[from].id;$('through').value=periods[through].id;
+  $('selection-hint').textContent='Data, salla dhe orët u përzgjodhën nga kërkimi i sallave të lira. Mund t’i ndryshoni para rezervimit.';
+  try{selectedPeriodIds();}catch(e){bookingMessage(errText(e),true);}
+}
 async function loadApp() {
   const userSnap = await getDoc(doc(db,'users',currentUser.uid));
   if (!userSnap.exists() || !userSnap.data().active) {
@@ -408,6 +424,7 @@ async function loadApp() {
   $('date').max = settings.endDate;
   $('app').hidden = false;
   message(settings.bookingOpen ? 'Keni hyrë me sukses. Mund të rezervoni një sallë.' : 'Rezervimet janë pezulluar përkohësisht gjatë përditësimit të orarit.');
+  applyBookingLink();
   await Promise.all([readAvailability(), readMyBookings(), readRequests()]);
 }
 function filterChoices(kind) {
