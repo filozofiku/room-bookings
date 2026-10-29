@@ -62,6 +62,8 @@ try {
     await page.evaluate(value=>window.testReport(value),{...result,rows:[{...booking,isPublic}]});
     for(const selector of ['.event.reservation-event','.agenda-entry.reservation-event']){
       const event=page.locator(selector).first();
+      assert.doesNotMatch(await event.textContent(),/Test Teacher/);
+      assert.doesNotMatch(await event.getAttribute('title')||'',/Test Teacher/);
       assert.ok((await event.getAttribute('class')).includes('category-'+category));
       assert.equal(await event.evaluate(el=>getComputedStyle(el).backgroundColor),color);
     }

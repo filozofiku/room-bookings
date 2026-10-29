@@ -451,7 +451,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
   function hours(e){return `${data.times[e.s]}–${data.times[e.e]}`;}
   function colorClass(event){return "category-"+eventCategory(event);}
   function extraForEvent(event){
-    if(event.booking) return `${event.r} · ${event.creatorName}`;
+    if(event.booking) return event.r;
     if(state.type==="subgroups") return [event.p,event.r].filter(Boolean).join(" · ");
     if(state.type==="teachers") return [event.g,event.r].filter(Boolean).join(" · ");
     return [event.g,event.p].filter(Boolean).join(" · ");
