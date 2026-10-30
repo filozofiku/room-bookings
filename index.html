@@ -20,7 +20,7 @@ fieldset{margin:1rem 0;border:1px solid #a8b2bf;border-radius:7px}.choices{max-h
 <label for="visibility">Njoftimi për aktivitetin</label><select id="visibility"><option value="private">Jo publik</option><option value="public">Publik</option></select>
 <div id="description-field" hidden><label for="description">Përshkrimi i aktivitetit (deri në 500 fjalë)</label><textarea id="description" rows="5" style="width:90%" aria-describedby="description-count"></textarea><p id="description-count" role="status">0 / 500 fjalë</p></div>
 <p id="email-notice" hidden>Marrësve në listën e njoftimeve do t’u dërgohet email 24 orë para fillimit. Nëse mbeten më pak se 24 orë, njoftimi futet menjëherë në pritje. Emaili dërgohet në ekzekutimin e parë pas afatit; mund të ketë vonesa.</p>
-<p><small>Hollësitë e çdo rezervimi shfaqen në orar. Kjo zgjedhje vlen vetëm për njoftimin me email.</small></p>
+<p><small>Nëse aktiviteti ësht Jo publik, aktiviteti do të shfaqet në orarin zyrtar. Nëse aktiviteti ësht Publik, aktiviteti do të shfaqet në orarin zyrtar dhe stafi do të informohet përmes emailit për aktivitetin 24 orë para fillimit të aktivitetit</small></p>
 <label for="mode">Mënyra e zhvillimit</label><select id="mode"><option value="physical">Fizik</option><option value="online">Online</option></select>
 <div id="online-field" hidden><label for="online-url">Linku i ngjarjes online</label><input type="url" id="online-url" placeholder="https://…" maxlength="2000" style="width:90%"></div>
 <label for="title">Titulli i aktivitetit (publikohet me emrin tuaj dhe kohën e rezervimit)</label><input id="title" placeholder="Mbledhje e departamentit" maxlength="120" required style="width:90%">
