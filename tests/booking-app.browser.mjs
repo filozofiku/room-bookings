@@ -295,6 +295,29 @@ await page.locator('#request-decision-dialog button[value="confirm"]').click();
 await page.waitForFunction(()=>!window.testStore.has('reservationRequests/reject'));
 assert.equal(await page.evaluate(()=>window.testStore.has('reservations/reject')),false);
 assert.equal(await page.evaluate(()=>window.testStore.get('requestDecisions/reject').status),'pending');
+await page.evaluate(()=>{
+ for(const id of ['new','reject']){
+  const d=window.testStore.get('requestDecisions/'+id);
+  window.testStore.set('requestDecisions/'+id,{...d,createdAt:{seconds:1793260800},booking:{...d.booking,createdAt:{seconds:1793174400},groupIds:['g_one','g_two'],teacherIds:['t_one','t_two'],isPublic:true,mode:'online',onlineUrl:'https://example.test/event',description:'Paragrafi i parë\n\n<img src=x onerror=alert(1)>'}});
+ }
+});
+await page.click('#refresh-requests');
+await page.locator('summary').filter({hasText:'Vendimet për kërkesat'}).click();
+await page.waitForFunction(()=>document.querySelector('#request-decisions').textContent.includes('Paragrafi i parë'));
+assert.equal(await page.locator('#request-decisions .decision-card').count(),2);
+for(const card of await page.locator('#request-decisions .decision-card').all()){
+ const text=await card.textContent();
+ for(const value of ['Mësimdhënës','Salla 127','08:00–08:30','Grupi 1, Grupi 2','Mësimdhënësi 1, Mësimdhënësi 2','Publik','Online','Administrator','Kërkesa u dërgua më','Vendimi u mor më','Arsyeja e vendimit','Paragrafi i parë'])assert.ok(text.includes(value),value);
+ assert.equal(await card.locator('a').getAttribute('href'),'https://example.test/event');
+ assert.equal(await card.locator('img').count(),0);
+ assert.equal(await card.locator('dd').filter({hasText:'Paragrafi i parë'}).textContent(),'Paragrafi i parë\n\n<img src=x onerror=alert(1)>');
+}
+assert.match(await page.locator('.decision-card h3').first().textContent(),/Miratuar/);
+assert.match(await page.locator('.decision-card h3').last().textContent(),/Refuzuar/);
+await page.setViewportSize({width:375,height:812});
+assert.equal(await page.locator('.decision-details').first().evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length),1);
+await page.setViewportSize({width:1280,height:720});
+
 await page.locator('#reservation-requests').getByRole('button',{name:'Miratoni',exact:true}).click();
 await page.fill('#request-decision-reason','Miratim');
 await page.locator('#request-decision-dialog button[value="confirm"]').click();

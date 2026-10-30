@@ -5,6 +5,7 @@ body{max-width:850px;margin:2rem auto;padding:0 1rem}header,.row{display:flex;al
 #slots .slot,#my-reservations .slot{flex-wrap:wrap}#slots .reserve-from{margin-left:auto}#booking-form{scroll-margin-top:1rem}#selection-hint:empty{display:none}
 .booking-actions{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-top:1rem}#booking-message{flex:1 1 240px;margin:0;white-space:pre-wrap}#booking-message:empty{display:none}
 fieldset{margin:1rem 0;border:1px solid #a8b2bf;border-radius:7px}.choices{max-height:180px;overflow:auto}.choices label{font-weight:400;display:flex;align-items:center;gap:.5rem}.choices label[hidden]{display:none}.choices input{flex-shrink:0}
+.decision-card{margin:1rem 0;padding:1rem;border:1px solid #d5deea;border-radius:10px;background:#f8fafc}.decision-card h3{margin:0 0 1rem;font-size:1.05rem;overflow-wrap:anywhere}.decision-details{display:grid;grid-template-columns:minmax(130px,1fr) minmax(0,3fr);gap:.6rem 1rem;margin:0}.decision-details dt{font-weight:600}.decision-details dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}@media(max-width:480px){.decision-details{grid-template-columns:1fr;gap:.25rem}.decision-details dd{margin-bottom:.65rem}}
 @media(max-width:480px){#slots .reserve-from{margin-left:0}}
 </style></head><body>
 <header><h1>Rezervimi i sallave të fakultetit</h1><div><span id="identity"></span> <button id="login">Hyni me Google</button> <button id="logout" class="secondary" hidden>Dilni</button></div></header>
@@ -28,7 +29,7 @@ fieldset{margin:1rem 0;border:1px solid #a8b2bf;border-radius:7px}.choices{max-h
 <p id="selection-hint" role="status"></p>
 <div class="booking-actions"><button type="submit" aria-describedby="booking-message">Bëni rezervimin</button><p id="booking-message" role="status" aria-live="polite" aria-atomic="true"></p></div>
 </form>
-<div class="row"><h2 id="requests-heading">Kërkesat e mia</h2><button type="button" id="refresh-requests" class="secondary">Rifreskoni kërkesat</button></div><div id="reservation-requests"></div><details><summary>Vendimet për kërkesat</summary><div id="request-decisions"></div></details>
+<div class="row"><h2 id="requests-heading">Kërkesat e mia</h2><button type="button" id="refresh-requests" class="secondary">Rifreskoni kërkesat</button></div><div id="reservation-requests"></div><details><summary>Vendimet për kërkesat</summary><p><small>Të dhënat më poshtë paraqesin kërkesën në kohën e vendimit. Rezervimi mund të jetë ndryshuar ose anuluar më pas.</small></p><div id="request-decisions"></div></details>
 <h2 id="reservations-heading">Rezervimet e mia</h2><div id="my-reservations"></div>
 </section>
 <dialog id="reservation-dialog" aria-labelledby="reservation-heading" style="max-width:640px;width:calc(100% - 4rem);max-height:85vh;overflow:auto">

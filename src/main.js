@@ -199,6 +199,40 @@ function confirmRequestDecision(data,outcome) {
     dialog.showModal();
   });
 }
+function decisionTimestamp(value) {
+  const date=typeof value?.toDate==='function'?value.toDate():typeof value?.seconds==='number'?new Date(value.seconds*1000):null;
+  return date&&Number.isFinite(date.getTime())?new Intl.DateTimeFormat('sq-AL',{timeZone:'Europe/Tirane',dateStyle:'medium',timeStyle:'short'}).format(date):'Nuk është regjistruar';
+}
+function decisionCard(decision) {
+  const data=decision.booking,card=document.createElement('article');card.className='decision-card';
+  const heading=document.createElement('h3');
+  heading.textContent=`${decision.outcome==='approved'?'Miratuar':'Refuzuar'} · ${data.title}`;
+  const details=document.createElement('dl');details.className='decision-details';
+  const fields=[
+    ['Kërkuesi',data.creatorName||'Emri nuk është i disponueshëm'],
+    ['Salla',rooms.find(room=>room.id===data.roomId)?.name||catalog.rooms?.[data.roomId]||data.roomId||'Pa sallë'],
+    ['Data e aktivitetit',data.date],['Ora',reservationTime(data.periodIds,periods)],
+    ['Lloji i aktivitetit',data.eventType||'Nuk është regjistruar'],
+    ['Mësimdhënësit',(data.teacherIds||[]).map(id=>catalog.teachers[id]||id).join(', ')||'Pa mësimdhënës'],
+    ['Grupet e studentëve',(data.groupIds||[]).map(id=>catalog.groups[id]||id).join(', ')||'Pa grup të studentëve'],
+    ['Njoftimi për aktivitetin',data.isPublic?'Publik':'Jo publik'],
+    ['Mënyra e zhvillimit',data.mode==='online'?'Online':'Fizik'],
+    ...(data.onlineUrl?[['Linku i ngjarjes online',data.onlineUrl]]:[]),
+    ...(data.description?[['Përshkrimi i aktivitetit',data.description]]:[]),
+    ['Kërkesa u dërgua më',decisionTimestamp(data.createdAt)],
+    ['Vendimi nga',decision.deciderName||'Emri nuk është i disponueshëm'],
+    ['Vendimi u mor më',decisionTimestamp(decision.createdAt)],
+    ['Arsyeja e vendimit',decision.reason]
+  ];
+  for(const [label,value] of fields){
+    const term=document.createElement('dt'),detail=document.createElement('dd');term.textContent=label;detail.textContent=value;
+    if(label==='Linku i ngjarjes online'&&/^https?:\/\//i.test(value)){
+      const link=document.createElement('a');link.textContent=value;link.href=value;link.target='_blank';link.rel='noopener noreferrer';detail.replaceChildren(link);
+    }
+    details.append(term,detail);
+  }
+  card.append(heading,details);return card;
+}
 async function readRequests() {
   if(!currentUser)return;
   const own=path=>canCancelAll?collection(db,path):query(collection(db,path),where(path==='requestDecisions'?'booking.ownerUid':'ownerUid','==',currentUser.uid));
@@ -225,9 +259,9 @@ async function readRequests() {
     card.append(feedback);wrapper.append(card);
   }
   const history=$('request-decisions');history.replaceChildren();
+  if(!decisions.docs.length)history.textContent='Ende nuk ka vendime për kërkesat.';
   for(const item of decisions.docs.sort((a,b)=>(b.data().createdAt?.seconds||0)-(a.data().createdAt?.seconds||0))){
-    const d=item.data(),p=document.createElement('p');p.style.whiteSpace='pre-wrap';
-    p.textContent=`${d.booking.date} · ${d.booking.title} · ${d.outcome==='approved'?'Miratuar':'Refuzuar'}\n${d.deciderName}: ${d.reason}`;history.append(p);
+    history.append(decisionCard(item.data()));
   }
 }
 async function readMyBookings() {
