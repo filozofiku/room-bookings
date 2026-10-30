@@ -44,6 +44,13 @@ try {
   assert.equal(await page.locator('#weekBody .day-column').count(),5);
   assert.equal(await page.locator('#agendaView .agenda-day').count(),5);
   await page.click('#navFree');
+  assert.equal(await page.locator('#freeDay').evaluate(el=>el.tagName),'OUTPUT');
+  assert.equal(await page.locator('#freeDay').textContent(),'E premte');
+  assert.match(await page.locator('#freeDayHint').textContent(),/ndryshoni datën/);
+  await page.locator('#bookingDate').fill('2026-10-24');await page.locator('#bookingDate').dispatchEvent('change');
+  assert.equal(await page.locator('#freeDay').textContent(),'E shtunë');
+  await page.locator('#bookingDate').fill('2026-10-23');await page.locator('#bookingDate').dispatchEvent('change');
+  await page.evaluate(value=>window.testReport(value),result);
   assert.equal(await page.locator('.room-choice').count(),1);
   {const link=new URL(await page.locator('.room-choice').first().getAttribute('href'));
    assert.equal(link.origin+link.pathname,'https://filozofiku.github.io/room-bookings/');
