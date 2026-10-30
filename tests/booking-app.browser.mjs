@@ -41,7 +41,7 @@ for(const [op,path,data] of writes)if(op==='set')store.set(path.path,data);else 
 `;
 const browser=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
 try{
-const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+const page=await browser.newPage();await page.clock.setFixedTime(new Date('2026-10-23T10:00:00Z'));const errors=[];page.on('pageerror',e=>errors.push(e.message));
 await page.route('https://booking.test/**',route=>{
 const path=new URL(route.request().url()).pathname;
 let body,contentType='text/javascript';
@@ -342,6 +342,34 @@ await page.waitForFunction(()=>document.getElementById('booking-message').textCo
 await page.goto('https://booking.test/?date=2026-10-23&room=Salla%20014&start=08:00&end=12:30');
 await page.waitForFunction(()=>document.getElementById('booking-message').textContent.includes('16'));
 assert.equal(await page.locator('#through').inputValue(),'p18');
+// Local today stays in the main list; earlier dates are collapsed and newest first.
+await page.clock.setFixedTime(new Date('2026-10-22T22:30:00Z'));
+await page.goto('https://booking.test/');
+await page.waitForFunction(()=>document.getElementById('slots').children.length===18);
+await page.evaluate(async()=>{
+ const sample=window.testStore.get('reservations/existing');
+ for(const [id,date,ownerUid] of [['past-old','2026-10-20','teacher'],['past-new','2026-10-22','teacher'],['future','2026-10-24','teacher'],['other-past','2026-10-21','other']])window.testStore.set('reservations/'+id,{...sample,title:id,date,ownerUid});
+ await window.testAuth({uid:'teacher',displayName:'Mësimdhënës',email:'test@example.test'});
+});
+assert.match(await page.locator('#my-reservations').textContent(),/Mbledhje/);
+assert.match(await page.locator('#my-reservations').textContent(),/future/);
+assert.doesNotMatch(await page.locator('#my-reservations').textContent(),/past/);
+assert.equal(await page.locator('#past-reservations-section').getAttribute('open'),null);
+assert.equal(await page.locator('#past-reservations-summary').textContent(),'Rezervimet e kaluara (2)');
+assert.match(await page.locator('#past-reservations .slot').first().textContent(),/past-new/);
+assert.doesNotMatch(await page.locator('#past-reservations').textContent(),/other-past/);
+await page.click('#past-reservations-summary');
+assert.equal(await page.locator('#past-reservations .slot').first().isVisible(),true);
+await page.evaluate(async()=>{
+ window.testStore.set('users/admin',{active:true,role:'admin',canCancelAll:true});
+ await window.testAuth({uid:'admin',displayName:'Administrator',email:'admin@example.test'});
+});
+assert.match(await page.locator('#past-reservations').textContent(),/other-past/);
+assert.equal(await page.locator('#past-reservations-summary').textContent(),'Rezervimet e kaluara (3)');
+await page.clock.setFixedTime(new Date('2026-10-25T12:00:00Z'));
+await page.evaluate(()=>window.testAuth({uid:'teacher',displayName:'Mësimdhënës',email:'test@example.test'}));
+assert.match(await page.locator('#my-reservations').textContent(),/Nuk ka rezervime për sot/);
+assert.equal(await page.locator('#past-reservations-summary').textContent(),'Rezervimet e kaluara (4)');
 assert.deepEqual(errors,[]);
 console.log('Albanian signed-in UI, status labels, boundary times, validation, 16-period booking/cancellation and localized SDK errors passed.');
 }finally{await browser.close();}

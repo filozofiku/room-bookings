@@ -264,15 +264,25 @@ async function readRequests() {
     history.append(decisionCard(item.data()));
   }
 }
+function todayDate() {
+  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Tirane',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).map(p=>[p.type,p.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
 async function readMyBookings() {
   if (!currentUser) return;
   const reservations = collection(db, 'reservations');
   const snap = await getDocs(canCancelAll ? reservations : query(reservations, where('ownerUid','==',currentUser.uid)));
   $('reservations-heading').textContent = canCancelAll ? 'Të gjitha rezervimet' : 'Rezervimet e mia';
-  const sorted = snap.docs.sort((a,b) => a.data().date.localeCompare(b.data().date));
-  const wrapper = $('my-reservations');
-  wrapper.replaceChildren();
-  if (!sorted.length) { wrapper.textContent = canCancelAll ? 'Ende nuk ka rezervime.' : 'Ende nuk keni rezervime.'; return; }
+  const today=todayDate();
+  const byDate=(a,b)=>a.data().date.localeCompare(b.data().date)||a.data().periodIds[0].localeCompare(b.data().periodIds[0]);
+  const upcoming=snap.docs.filter(item=>item.data().date>=today).sort(byDate);
+  const past=snap.docs.filter(item=>item.data().date<today).sort((a,b)=>byDate(b,a));
+  const sorted=[...upcoming,...past];
+  const wrapper = $('my-reservations'),archive=$('past-reservations');
+  wrapper.replaceChildren();archive.replaceChildren();
+  $('past-reservations-summary').textContent=`Rezervimet e kaluara (${past.length})`;
+  if(!upcoming.length)wrapper.textContent='Nuk ka rezervime për sot ose për ditët në vijim.';
+  if(!past.length)archive.textContent='Nuk ka rezervime të kaluara.';
   for (const item of sorted) {
     const data = item.data();
     const roomName = rooms.find(r => r.id === data.roomId)?.name || data.roomId || 'Pa sallë';
@@ -298,7 +308,7 @@ async function readMyBookings() {
     edit.type='button';edit.className='secondary';edit.textContent='Redaktoni';
     edit.onclick=()=>startEditing(item.id,data);
     div.append(description,edit,button);
-    wrapper.appendChild(div);
+    (data.date<today?archive:wrapper).appendChild(div);
   }
 }
 function bookingMessage(text, isError = false) {
@@ -451,8 +461,7 @@ async function loadApp() {
   }
   fillOptions($('from'),periods,p=>p.id,p=>p.start);
   fillOptions($('through'),periods,p=>p.id,p=>p.end);
-  const dayParts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {timeZone:'Europe/Tirane',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).map(p=>[p.type,p.value]));
-  const localToday = `${dayParts.year}-${dayParts.month}-${dayParts.day}`;
+  const localToday = todayDate();
   $('date').value = localToday >= settings.startDate && localToday <= settings.endDate ? localToday : settings.startDate;
   $('date').min = settings.startDate;
   $('date').max = settings.endDate;
