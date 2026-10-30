@@ -51,6 +51,24 @@ try {
    assert.equal(link.searchParams.get('room'),roomName);
    assert.equal(link.searchParams.get('start'),await page.locator('#freeStart option:checked').textContent());
    assert.equal(link.searchParams.get('end'),await page.locator('#freeEnd option:checked').textContent());}
+  // Optional capacity/equipment filters combine with availability and can be cleared.
+  const featureRooms=['Salla 02','Salla 05','Salla 108','Salla 127'];
+  await page.evaluate(value=>window.testReport(value),{...result,rooms:featureRooms.map((name,i)=>({id:'test'+i,name})),rows:[]});
+  assert.equal(await page.locator('.room-choice').count(),4);
+  await page.fill('#freeCapacity','63');assert.equal(await page.locator('.room-choice').count(),2);
+  await page.selectOption('#freeSmartboard','yes');assert.equal(await page.locator('.room-choice').count(),2);
+  await page.selectOption('#freeWhiteboard','yes');assert.equal(await page.locator('.room-choice').count(),1);
+  assert.match(await page.locator('.room-choice').textContent(),/Salla 05/);
+  await page.selectOption('#freeWhiteboard','no');assert.equal(await page.locator('.room-choice').count(),1);
+  assert.match(await page.locator('.room-choice').textContent(),/Salla 127/);
+  await page.fill('#freeCapacity','64');assert.equal(await page.locator('.room-choice').count(),0);
+  await page.fill('#freeCapacity','');await page.selectOption('#freeSmartboard','no');
+  assert.match(await page.locator('.room-choice').textContent(),/Salla 108/);
+  await page.fill('#freeCapacity','-1');assert.equal(await page.locator('#freeError').isVisible(),true);
+  await page.fill('#freeCapacity','2.5');assert.equal(await page.locator('#freeError').isVisible(),true);
+  await page.fill('#freeCapacity','');await page.selectOption('#freeSmartboard','');await page.selectOption('#freeWhiteboard','');
+  assert.equal(await page.locator('.room-choice').count(),4);
+  await page.evaluate(value=>window.testReport(value),result);
   const booking = {title:'<img src=x onerror=alert(1)>',date:result.date,room:roomName,creatorName:'Test Teacher',createdAt:{seconds:1792706400},slots:[{start:'12:00',end:'12:15'},{start:'12:15',end:'12:30'}]};
   assert.equal(await page.locator('.legend-swatch').count(),5);
   for(const entry of await page.locator('.agenda-entry:not(.reservation-event)').all()){

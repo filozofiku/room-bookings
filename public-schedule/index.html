@@ -214,6 +214,9 @@
         <div><label for="freeDay">Dita (sipas datës së zgjedhur)</label><select id="freeDay" disabled></select></div>
         <div><label for="freeStart">Nga ora</label><select id="freeStart"></select></div>
         <div><label for="freeEnd">Deri në orën</label><select id="freeEnd"></select></div>
+        <div><label for="freeCapacity">Numri i studentëve (opsional)</label><input id="freeCapacity" type="number" min="1" step="1" inputmode="numeric" placeholder="Pa kufizim"></div>
+        <div><label for="freeSmartboard">Smartboard (opsional)</label><select id="freeSmartboard"><option value="">Pa kufizim</option><option value="yes">Po</option><option value="no">Jo</option></select></div>
+        <div><label for="freeWhiteboard">Tabelë e bardhë (opsional)</label><select id="freeWhiteboard"><option value="">Pa kufizim</option><option value="yes">Po</option><option value="no">Jo</option></select></div>
       </div>
     </div>
     <div class="free-results">
@@ -550,7 +553,11 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     const d = day ? dayIndex(data.days, day.weekday) : -1;
     $("freeDay").value = String(d);
     const s=Number($("freeStart").value),e=Number($("freeEnd").value);
-    const invalid = e<=s;
+    const capacityInput=$('freeCapacity'),capacity=capacityInput.value===''?null:Number(capacityInput.value);
+    const invalidCapacity=capacityInput.validity.badInput || (capacity!==null&&(!Number.isSafeInteger(capacity)||capacity<1));
+    const smartboard=$('freeSmartboard').value,whiteboard=$('freeWhiteboard').value;
+    const invalid = e<=s||invalidCapacity;
+    $('freeError').textContent=e<=s?'Ora e përfundimit duhet të jetë pas orës së fillimit.':'Numri i studentëve duhet të jetë numër i plotë më i madh se zero.';
     $("freeError").hidden=!invalid;$("freeValid").hidden=invalid;
     if(invalid)return;
     const unavailable = publicState.status !== 'ready' || !day || (day.fetActive && d < 0);
@@ -560,10 +567,16 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
       $('roomResults').replaceChildren();
       return;
     }
-    const free=ordered.rooms.filter(room => publicState.rooms.some(r => r.name === room.n) &&
+    const matchesFeatures=room=>{
+      const features=roomFeatures[room.n];
+      return (capacity===null || (features&&features[0]>=capacity)) &&
+        (!smartboard || (features&&features[1]===(smartboard==='yes'))) &&
+        (!whiteboard || (features&&features[2]===(whiteboard==='yes')));
+    };
+    const free=ordered.rooms.filter(room => matchesFeatures(room) && publicState.rooms.some(r => r.name === room.n) &&
       (!day.fetActive || !room.e.some(event=>event.d===d&&event.s<e&&event.e>s)) &&
       !publicState.rows.some(b => b.date === publicState.date && overlaps(b,room.n,data.times[s],data.times[e])));
-    $("freeCount").textContent=`${free.length} nga ${data.rooms.length} salla të lira`;
+    $("freeCount").textContent=`${free.length} nga ${data.rooms.length} salla të lira që përputhen me kërkimin`;
     $("freeSummary").textContent=`${publicState.date} · ${data.times[s]}–${data.times[e]}`;
     const bookingLink=room=>{
       const url=new URL('https://filozofiku.github.io/room-bookings/');
@@ -572,7 +585,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     };
     $("roomResults").innerHTML=free.length?
       free.map(room=>`<a class="room-choice" href="${esc(bookingLink(room))}" aria-label="${esc('Rezervoni '+room.l)}"><span>${esc(room.l)}</span><span class="arrow" aria-hidden="true">↗</span></a>`).join("") :
-      `<div class="card empty-state" style="grid-column:1/-1"><strong>Nuk ka salla të lira</strong>Provo një interval më të shkurtër ose një orar tjetër.</div>`;
+      `<div class="card empty-state" style="grid-column:1/-1"><strong>Nuk ka salla të lira</strong>Provo një interval tjetër ose ndrysho filtrat e kapacitetit dhe pajisjeve.</div>`;
 
   }
   function initFree(){
@@ -585,6 +598,8 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     $("freeStart").value=start>=0?start:0;
     $("freeEnd").value=end>=0?end:data.times.length-1;
     for(const id of ["freeDay","freeStart","freeEnd"]) $(id).addEventListener("change",renderFree);
+    $('freeCapacity').addEventListener('input',renderFree);
+    for(const id of ['freeSmartboard','freeWhiteboard'])$(id).addEventListener('change',renderFree);
     renderFree();
   }
   $('previousWeek').addEventListener('click', () => moveWeek(-1));
