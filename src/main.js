@@ -1,3 +1,4 @@
+import {calendarActions} from './calendar-export.js';
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, query, where, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { BookingError, selectPeriods, reservationTime, errorText, MAX_PERIODS } from './booking-ui.js';
@@ -151,6 +152,7 @@ function stopEditing() {
   updateRequestHint();
 }
 function startEditing(id,data) {
+  $('booking-receipt').hidden=true;
   editing={id,data,revision:data.revision||0};
   $('date').value=data.date;$('room').value=data.roomId;
   $('title').value=data.title;$('event-type').value=data.eventType||EVENT_TYPES[0];
@@ -178,6 +180,14 @@ function updateRequestHint() {
     ? 'Për ndryshimin e sallës, datës, orës ose pjesëmarrësve të një rezervimi në sallë të posaçme nevojitet një kërkesë e re. Rezervimi ekzistues mbetet në fuqi.'
     : 'Kjo sallë kërkon miratim. Kërkesa nuk e zë sallën dhe nuk shfaqet në orarin publik deri në miratim.';
   $('booking-form').querySelector('button').textContent=editing?'Ruani ndryshimet':special?'Dërgoni kërkesën për rezervim':'Bëni rezervimin';
+}
+function statusBadge(kind){
+ const badge=document.createElement('strong');badge.className='reservation-status status-'+kind;
+ badge.textContent={confirmed:'E konfirmuar',pending:'Në pritje të miratimit',rejected:'E refuzuar'}[kind];return badge;
+}
+function bookingCalendar(id,data){
+ const slots=periods.filter(p=>data.periodIds.includes(p.id)).sort((a,b)=>a.start.localeCompare(b.start));
+ return calendarActions({id,title:data.title,date:data.date,start:slots[0].start,end:slots.at(-1).end,room:rooms.find(r=>r.id===data.roomId)?.name||'Pa sallë',description:data.description,onlineUrl:data.onlineUrl});
 }
 function requestDetails(data) {
   const lines=[`${data.date} · ${rooms.find(r=>r.id===data.roomId)?.name||data.roomId} · ${reservationTime(data.periodIds,periods)}`,data.title,
@@ -231,7 +241,7 @@ function decisionCard(decision) {
     }
     details.append(term,detail);
   }
-  card.append(heading,details);return card;
+  card.append(statusBadge(decision.outcome==='approved'?'confirmed':'rejected'),heading,details);return card;
 }
 async function readRequests() {
   if(!currentUser)return;
@@ -241,7 +251,7 @@ async function readRequests() {
   const wrapper=$('reservation-requests');wrapper.replaceChildren();
   if(!pending.docs.length)wrapper.textContent='Nuk ka kërkesa në pritje.';
   for(const item of pending.docs.sort((a,b)=>a.data().date.localeCompare(b.data().date))){
-    const data=item.data(),card=document.createElement('div');card.className='request-card';
+    const data=item.data(),card=document.createElement('div');card.className='request-card';card.append(statusBadge('pending'));
     const details=document.createElement('p');details.style.whiteSpace='pre-wrap';details.textContent=requestDetails(data)+'\nNë pritje të miratimit';card.append(details);
     const feedback=document.createElement('p');feedback.setAttribute('role','status');feedback.style.whiteSpace='pre-wrap';
     if(canCancelAll)for(const [outcome,label] of [['approved','Miratoni'],['rejected','Refuzoni']]){
@@ -300,6 +310,7 @@ async function readMyBookings() {
       button.disabled = true;
       try {
         await cancelReservation(item.id, confirmation.reason);
+        $('booking-receipt').hidden=true;
         await Promise.all([readMyBookings(), readAvailability()]);
         message(data.ownerUid === currentUser.uid ? 'Rezervimi u anulua.' : 'Rezervimi u anulua. Njoftimi me email është në pritje të dërgimit.');
       } catch(e) { message(errText(e), true); button.disabled = false; }
@@ -307,7 +318,7 @@ async function readMyBookings() {
     const edit=document.createElement('button');
     edit.type='button';edit.className='secondary';edit.textContent='Redaktoni';
     edit.onclick=()=>startEditing(item.id,data);
-    div.append(description,edit,button);
+    div.append(statusBadge('confirmed'),description,edit,button,bookingCalendar(item.id,data));
     (data.date<today?archive:wrapper).appendChild(div);
   }
 }
@@ -319,6 +330,7 @@ function bookingMessage(text, isError = false) {
   feedback.scrollIntoView({block:'nearest'});
 }
 async function createReservation(event) {
+  $('booking-receipt').hidden=true;
   event.preventDefault();
   $('booking-message').textContent = '';
   if (!currentUser || $('reservation-dialog').open || $('booking-form').querySelector('button').disabled) return;
@@ -386,6 +398,10 @@ async function createReservation(event) {
     $('description-count').textContent = '0 / 500 fjalë';
     if(edit)stopEditing();
     bookingMessage(edit ? (edit.data.ownerUid===ownerUid?'Rezervimi u ndryshua me sukses.':'Rezervimi u ndryshua. Njoftimi me email është në pritje të dërgimit.') : requestOnly?'Kërkesa u dërgua për miratim. Salla ende nuk është rezervuar.':'Rezervimi u krijua me sukses.');
+    const receipt=$('booking-receipt');receipt.replaceChildren(statusBadge(requestOnly?'pending':'confirmed'));
+    const summary=document.createElement('p');summary.style.whiteSpace='pre-wrap';summary.textContent=requestDetails({...data,creatorName:currentUser.displayName||''});receipt.append(summary);
+    const next=document.createElement('p');next.textContent=requestOnly?'Kërkesa do të shqyrtohet nga një përdorues me autorizim. Salla ende nuk është rezervuar. Për vendimin do të njoftoheni me email; dërgimi mund të vonohet.':'Rezervimi shfaqet në orarin zyrtar. Mund ta redaktoni ose anuloni te rezervimet më poshtë.';receipt.append(next);
+    if(!requestOnly)receipt.append(bookingCalendar(edit?.id||reservationRef.id,data));receipt.hidden=false;receipt.focus();
     await Promise.all([readAvailability(),readMyBookings(),readRequests()]);
   } catch (e) { bookingMessage(errText(e),true); }
   finally { $('booking-form').querySelector('button').disabled = false; }

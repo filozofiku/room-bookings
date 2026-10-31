@@ -50,7 +50,7 @@ else if(path==='/auth.js')body=authModule;
 else if(path==='/firestore.js')body=firestoreModule;
 else if(path==='/src/firebase.js')body='export const auth={};export const db={};';
 else if(['/src/main.js','/src/update-reservation.js','/src/reservation-requests.js'].includes(path))body=readFileSync(path.slice(1),'utf8').replaceAll("'firebase/auth'","'/auth.js'").replaceAll("'firebase/firestore'","'/firestore.js'");
-else if(['/src/booking-ui.js','/src/booking-resources.js'].includes(path))body=readFileSync(path.slice(1),'utf8');
+else if(['/src/booking-ui.js','/src/booking-resources.js','/src/calendar-export.js'].includes(path))body=readFileSync(path.slice(1),'utf8');
 else return route.abort();
 return route.fulfill({contentType,body});
 });
@@ -76,6 +76,8 @@ for (const kind of ['groups','teachers']) {
  await page.locator(`#${kind} input`).first().uncheck();
 }
 
+assert.equal(await page.locator('#booking-help').count(),1);
+assert.equal(await page.locator('#my-reservations .status-confirmed').count(),1);
 assert.equal(await page.locator('#from option').first().textContent(),'08:00');
 assert.equal(await page.locator('#through option').first().textContent(),'08:15');
 assert.equal(await page.getByText('Salla e lirë',{exact:true}).count(),16);
@@ -147,6 +149,13 @@ assert.match(await page.locator('#message').textContent(),/link të vlefshëm/);
 await page.fill('#online-url','https://example.test/event');
 await submitBooking();
 await page.waitForFunction(()=>document.getElementById('message').textContent.includes('u krijua me sukses'));
+await page.waitForFunction(()=>!document.getElementById('booking-receipt').hidden);
+assert.equal(await page.locator('#booking-receipt .status-confirmed').textContent(),'E konfirmuar');
+await page.locator('#booking-receipt .calendar-actions summary').click();
+const calendarUrl=new URL(await page.locator('#booking-receipt .calendar-actions a').getAttribute('href'));
+assert.equal(calendarUrl.searchParams.get('location'),'Pa sallë');
+assert.match(calendarUrl.searchParams.get('details'),/https:\/\/example.test\/event/);
+const downloaded=page.waitForEvent('download');await page.locator('#booking-receipt .calendar-actions button').click();assert.equal((await downloaded).suggestedFilename(),'rezervimi.ics');
 assert.equal(await page.evaluate(()=>window.testStore.get('reservations/new').description),paragraphs);
 assert.equal(await page.evaluate(()=>window.testStore.get('publicBookings/new').description),paragraphs);
 assert.deepEqual(await page.evaluate(()=>{const d=window.testStore.get('reservations/new');return [d.roomId,d.groupIds,d.teacherIds,d.isPublic,d.mode,d.onlineUrl,d.eventType]}),['',[],[],true,'online','https://example.test/event','Konferencë']);
@@ -263,6 +272,8 @@ assert.match(await page.locator('#booking-form button').textContent(),/Dërgoni 
 const beforePublic=await page.evaluate(()=>JSON.stringify([...window.testStore].filter(([k])=>k.startsWith('publicBookings/'))));
 await submitBooking();
 assert.equal(await page.evaluate(()=>window.testStore.has('reservationRequests/new')),true);
+await page.waitForFunction(()=>document.querySelector('#booking-receipt .status-pending'));
+assert.equal(await page.locator('#booking-receipt .calendar-actions').count(),0);
 assert.equal(await page.evaluate(()=>window.testStore.get('requestNotifications/new').status),'pending');
 assert.equal(await page.evaluate(()=>window.testStore.get('requestNotifications/new').booking.title),'Kërkesa për sallën 127');
 assert.equal(await page.evaluate(()=>JSON.stringify([...window.testStore].filter(([k])=>k.startsWith('publicBookings/')))),beforePublic);

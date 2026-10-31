@@ -13,9 +13,16 @@ header{border-top:5px solid #ce2c32;border-bottom:1px solid #e1dcdc;padding:1.25
 .university-brand{display:flex;align-items:center;gap:1rem;min-width:0}.university-logo{width:88px;height:auto;flex-shrink:0;background:white;border-radius:8px;padding:5px}.university-name{font-size:.8rem;font-weight:750;letter-spacing:.035em}.faculty-name{color:#625d5d;font-size:.8rem;margin-top:.2rem}header h1{margin:.4rem 0 0;font-size:1.5rem}
 button:hover:not(:disabled){background:#a51f25}button.secondary:hover:not(:disabled){background:#302d2d}button.danger{background:#a22030}a{color:#a51f25}input,select,textarea{accent-color:#ce2c32}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:3px solid #a51f25;outline-offset:3px}dialog{border:1px solid #d4cccc;border-top:4px solid #ce2c32;border-radius:12px;color:#242222}dialog::backdrop{background:#24222280}summary{cursor:pointer}h2{color:#302d2d}
 @media(max-width:480px){.university-logo{width:68px}.university-brand{gap:.75rem}header h1{font-size:1.2rem}}
+.reservation-status{display:inline-block;padding:.3rem .65rem;border-radius:20px;font-size:.85rem}.status-confirmed{background:#dcfce7;color:#14532d}.status-pending{background:#fef3c7;color:#78350f}.status-rejected{background:#fee2e2;color:#991b1b}.request-card{border:1px solid #ddd;padding:1rem;margin:1rem 0;border-radius:10px}.calendar-actions{flex-basis:100%;margin:.7rem 0}.calendar-actions p{font-size:.85rem;color:#625d5d}.calendar-actions button{margin:.5rem 0}#booking-help li{line-height:1.5}
 </style></head><body>
 <header><div class="university-brand"><img class="university-logo" src="./university-logo.png" alt="Logoja e Universitetit të Prishtinës" width="846" height="763"><div><div class="university-name">UNIVERSITETI I PRISHTINËS</div><div class="faculty-name">Fakulteti Filozofik</div><h1>Rezervimi i sallave të fakultetit</h1></div></div><div><span id="identity"></span> <button id="login">Hyni me Google</button> <button id="logout" class="secondary" hidden>Dilni</button></div></header>
 <p id="message"></p>
+<section><details id="booking-help"><summary>Ndihmë: si të bëni një rezervim</summary>
+<ol><li>Hyni me llogarinë tuaj të miratuar të universitetit. Zgjidhni datën, sallën (ose “Pa sallë”), orët dhe të dhënat e aktivitetit.</li><li>Klikoni “Bëni rezervimin”, kontrolloni përmbledhjen dhe konfirmoni. Paralajmërimet për përplasjet shfaqen pranë butonit.</li><li>Për sallat 102 dhe 127, përdoruesit e rregullt dërgojnë kërkesë për miratim. Kërkesa në pritje nuk e rezervon sallën; kontrolloni statusin dhe vendimet në këtë faqe.</li><li>Te rezervimet tuaja, përdorni “Redaktoni” ose “Anuloni”. Përdoruesit me autorizim mund të veprojnë edhe mbi rezervimet e të tjerëve; ndryshimet dhe anulimet njoftohen me email.</li></ol>
+<p><strong>Publik / Jo publik:</strong> Të dyja shfaqen në orarin zyrtar. Për aktivitetet publike, stafi njoftohet me email 24 orë para fillimit, ose në ekzekutimin e parë të shërbimit nëse afati ka kaluar. Emaili mund të vonohet.</p>
+<p><strong>Shto në kalendar:</strong> Rezervimet e konfirmuara mund t’i shtoni në Google Calendar ose t’i shkarkoni për Outlook / Apple Calendar. Kjo është kopje personale dhe nuk përditësohet automatikisht.</p>
+<p>Rezervimet e sotme dhe të ardhshme janë në listën kryesore; të mëparshmet te “Rezervimet e kaluara”.</p>
+</details></section>
 <section id="app" hidden>
 <div class="row"><div><label for="date">Data</label><input type="date" id="date"></div><div><label for="room">Salla</label><select id="room"></select></div></div>
 <h2>Disponueshmëria e sallës</h2><div id="slots"></div>
@@ -35,6 +42,7 @@ button:hover:not(:disabled){background:#a51f25}button.secondary:hover:not(:disab
 <p id="selection-hint" role="status"></p>
 <div class="booking-actions"><button type="submit" aria-describedby="booking-message">Bëni rezervimin</button><p id="booking-message" role="status" aria-live="polite" aria-atomic="true"></p></div>
 </form>
+<div id="booking-receipt" class="decision-card" tabindex="-1" role="status" hidden></div>
 <div class="row"><h2 id="requests-heading">Kërkesat e mia</h2><button type="button" id="refresh-requests" class="secondary">Rifreskoni kërkesat</button></div><div id="reservation-requests"></div><details><summary>Vendimet për kërkesat</summary><p><small>Të dhënat më poshtë paraqesin kërkesën në kohën e vendimit. Rezervimi mund të jetë ndryshuar ose anuluar më pas.</small></p><div id="request-decisions"></div></details>
 <h2 id="reservations-heading">Rezervimet e mia</h2><p><small>Sot dhe në ditët në vijim.</small></p><div id="my-reservations"></div>
 <details id="past-reservations-section"><summary id="past-reservations-summary">Rezervimet e kaluara</summary><div id="past-reservations"></div></details>

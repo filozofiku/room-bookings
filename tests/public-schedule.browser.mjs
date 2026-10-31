@@ -103,6 +103,11 @@ try {
   await page.locator('#weekBody .reservation-event').click();
   assert.match(await page.locator('#modalDetails').textContent(),/Test Teacher/);
   assert.match(await page.locator('#modalDetails').textContent(),/12:00–12:30/);
+  assert.match(await page.locator('#modalCalendar').textContent(),/E konfirmuar/);
+  await page.locator('#modalCalendar summary').click();
+  const calendarUrl=new URL(await page.locator('#modalCalendar a').getAttribute('href'));
+  assert.equal(calendarUrl.searchParams.get('dates'),'20261023T100000Z/20261023T103000Z');
+  const download=page.waitForEvent('download');await page.locator('#modalCalendar button').click();assert.equal((await download).suggestedFilename(),'rezervimi.ics');
   assert.match(await page.locator('#modalDetails').textContent(),/Rezervimi u krijua/);
   await page.click('#closeDialog');
   await page.click('#viewList');

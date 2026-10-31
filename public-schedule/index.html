@@ -240,11 +240,12 @@
   <div class="modal-content">
     <h2 class="modal-title" id="modalTitle"></h2>
     <span class="modal-tag" id="modalTag"></span>
-    <dl class="detail-dl" id="modalDetails"></dl>
+    <dl class="detail-dl" id="modalDetails"></dl><div id="modalCalendar"></div>
   </div>
 </dialog>
 <!-- Timetables are loaded directly from three files in the same folder. -->
 <script type="module">
+  import {calendarActions} from "./calendar-export.js";
 import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTimestamp, eventLanes, eventCategory, EVENT_CATEGORY_LABELS} from './booking-model.js';
 (() => {
   "use strict";
@@ -548,6 +549,10 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
       const dt=document.createElement('dt'), dd=document.createElement('dd'), link=document.createElement('a');
       dt.textContent='Linku i ngjarjes online'; link.textContent=e.onlineUrl; link.href=e.onlineUrl; link.target='_blank'; link.rel='noopener noreferrer';
       dd.append(link); $('modalDetails').append(dt,dd);
+    }
+    $('modalCalendar').replaceChildren();
+    if(e.booking){
+      const status=document.createElement('p');status.textContent='Statusi: E konfirmuar';$('modalCalendar').append(status,calendarActions({id:e.id||`${e.date}-${e.s}-${e.t}`,title:e.t,date:e.date,start:data.times[e.s],end:data.times[e.e],room:e.r,description:e.description,onlineUrl:e.onlineUrl}));
     }
     $("detailDialog").showModal();
   }
