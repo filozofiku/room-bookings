@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#172d47">
+  <meta name="theme-color" content="#242222">
   <meta name="description" content="Orari mësimor i Fakultetit Filozofik, Universiteti i Prishtinës. Kërko sipas grupit të studentëve, mësimdhënësit ose sallës dhe gjej sallat e lira.">
   <title>Orari mësimor | Universiteti i Prishtinës</title>
   <style>
     :root{
-      --ink:#172d47;--ink-soft:#50627a;--muted:#75859a;--line:#dfe6ee;
-      --page:#f5f7fa;--white:#fff;--accent:#0d7d8d;--accent-hover:#086778;
-      --tint:#e9f5f5;--shadow:0 10px 32px rgba(23,45,71,.055);
+      --ink:#242222;--ink-soft:#595353;--muted:#706969;--line:#e2dddd;
+      --page:#f7f6f6;--white:#fff;--accent:#ce2c32;--accent-hover:#a51f25;
+      --tint:#fbecee;--shadow:0 10px 32px rgba(23,45,71,.055);
       --slot-height:15px;--timetable-height:795px;
     }
     *{box-sizing:border-box}
@@ -21,26 +21,27 @@
     #weekNavigation:not([hidden]){display:flex;align-items:center;gap:12px;max-width:480px}
     #weekNavigation button{min-width:44px;min-height:44px;flex-shrink:0}
     #weekRange{flex:1;min-width:0;text-align:center}
-    button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:3px solid #56b6bf;outline-offset:2px}
+    button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:3px solid #ce2c32;outline-offset:2px}
     [hidden]{display:none!important}
     .wrap{max-width:1340px;margin:0 auto;padding-left:clamp(16px,4vw,46px);padding-right:clamp(16px,4vw,46px)}
-    .hero{background:linear-gradient(115deg,#162b45 0%,#1b3c58 70%,#125466 130%);color:#fff;padding:28px 0 36px}
+    .hero{background:linear-gradient(115deg,#242222 0%,#383131 100%);border-top:5px solid #ce2c32;color:#fff;padding:28px 0 36px}
     .brand{display:flex;align-items:center;gap:12px;margin-bottom:30px}
-    .brand-mark{display:grid;place-items:center;background:#fff;color:#19425a;width:43px;height:43px;border-radius:12px;font-weight:850;letter-spacing:-1px;font-size:20px}
+    .university-logo{width:88px;height:auto;flex-shrink:0;background:#fff;border-radius:8px;padding:5px}
+    @media(max-width:480px){.university-logo{width:68px}}
     .brand-name{font-size:13px;font-weight:720;letter-spacing:.035em}
-    .brand-sub{font-size:12px;color:#b8cfda}
-    .eyebrow{color:#93d8db;font-weight:750;letter-spacing:.15em;text-transform:uppercase;font-size:11px;margin-bottom:8px}
+    .brand-sub{font-size:12px;color:#ddd5d5}
+    .eyebrow{color:#ffadb1;font-weight:750;letter-spacing:.15em;text-transform:uppercase;font-size:11px;margin-bottom:8px}
     h1{font-size:clamp(29px,4vw,44px);letter-spacing:-.045em;line-height:1.12;margin:0 0 12px;font-weight:800}
-    .hero-p{max-width:750px;margin:0;color:#d0dee7;font-size:15px}
+    .hero-p{max-width:750px;margin:0;color:#e5dede;font-size:15px}
     .hero-bottom{display:flex;gap:10px 20px;flex-wrap:wrap;align-items:center;margin-top:22px}
-    .micro{color:#bad1de;font-size:12px}
-    .count{color:#e8fcfc;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.13);border-radius:22px;font-size:12px;padding:5px 11px}
-    .load-status{margin-top:20px;border:1px solid #cfe5e8;background:#eef8f8;color:#255e6a;border-radius:12px;padding:16px 19px;white-space:pre-line;font-size:14px}
+    .micro{color:#ddd5d5;font-size:12px}
+    .count{color:#fff;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.13);border-radius:22px;font-size:12px;padding:5px 11px}
+    .load-status{margin-top:20px;border:1px solid #e5c8ca;background:#fcf3f4;color:#75383c;border-radius:12px;padding:16px 19px;white-space:pre-line;font-size:14px}
     .load-status.failed{background:#fff4f2;border-color:#f2c5be;color:#8e2d21}
     .page{padding-top:24px;padding-bottom:54px}
     .navigation{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:21px}
     .nav-btn{border:1px solid #dce6ed;background:white;color:var(--ink-soft);padding:11px 18px;border-radius:12px;font-size:14px;font-weight:740;box-shadow:0 2px 5px rgba(0,0,0,.012)}
-    .nav-btn.active{background:var(--ink);color:white;border-color:var(--ink)}
+    .nav-btn.active{background:var(--accent);color:white;border-color:var(--accent)}
     .card{border:1px solid #e3eaf1;border-radius:18px;background:#fff;box-shadow:var(--shadow)}
     .filters{padding:25px;margin-bottom:19px}
     .section-heading{font-size:20px;letter-spacing:-.025em;line-height:1.3;font-weight:770;margin:0}
@@ -57,8 +58,8 @@
     .room-features span{padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:#f8fafc;color:var(--ink-soft);font-size:13px}
     .tools{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
     .tool-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;background:#fff;border:1px solid #d9e3ec;color:var(--ink-soft);border-radius:9px;padding:8px 11px;font-weight:680;font-size:12px}
-    .tool-btn.active{color:var(--accent-hover);background:var(--tint);border-color:#aadbdc}
-    .tool-btn:hover,.nav-btn:not(.active):hover{background:#f4f8fa}
+    .tool-btn.active{color:var(--accent-hover);background:var(--tint);border-color:#e5afb2}
+    .tool-btn:hover,.nav-btn:not(.active):hover{background:var(--tint)}
     .calendar-box{overflow:hidden}
     .calendar-scroll{overflow-x:auto;max-width:100%}
     .calendar-inner{min-width:950px}
@@ -109,7 +110,7 @@
     #freeDay{display:block;padding:8px 0;font-size:16px;font-weight:700;color:var(--ink)}
     #freeDayHint{display:block;color:var(--muted);font-size:12px;max-width:280px}
     .room-choice{text-decoration:none;display:flex;align-items:center;justify-content:space-between;text-align:left;gap:10px;padding:16px;background:#fff;border:1px solid #dfebea;border-radius:12px;color:var(--ink);font-weight:750;min-height:62px}
-    .room-choice:hover{border-color:#85cbcc;background:#eef9f7}
+    .room-choice:hover{border-color:#ce2c32;background:#fbecee}
     .arrow{font-size:18px;color:var(--accent);font-weight:500}
     .hint{font-size:12px;color:#728396;margin-top:17px;max-width:850px}
     .error{border:1px solid #efc2c2;background:#fff5f3;color:#a33a32;border-radius:11px;padding:15px 17px;font-size:13px}
@@ -119,7 +120,7 @@
     .detail-modal::backdrop{background:rgba(15,32,50,.52)}
     .modal-content{padding:27px}
     .modal-title{font-size:21px;line-height:1.25;letter-spacing:-.02em;margin:0 25px 7px 0}
-    .modal-tag{display:inline-block;color:#12677a;background:#e5f4f4;border-radius:20px;padding:4px 9px;font-size:12px;margin:6px 0 20px}
+    .modal-tag{display:inline-block;color:#a51f25;background:#fbecee;border-radius:20px;padding:4px 9px;font-size:12px;margin:6px 0 20px}
     .detail-dl{display:grid;grid-template-columns:105px minmax(0,1fr);gap:12px 9px;margin:6px 0 20px;font-size:13px}
     .detail-dl dt{font-weight:690;color:#778599}
     .detail-dl dd{margin:0;color:var(--ink);overflow-wrap:anywhere;white-space:pre-wrap}
@@ -136,7 +137,7 @@
 <header class="hero">
   <div class="wrap">
     <div class="brand">
-      <div class="brand-mark" aria-hidden="true">UP</div>
+      <img class="university-logo" src="./university-logo.png" alt="Logoja e Universitetit të Prishtinës" width="846" height="763">
       <div><div class="brand-name">UNIVERSITETI I PRISHTINËS</div><div class="brand-sub">Fakulteti Filozofik</div></div>
     </div>
     <div class="eyebrow">Orari zyrtar · Universiteti i Prishtinës</div>
