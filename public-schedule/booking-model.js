@@ -76,7 +76,7 @@ export function eventLanes(events) {
 export const EVENT_CATEGORY_LABELS = {
   lecture:'Ligjërata obligative',
   exercise:'Ushtrime obligative',
-  elective:'Aktivitete zgjedhore',
+  elective:'Lëndë zgjedhore',
   'public-reservation':'Rezervime publike',
   'private-reservation':'Rezervime jo publike'
 };
