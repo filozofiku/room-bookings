@@ -318,7 +318,8 @@ async function readMyBookings() {
     const edit=document.createElement('button');
     edit.type='button';edit.className='secondary';edit.textContent='Redaktoni';
     edit.onclick=()=>startEditing(item.id,data);
-    div.append(statusBadge('confirmed'),description,edit,button,bookingCalendar(item.id,data));
+    const actions=document.createElement('div');actions.className='reservation-actions';actions.append(edit,button);
+    div.append(statusBadge('confirmed'),description,actions,bookingCalendar(item.id,data));
     (data.date<today?archive:wrapper).appendChild(div);
   }
 }
