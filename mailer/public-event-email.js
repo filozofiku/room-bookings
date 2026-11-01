@@ -22,7 +22,7 @@ export function selectedPeriods(booking,periods){
 export function notificationDue(booking,periods,now){
  if(booking.isPublic!==true)return false;
  const start=eventStart(booking.date,selectedPeriods(booking,periods)[0].start);
- return now>=start-24*60*60*1000 && now<start;
+ return now>=start-48*60*60*1000 && now<start;
 }
 export function publicEventEmail(booking,periods,rooms,catalog){
  const selected=selectedPeriods(booking,periods);

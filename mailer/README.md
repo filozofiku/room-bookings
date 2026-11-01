@@ -66,7 +66,7 @@ workflow-t kontrollon konfigurimin dhe numëron ngjarjet për njoftim pa dërgua
 Dërgimi publik është i ndarë nga ai i anulimeve: kërkon repository variable
 `PUBLIC_EVENT_EMAIL_ENABLED=true`. Kufizimi i planifikimit është pranuar dhe shfaqet në formularin e rezervimit.
 
-Afati llogaritet si 24 orë reale para fillimit sipas `Europe/Tirane`, përfshirë
+Afati llogaritet si 48 orë reale para fillimit sipas `Europe/Tirane`, përfshirë
 ndryshimet sezonale të orës. Rezervimet e krijuara më vonë janë menjëherë të
 pranueshme për përpunim, por ekzekutimi GitHub mund të vonohet: kjo zgjidhje
 nuk garanton email të menjëhershëm ose saktësisht në afat. Edhe rezervimet publike

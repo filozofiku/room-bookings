@@ -3,18 +3,19 @@ import assert from 'node:assert/strict';
 import {eventStart,notificationDue,publicEventEmail,deliverPublicEvent,deliveryId} from '../mailer/public-event-email.js';
 const periods=[{id:'p1',start:'13:00',end:'13:15'}];
 const booking={isPublic:true,date:'2026-10-26',periodIds:['p1'],title:'Panel',eventType:'Panel',roomId:'',mode:'online',onlineUrl:'https://example.test/event',description:'Përshkrimi',creatorName:'Organizatori',groupIds:[],teacherIds:[]};
-test('notification timing uses Tirane timezone and an elapsed 24 hours across DST',()=>{
+test('notification timing uses Tirane timezone and an elapsed 48 hours across DST',()=>{
  assert.equal(new Date(eventStart('2026-10-26','13:00')).toISOString(),'2026-10-26T12:00:00.000Z');
  assert.equal(new Date(eventStart('2026-07-26','13:00')).toISOString(),'2026-07-26T11:00:00.000Z');
  const start=eventStart(booking.date,'13:00');
- assert.equal(notificationDue(booking,periods,start-86400001),false);
- assert.equal(notificationDue(booking,periods,start-86400000),true);
+ assert.equal(notificationDue(booking,periods,start-172800001),false);
+ assert.equal(notificationDue(booking,periods,start-172800000),true);
+ assert.equal(notificationDue(booking,periods,start-36*60*60*1000),true);
  assert.equal(notificationDue(booking,periods,start-1),true);
  assert.equal(notificationDue(booking,periods,start),false);
  assert.equal(notificationDue({...booking,isPublic:false},periods,start-1),false);
  const transition={...booking,date:'2026-10-25'};
- assert.equal(notificationDue(transition,periods,Date.parse('2026-10-24T11:59:59Z')),false);
- assert.equal(notificationDue(transition,periods,Date.parse('2026-10-24T12:00:00Z')),true);
+ assert.equal(notificationDue(transition,periods,Date.parse('2026-10-23T11:59:59Z')),false);
+ assert.equal(notificationDue(transition,periods,Date.parse('2026-10-23T12:00:00Z')),true);
 });
 test('Albanian email includes online link, description, resources and do-not-reply text',()=>{
  const email=publicEventEmail(booking,periods,[],{});
