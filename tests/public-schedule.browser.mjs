@@ -16,6 +16,15 @@ try {
   await page.goto(process.env.PREVIEW_URL || 'http://127.0.0.1:8765');
   await page.waitForFunction(() => window.testReport && !document.getElementById('mainContent').hidden);
   await page.locator('#bookingDate').evaluate((el,date)=>{el.value=date},'2026-10-23');
+  // Anonymous visitors can export a class occurrence from the displayed week.
+  await page.locator('#weekBody .event').first().click();
+  assert.match(await page.locator('#modalCalendar').textContent(),/sipas javës së shfaqur/);
+  await page.locator('#modalCalendar summary').click();
+  const classUrl=new URL(await page.locator('#modalCalendar a').getAttribute('href'));
+  const classDates=classUrl.searchParams.get('dates');
+  assert.match(classDates,/^202610(19|20|21|22|23|24|25)T/);
+  const classDownload=page.waitForEvent('download');await page.locator('#modalCalendar button').click();assert.equal((await classDownload).suggestedFilename(),'rezervimi.ics');
+  await page.click('#closeDialog');
   assert.equal(await page.locator('#bookingDate').isVisible(),false);
   assert.equal(await page.locator('#weekNavigation').isVisible(),true);
   await page.click('#nextWeek');assert.equal(await page.locator('#bookingDate').inputValue(),'2026-10-26');

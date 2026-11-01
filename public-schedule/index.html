@@ -551,9 +551,14 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
       dd.append(link); $('modalDetails').append(dt,dd);
     }
     $('modalCalendar').replaceChildren();
-    if(e.booking){
-      const status=document.createElement('p');status.textContent='Statusi: E konfirmuar';$('modalCalendar').append(status,calendarActions({id:e.id||`${e.date}-${e.s}-${e.t}`,title:e.t,date:e.date,start:data.times[e.s],end:data.times[e.e],room:e.r,description:e.description,onlineUrl:e.onlineUrl}));
-    }
+    const eventDate=e.booking?e.date:dateForDay(e.d);
+    const status=document.createElement('p');
+    status.textContent=e.booking?'Statusi: E konfirmuar':`Shto vetëm këtë aktivitet më ${eventDate}, sipas javës së shfaqur.`;
+    $('modalCalendar').append(status,calendarActions({
+      id:e.id||JSON.stringify([eventDate,e.s,e.e,e.t,e.r,e.g,e.p]),
+      title:e.t,date:eventDate,start:data.times[e.s],end:data.times[e.e],room:e.r,
+      description:[e.description,e.g?`Studentët / Grupi: ${e.g}`:'',e.p?`Mësimdhënësi: ${e.p}`:''].filter(Boolean).join('\n\n'),onlineUrl:e.onlineUrl
+    }));
     $("detailDialog").showModal();
   }
   function renderFree(){
