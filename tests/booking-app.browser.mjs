@@ -368,6 +368,17 @@ assert.doesNotMatch(await page.locator('#my-reservations').textContent(),/past/)
 assert.equal(await page.locator('#past-reservations-section').getAttribute('open'),null);
 assert.equal(await page.locator('#past-reservations-summary').textContent(),'Rezervimet e kaluara (2)');
 assert.match(await page.locator('#past-reservations .slot').first().textContent(),/past-new/);
+await page.fill('#reservation-search','PAST-NEW');
+assert.equal(await page.locator('#past-reservations .slot:visible').count(),1);
+assert.equal(await page.locator('#my-reservations .slot:visible').count(),0);
+assert.match(await page.locator('#reservation-search-results').textContent(),/1 rezervime të kaluara/);
+await page.fill('#reservation-search','future');
+assert.equal(await page.locator('#my-reservations .slot:visible').count(),1);
+assert.equal(await page.locator('#past-reservations .slot:visible').count(),0);
+await page.fill('#reservation-search','not-a-match');
+assert.match(await page.locator('#my-reservations').textContent(),/Nuk ka rezervime që përputhen/);
+await page.fill('#reservation-search','');
+
 assert.doesNotMatch(await page.locator('#past-reservations').textContent(),/other-past/);
 await page.click('#past-reservations-summary');
 assert.equal(await page.locator('#past-reservations .slot').first().isVisible(),true);

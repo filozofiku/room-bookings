@@ -291,13 +291,13 @@ async function readMyBookings() {
   const wrapper = $('my-reservations'),archive=$('past-reservations');
   wrapper.replaceChildren();archive.replaceChildren();
   $('past-reservations-summary').textContent=`Rezervimet e kaluara (${past.length})`;
-  if(!upcoming.length)wrapper.textContent='Nuk ka rezervime për sot ose për ditët në vijim.';
-  if(!past.length)archive.textContent='Nuk ka rezervime të kaluara.';
+
   for (const item of sorted) {
     const data = item.data();
     const roomName = rooms.find(r => r.id === data.roomId)?.name || data.roomId || 'Pa sallë';
     const div = document.createElement('div');
     div.className = 'slot';
+    div.dataset.search=normalizeSearch([data.title,data.date,roomName,data.creatorName,data.eventType,data.description,reservationTime(data.periodIds,periods),...(data.groupIds||[]).map(id=>catalog.groups[id]||id),...(data.teacherIds||[]).map(id=>catalog.teachers[id]||id)].filter(Boolean).join(' '));
     const description = document.createElement('span');
     description.append(safeText(`${data.date} · ${roomName} · ${data.title} · ${reservationTime(data.periodIds, periods)}`));
     if (canCancelAll) description.append(safeText(` · Rezervuar nga: ${data.creatorName || (data.ownerUid === currentUser.uid ? currentUser.displayName : '') || 'Emri nuk është i disponueshëm'}`));
@@ -322,6 +322,25 @@ async function readMyBookings() {
     div.append(statusBadge('confirmed'),description,actions,bookingCalendar(item.id,data));
     (data.date<today?archive:wrapper).appendChild(div);
   }
+  filterReservations();
+}
+function normalizeSearch(value){return String(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();}
+let archiveBeforeSearch=null;
+function filterReservations(){
+ const words=normalizeSearch($('reservation-search').value.trim()).split(/\s+/).filter(Boolean);
+ const counts=[];
+ for(const [index,id] of ['my-reservations','past-reservations'].entries()){
+  const wrapper=$(id);wrapper.querySelector('.reservation-empty')?.remove();
+  const rows=[...wrapper.querySelectorAll('.slot')];
+  for(const row of rows)row.hidden=!words.every(word=>row.dataset.search.includes(word));
+  const count=rows.filter(row=>!row.hidden).length;counts.push(count);
+  if(!count){const empty=document.createElement('p');empty.className='reservation-empty';empty.textContent=words.length?'Nuk ka rezervime që përputhen me kërkimin.':index?'Nuk ka rezervime të kaluara.':'Nuk ka rezervime për sot ose për ditët në vijim.';wrapper.append(empty);}
+ }
+ $('past-reservations-summary').textContent=`Rezervimet e kaluara (${counts[1]})`;
+ $('reservation-search-results').textContent=words.length?`${counts[0]} rezervime të ardhshme · ${counts[1]} rezervime të kaluara` : '';
+ const archive=$('past-reservations-section');
+ if(words.length){if(archiveBeforeSearch===null)archiveBeforeSearch=archive.open;archive.open=true;}
+ else if(archiveBeforeSearch!==null){archive.open=archiveBeforeSearch;archiveBeforeSearch=null;}
 }
 function bookingMessage(text, isError = false) {
   message(text, isError);
@@ -506,6 +525,7 @@ $('date').onchange = () => readAvailability().catch(e => message(errText(e),true
 $('room').onchange = () => readAvailability().catch(e => message(errText(e),true));
 $('booking-form').onsubmit = createReservation;
 $('stop-editing').onclick = stopEditing;
+$('reservation-search').addEventListener('input',filterReservations);
 $('refresh-requests').onclick=()=>readRequests().catch(e=>message(errText(e),true));
 $('request-decision-form').onsubmit=event=>{
   event.preventDefault();

@@ -15,6 +15,7 @@ button:hover:not(:disabled){background:#a51f25}button.secondary:hover:not(:disab
 @media(max-width:480px){.university-logo{width:68px}.university-brand{gap:.75rem}header h1{font-size:1.2rem}}
 .reservation-status{display:inline-block;padding:.3rem .65rem;border-radius:20px;font-size:.85rem}.status-confirmed{background:#dcfce7;color:#14532d}.status-pending{background:#fef3c7;color:#78350f}.status-rejected{background:#fee2e2;color:#991b1b}.request-card{border:1px solid #ddd;padding:1rem;margin:1rem 0;border-radius:10px}.calendar-actions{flex-basis:100%;margin:.7rem 0}.calendar-actions p{font-size:.85rem;color:#625d5d}.calendar-actions button{margin:.5rem 0}#booking-help li{line-height:1.5}
 .reservation-actions{display:flex;flex-basis:100%;gap:.75rem;align-items:center}
+.slot[hidden]{display:none}
 </style></head><body>
 <header><div class="university-brand"><img class="university-logo" src="./university-logo.png" alt="Logoja e Universitetit të Prishtinës" width="846" height="763"><div><div class="university-name">UNIVERSITETI I PRISHTINËS</div><div class="faculty-name">Fakulteti Filozofik</div><h1>Rezervimi i sallave të fakultetit</h1></div></div><div><span id="identity"></span> <button id="login">Hyni me Google</button> <button id="logout" class="secondary" hidden>Dilni</button></div></header>
 <p id="message"></p>
@@ -45,7 +46,8 @@ button:hover:not(:disabled){background:#a51f25}button.secondary:hover:not(:disab
 </form>
 <div id="booking-receipt" class="decision-card" tabindex="-1" role="status" hidden></div>
 <div class="row"><h2 id="requests-heading">Kërkesat e mia</h2><button type="button" id="refresh-requests" class="secondary">Rifreskoni kërkesat</button></div><div id="reservation-requests"></div><details><summary>Vendimet për kërkesat</summary><p><small>Të dhënat më poshtë paraqesin kërkesën në kohën e vendimit. Rezervimi mund të jetë ndryshuar ose anuluar më pas.</small></p><div id="request-decisions"></div></details>
-<h2 id="reservations-heading">Rezervimet e mia</h2><p><small>Sot dhe në ditët në vijim.</small></p><div id="my-reservations"></div>
+<h2 id="reservations-heading">Rezervimet e mia</h2>
+<label for="reservation-search">Kërkoni rezervimet</label><input id="reservation-search" type="search" placeholder="Titulli, data, salla, mësimdhënësi…" aria-controls="my-reservations past-reservations" aria-describedby="reservation-search-hint"><p id="reservation-search-hint"><small>Kërkimi përfshin rezervimet e ardhshme dhe të kaluara. Mund të kërkoni edhe sipas grupit, llojit të aktivitetit ose krijuesit. Data: VVVV-MM-DD.</small></p><p id="reservation-search-results" role="status" aria-live="polite"></p><p><small>Sot dhe në ditët në vijim.</small></p><div id="my-reservations"></div>
 <details id="past-reservations-section"><summary id="past-reservations-summary">Rezervimet e kaluara</summary><div id="past-reservations"></div></details>
 </section>
 <dialog id="reservation-dialog" aria-labelledby="reservation-heading" style="max-width:640px;width:calc(100% - 4rem);max-height:85vh;overflow:auto">
