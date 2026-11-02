@@ -16,6 +16,7 @@ button:hover:not(:disabled){background:#a51f25}button.secondary:hover:not(:disab
 .reservation-status{display:inline-block;padding:.3rem .65rem;border-radius:20px;font-size:.85rem}.status-confirmed{background:#dcfce7;color:#14532d}.status-pending{background:#fef3c7;color:#78350f}.status-rejected{background:#fee2e2;color:#991b1b}.request-card{border:1px solid #ddd;padding:1rem;margin:1rem 0;border-radius:10px}.calendar-actions{flex-basis:100%;margin:.7rem 0}.calendar-actions p{font-size:.85rem;color:#625d5d}.calendar-actions button{margin:.5rem 0}#booking-help li{line-height:1.5}
 .reservation-actions{display:flex;flex-basis:100%;gap:.75rem;align-items:center}
 .slot[hidden]{display:none}
+#room-availability{margin:1.25rem 0}#room-availability>summary{font-size:1.2rem;font-weight:700}
 </style></head><body>
 <header><div class="university-brand"><img class="university-logo" src="./university-logo.png" alt="Logoja e Universitetit të Prishtinës" width="846" height="763"><div><div class="university-name">UNIVERSITETI I PRISHTINËS</div><div class="faculty-name">Fakulteti Filozofik</div><h1>Rezervimi i sallave të fakultetit</h1></div></div><div><span id="identity"></span> <button id="login">Hyni me Google</button> <button id="logout" class="secondary" hidden>Dilni</button></div></header>
 <p id="message"></p>
@@ -27,7 +28,7 @@ button:hover:not(:disabled){background:#a51f25}button.secondary:hover:not(:disab
 </details></section>
 <section id="app" hidden>
 <div class="row"><div><label for="date">Data</label><input type="date" id="date"></div><div><label for="room">Salla</label><select id="room"></select></div></div>
-<h2>Disponueshmëria e sallës</h2><div id="slots"></div>
+<details id="room-availability"><summary>Disponueshmëria e sallës</summary><div id="slots"></div></details>
 <h2 id="booking-heading">Rezervoni një aktivitet</h2><div id="edit-banner" hidden><p id="edit-notice"></p><button id="stop-editing" type="button" class="secondary">Hiqni dorë nga redaktimi</button></div><form id="booking-form" novalidate>
 <label for="event-type">Lloji i aktivitetit</label><select id="event-type"></select>
 <fieldset><legend>Grupet e studentëve</legend><p><small>Mund të zgjidhni një ose më shumë grupe. Pa përzgjedhje: pa grup të studentëve.</small></p><label for="groups-search">Kërko grupin e studentëve</label><input id="groups-search" type="search" placeholder="Shkruani emrin e grupit" aria-controls="groups"><p id="groups-results" role="status"></p><div id="groups" class="choices"></div></fieldset>

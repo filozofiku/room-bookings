@@ -79,6 +79,8 @@ for (const kind of ['groups','teachers']) {
 
 assert.equal(await page.locator('#booking-help').count(),1);
 assert.equal(await page.locator('#my-reservations .status-confirmed').count(),1);
+assert.equal(await page.locator('#room-availability').getAttribute('open'),null);
+await page.locator('#room-availability > summary').click();
 assert.equal(await page.locator('#from option').first().textContent(),'08:00');
 assert.equal(await page.locator('#through option').first().textContent(),'08:15');
 assert.equal(await page.getByText('Salla e lirë',{exact:true}).count(),16);
