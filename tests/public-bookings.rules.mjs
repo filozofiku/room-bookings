@@ -94,7 +94,7 @@ test('resource reservations: atomic publication, optional resources, conflicts, 
   assert.equal(deliveries,1);
   await seed('mailSettings/publicEvents',{enabled:true,recipients:['recipient@example.test']});
   for(const context of [anon,db,manager]){
-    await assertFails(getDoc(doc(context,'mailSettings','publicEvents')));
+    await (context===manager?assertSucceeds:assertFails)(getDoc(doc(context,'mailSettings','publicEvents')));
     await assertFails(setDoc(doc(context,'publicEventDeliveries','forged'),{status:'sent'}));
   }
   await assertSucceeds(getDoc(doc(worker,'mailSettings','publicEvents')));

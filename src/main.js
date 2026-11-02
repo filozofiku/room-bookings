@@ -1,4 +1,5 @@
-import {calendarActions} from './calendar-export.js';
+import {loadEmailDeliveries,deliveryLabel,retryEmail} from './email-delivery.js';
+import {calendarActions,calendarInstant} from './calendar-export.js';
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, query, where, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { BookingError, selectPeriods, reservationTime, errorText, MAX_PERIODS } from './booking-ui.js';
@@ -324,6 +325,42 @@ async function readMyBookings() {
   }
   filterReservations();
 }
+let emailViewGeneration=0;
+async function readEmailDelivery(){
+ const user=currentUser, elevated=canCancelAll, generation=++emailViewGeneration;
+ if(!user)return;
+ const feedback=$('email-delivery-feedback'),list=$('email-delivery-list');feedback.textContent='Duke ngarkuar…';list.replaceChildren();
+ try{
+  const {notices,publicEvents}=await loadEmailDeliveries(db,user,elevated);
+  if(currentUser?.uid!==user.uid||generation!==emailViewGeneration)return;
+  const retryButton=(card,paths)=>{
+   const button=document.createElement('button');button.type='button';button.textContent='Riprovoni dërgimin';
+   button.onclick=async()=>{button.disabled=true;let count=0;
+    try{for(const path of paths)if(await retryEmail(db,path,user))count++;
+     await readEmailDelivery();feedback.textContent=`${count} njoftime u vendosën në pritje. Dërgimi bëhet në ekzekutimin e radhës; mund të ketë vonesa.`;
+    }catch(e){feedback.textContent=`${count} njoftime u vendosën në pritje. `+errText(e);button.disabled=false;}
+   };card.append(button);
+  };
+  for(const notice of notices.filter(n=>n.status!=='recorded').sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0))){
+   const card=document.createElement('article');card.className='decision-card';
+   const heading=document.createElement('h3');heading.textContent=`${notice.kind} · ${notice.booking?.title||'Rezervim'}`;
+   const text=document.createElement('p');text.style.whiteSpace='pre-wrap';text.textContent=[`Statusi: ${deliveryLabel(notice.status)}`,`Data e aktivitetit: ${notice.booking?.date||'—'}`,`Kërkuesi: ${notice.booking?.creatorName||'—'}`,`Krijuar: ${decisionTimestamp(notice.createdAt)}`,notice.sentAt?`Dërguar: ${decisionTimestamp(notice.sentAt)}`:'',notice.lastAttemptAt?`Përpjekja e fundit: ${decisionTimestamp(notice.lastAttemptAt)}`:'',notice.status==='failed'?'Dërgimi kërkon ndërhyrjen e administratorit.':''].filter(Boolean).join('\n');card.append(heading,text);
+   if(elevated&&notice.status==='failed')retryButton(card,[notice.path]);list.append(card);
+  }
+  for(const event of publicEvents.sort((a,b)=>b.booking.date.localeCompare(a.booking.date))){
+   const card=document.createElement('article');card.className='decision-card';const heading=document.createElement('h3');heading.textContent=`Njoftim publik · ${event.booking.title}`;
+   const counts={sent:0,failed:0,waiting:0,skipped:0};for(const d of event.deliveries){if(d.status==='sent')counts.sent++;else if(d.status==='failed')counts.failed++;else if(d.status==='skipped')counts.skipped++;else counts.waiting++;}
+   counts.waiting+=Math.max(0,event.expected-event.deliveries.length);
+   const first=periods.filter(p=>event.booking.periodIds?.includes(p.id)).sort((a,b)=>a.start.localeCompare(b.start))[0];
+   const instant=first?calendarInstant(event.booking.date,first.start):null;
+   const start=instant?Date.parse(instant.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/,'$1-$2-$3T$4:$5:$6Z')):NaN;
+   const ended=!Number.isFinite(start)||start<=Date.now();
+   const text=document.createElement('p');text.textContent=`${event.booking.date} · Dërguar: ${counts.sent} · Dështuar: ${counts.failed} · ${ended?'Pa dërguar':'Në pritje'}: ${counts.waiting} · Të anashkaluara: ${counts.skipped}. `+(!event.enabled?'Njoftimet publike janë të çaktivizuara. ':event.expected===0?'Lista e marrësve nuk është konfiguruar. ':'')+'Afati: 48 orë para fillimit; shërbimi nuk dërgon pas fillimit të aktivitetit.';card.append(heading,text);
+   if(!ended&&counts.failed)retryButton(card,event.deliveries.filter(d=>d.status==='failed').map(d=>d.path));list.append(card);
+  }
+  feedback.textContent=list.children.length?'Statusi u rifreskua.':'Nuk ka njoftime për të shfaqur.';
+ }catch(e){if(currentUser?.uid===user.uid&&generation===emailViewGeneration)feedback.textContent=errText(e);}
+}
 function normalizeSearch(value){return String(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();}
 let archiveBeforeSearch=null;
 function filterReservations(){
@@ -466,6 +503,7 @@ async function loadApp() {
   const userSnap = await getDoc(doc(db,'users',currentUser.uid));
   if (!userSnap.exists() || !userSnap.data().active) {
     $('app').hidden = true;
+  emailViewGeneration++;$('email-delivery-list').replaceChildren();$('email-delivery-feedback').textContent='';$('email-delivery-section').open=false;
     message(`Keni hyrë me llogarinë Google, por ajo ende nuk është miratuar. Dërgojani administratorit këtë identifikues të llogarisë: ${currentUser.uid}`,true);
     return;
   }
@@ -525,6 +563,8 @@ $('date').onchange = () => readAvailability().catch(e => message(errText(e),true
 $('room').onchange = () => readAvailability().catch(e => message(errText(e),true));
 $('booking-form').onsubmit = createReservation;
 $('stop-editing').onclick = stopEditing;
+$('email-delivery-section').addEventListener('toggle',()=>{if($('email-delivery-section').open)readEmailDelivery();});
+$('refresh-email-delivery').onclick=readEmailDelivery;
 $('reservation-search').addEventListener('input',filterReservations);
 $('refresh-requests').onclick=()=>readRequests().catch(e=>message(errText(e),true));
 $('request-decision-form').onsubmit=event=>{
@@ -565,6 +605,7 @@ onAuthStateChanged(auth,async user => {
   $('logout').hidden = !user;
   $('identity').textContent = user?.email || '';
   $('app').hidden = true;
+  emailViewGeneration++;$('email-delivery-list').replaceChildren();$('email-delivery-feedback').textContent='';$('email-delivery-section').open=false;
   if (user) try { await loadApp(); } catch(e){message(errText(e),true);}
   else message('Hyni me llogarinë tuaj Google për të parë disponueshmërinë dhe për të rezervuar salla.');
 });

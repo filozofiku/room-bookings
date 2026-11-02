@@ -50,3 +50,10 @@ test('transient failures retry, permanent failures remain visible, stale leases 
  for(let i=0;i<4;i++)await assert.rejects(repeated.run());
  await repeated.run();assert.equal(repeated.data().status,'failed');assert.equal(repeated.data().attempts,5);
 });
+
+test('administrator requeue allows a failed notification to be delivered once',async()=>{
+ const sent=[];const f=fixture(async mail=>sent.push(mail));
+ f.set({status:'failed',attempts:5});await f.run();assert.equal(sent.length,0);
+ f.set({status:'pending',attempts:0,retryRequestedBy:'manager'});
+ await f.run();await f.run();assert.equal(sent.length,1);assert.equal(f.data().status,'sent');assert.equal(f.data().attempts,1);
+});

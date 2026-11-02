@@ -35,8 +35,9 @@ export const getDoc=async path=>{if(window.testFail)throw Object.assign(new Erro
 export const getDocs=async ref=>{const path=ref.path||ref;return {docs:[...store.keys()].filter(k=>k.startsWith(path+'/')).map(snap).filter(s=>(ref.filters||[]).every(([field,op,value])=>field.split('.').reduce((v,k)=>v?.[k],s.data())===value))}};
 export const serverTimestamp=()=>({seconds:123456});
 export const runTransaction=async(db,callback)=>{
-const writes=[];await callback({get:getDoc,set:(...args)=>writes.push(['set',...args]),delete:path=>writes.push(['delete',path])});
+const writes=[];const result=await callback({get:getDoc,update:(ref,patch)=>writes.push(['set',ref,{...store.get(ref.path),...patch}]),set:(...args)=>writes.push(['set',...args]),delete:path=>writes.push(['delete',path])});
 for(const [op,path,data] of writes)if(op==='set')store.set(path.path,data);else store.delete(path.path);
+return result;
 };
 `;
 const browser=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
@@ -49,7 +50,7 @@ if(path==='/'){body=readFileSync('index.html','utf8');contentType='text/html';}
 else if(path==='/auth.js')body=authModule;
 else if(path==='/firestore.js')body=firestoreModule;
 else if(path==='/src/firebase.js')body='export const auth={};export const db={};';
-else if(['/src/main.js','/src/update-reservation.js','/src/reservation-requests.js'].includes(path))body=readFileSync(path.slice(1),'utf8').replaceAll("'firebase/auth'","'/auth.js'").replaceAll("'firebase/firestore'","'/firestore.js'");
+else if(['/src/main.js','/src/update-reservation.js','/src/reservation-requests.js','/src/email-delivery.js'].includes(path))body=readFileSync(path.slice(1),'utf8').replaceAll("'firebase/auth'","'/auth.js'").replaceAll("'firebase/firestore'","'/firestore.js'");
 else if(['/src/booking-ui.js','/src/booking-resources.js','/src/calendar-export.js'].includes(path))body=readFileSync(path.slice(1),'utf8');
 else return route.abort();
 return route.fulfill({contentType,body});
@@ -392,6 +393,22 @@ await page.clock.setFixedTime(new Date('2026-10-25T12:00:00Z'));
 await page.evaluate(()=>window.testAuth({uid:'teacher',displayName:'Mësimdhënës',email:'test@example.test'}));
 assert.match(await page.locator('#my-reservations').textContent(),/Nuk ka rezervime për sot/);
 assert.equal(await page.locator('#past-reservations-summary').textContent(),'Rezervimet e kaluara (4)');
+// Notification visibility and administrator retry use the existing worker queue.
+await page.evaluate(()=>{
+ window.testStore.set('cancellationNotifications/mail-own',{booking:{ownerUid:'teacher',title:'Email personal',date:'2026-10-23',creatorName:'Teacher'},status:'failed',attempts:5});
+ window.testStore.set('cancellationNotifications/mail-other',{booking:{ownerUid:'other',title:'Email privat i tjetrit',date:'2026-10-23'},status:'sent'});
+});
+await page.locator('#email-delivery-section summary').click();
+await page.waitForFunction(()=>document.querySelector('#email-delivery-list').textContent.includes('Email personal'));
+assert.doesNotMatch(await page.locator('#email-delivery-list').textContent(),/Email privat i tjetrit/);
+assert.equal(await page.locator('#email-delivery-list button').count(),0);
+await page.evaluate(()=>window.testAuth({uid:'admin',displayName:'Administrator',email:'admin@example.test'}));
+await page.locator('#email-delivery-section summary').click();
+await page.waitForFunction(()=>document.querySelector('#email-delivery-list').textContent.includes('Email privat i tjetrit'));
+const retryCard=page.locator('#email-delivery-list article').filter({hasText:'Email personal'});
+await retryCard.getByRole('button',{name:'Riprovoni dërgimin'}).click();
+await page.waitForFunction(()=>window.testStore.get('cancellationNotifications/mail-own').status==='pending');
+assert.equal(await page.evaluate(()=>window.testStore.get('cancellationNotifications/mail-own').attempts),0);
 assert.deepEqual(errors,[]);
 console.log('Albanian signed-in UI, status labels, boundary times, validation, 16-period booking/cancellation and localized SDK errors passed.');
 }finally{await browser.close();}

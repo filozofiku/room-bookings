@@ -25,6 +25,12 @@ service cloud.firestore {
       return booking.ownerUid == request.auth.uid || get(userPath()).data.get('canCancelAll', false) == true;
     }
     function elevated() { return get(userPath()).data.get('canCancelAll',false) == true; }
+    function adminEmailRetry() {
+      return approved() && elevated() && resource.data.status == 'failed' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','attempts','retryRequestedAt','retryRequestedBy']) &&
+        request.resource.data.status == 'pending' && request.resource.data.attempts == 0 &&
+        request.resource.data.retryRequestedAt == request.time && request.resource.data.retryRequestedBy == request.auth.uid;
+    }
     function specialRoom(id) { return id in ['r_9c3ca97a27ce','r_a8ae63f60a13']; }
     function approvedRequest(id, booking) {
       let path = /databases/$(database)/documents/reservationRequests/$(id);
@@ -215,7 +221,8 @@ service cloud.firestore {
         !exists(/databases/$(database)/documents/reservationRequests/$(id)) &&
         request.resource.data.booking == getAfter(/databases/$(database)/documents/reservationRequests/$(id)).data &&
         request.resource.data.booking.ownerUid == request.auth.uid;
-      allow read: if mailWorker() || (approved() && elevated());
+      allow read: if mailWorker() || (approved() && (elevated() || resource.data.booking.ownerUid == request.auth.uid));
+      allow update: if adminEmailRetry();
       allow update: if mailWorker() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'status','attempts','leaseToken','leaseUntil','sentAt','lastErrorCode','lastAttemptAt'
       ]) && request.resource.data.status in ['sending','sent','retrying','failed'];
@@ -235,6 +242,7 @@ service cloud.firestore {
       }
       allow read: if mailWorker() || (approved() && (resource.data.booking.ownerUid == request.auth.uid || elevated()));
       allow create: if approved() && elevated() && validDecision();
+      allow update: if adminEmailRetry();
       allow update: if mailWorker() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'status','attempts','leaseToken','leaseUntil','sentAt','lastErrorCode','lastAttemptAt'
       ]) && request.resource.data.status in ['sending','sent','retrying','failed'];
@@ -255,17 +263,19 @@ service cloud.firestore {
       }
       allow create: if approved() && controls().bookingOpen && validModification();
       allow read: if mailWorker() || (approved() && (resource.data.booking.ownerUid == request.auth.uid || get(userPath()).data.get('canCancelAll',false)));
+      allow update: if adminEmailRetry();
       allow update: if mailWorker() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'status','attempts','leaseToken','leaseUntil','sentAt','lastErrorCode','lastAttemptAt'
       ]) && request.resource.data.status in ['sending','sent','retrying','failed'];
       allow delete: if false;
     }
     match /mailSettings/{id} {
-      allow get: if mailWorker() && id == 'publicEvents';
+      allow get: if (mailWorker() || (approved() && elevated())) && id == 'publicEvents';
       allow list, write: if false;
     }
     match /publicEventDeliveries/{id} {
-      allow read: if mailWorker();
+      allow read: if mailWorker() || (approved() && elevated());
+      allow update: if adminEmailRetry() && get(/databases/$(database)/documents/publicBookings/$(resource.data.bookingId)).data.isPublic == true;
       allow create: if mailWorker() &&
         get(/databases/$(database)/documents/publicBookings/$(request.resource.data.bookingId)).data.isPublic == true &&
         request.resource.data.recipient in get(/databases/$(database)/documents/mailSettings/publicEvents).data.recipients;
@@ -287,6 +297,7 @@ service cloud.firestore {
       }
       allow create: if approved() && controls().bookingOpen && validCancellation();
       allow read: if mailWorker() || (approved() && (resource.data.booking.ownerUid == request.auth.uid || get(userPath()).data.get('canCancelAll',false)));
+      allow update: if adminEmailRetry();
       allow update: if mailWorker() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'status','attempts','leaseToken','leaseUntil','sentAt','lastErrorCode','lastAttemptAt'
       ]) && request.resource.data.status in ['sending','sent','retrying','failed'];

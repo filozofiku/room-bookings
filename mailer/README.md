@@ -91,3 +91,19 @@ pronarit origjinal një email me vlerat para/pas ndryshimit dhe hollësitë e re
 Marrësi merret nga profili privat i pronarit. Regjistrat `recorded` për ndryshimet
 e rezervimit të vet nuk përpunohen. Riprovimi dhe bllokimi kundër dërgimeve të
 njëkohshme përdorin të njëjtin mekanizëm si emaili i anulimit.
+
+### Statusi dhe riprovimi nga aplikacioni
+
+Te “Statusi i njoftimeve me email”, përdoruesit shohin njoftimet për rezervimet
+ose kërkesat e tyre. Përdoruesit me `canCancelAll` shohin të gjitha njoftimet
+si dhe numërimet e dërgimeve për aktivitetet publike. Seksioni ngarkohet kur
+hapet; butoni “Rifreskoni statusin” lexon gjendjen aktuale.
+
+“Dërguar” nënkupton pranim nga SMTP, jo konfirmim të mbërritjes në inbox.
+Vetëm njoftimet `failed` mund të riprovohen nga administratorët: një transaksion
+vendos `pending`, rivendos numrin e përpjekjeve dhe regjistron
+`retryRequestedBy` / `retryRequestedAt`. Përmbajtja dhe marrësit nuk ndryshohen.
+Njoftimet e dërguara ose në proces nuk mund të rivendosen. Worker-i ekzistues
+përpunon riprovimet në ekzekutimin vijues; butoni nuk garanton dërgim të menjëhershëm.
+Dërgimet publike mbeten të kufizuara në intervalin 48-orësh para fillimit dhe
+ndalojnë nëse aktiviteti anulohet ose nuk është më publik.

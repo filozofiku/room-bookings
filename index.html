@@ -46,6 +46,9 @@ button:hover:not(:disabled){background:#a51f25}button.secondary:hover:not(:disab
 </form>
 <div id="booking-receipt" class="decision-card" tabindex="-1" role="status" hidden></div>
 <div class="row"><h2 id="requests-heading">Kërkesat e mia</h2><button type="button" id="refresh-requests" class="secondary">Rifreskoni kërkesat</button></div><div id="reservation-requests"></div><details><summary>Vendimet për kërkesat</summary><p><small>Të dhënat më poshtë paraqesin kërkesën në kohën e vendimit. Rezervimi mund të jetë ndryshuar ose anuluar më pas.</small></p><div id="request-decisions"></div></details>
+<details id="email-delivery-section"><summary>Statusi i njoftimeve me email</summary>
+<p>“Në pritje” përfshin njoftimet që presin ekzekutimin e radhës. “Dërguar” do të thotë se shërbimi i emailit e ka pranuar mesazhin; nuk garanton mbërritjen në inbox. Mund të ketë vonesa.</p>
+<button type="button" id="refresh-email-delivery" class="secondary">Rifreskoni statusin</button><p id="email-delivery-feedback" role="status"></p><div id="email-delivery-list"></div></details>
 <h2 id="reservations-heading">Rezervimet e mia</h2>
 <label for="reservation-search">Kërkoni rezervimet</label><input id="reservation-search" type="search" placeholder="Titulli, data, salla, mësimdhënësi…" aria-controls="my-reservations past-reservations" aria-describedby="reservation-search-hint"><p id="reservation-search-hint"><small>Kërkimi përfshin rezervimet e ardhshme dhe të kaluara. Mund të kërkoni edhe sipas grupit, llojit të aktivitetit ose krijuesit. Data: VVVV-MM-DD.</small></p><p id="reservation-search-results" role="status" aria-live="polite"></p><p><small>Sot dhe në ditët në vijim.</small></p><div id="my-reservations"></div>
 <details id="past-reservations-section"><summary id="past-reservations-summary">Rezervimet e kaluara</summary><div id="past-reservations"></div></details>
