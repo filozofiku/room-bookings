@@ -61,6 +61,9 @@ async function submitBooking(){
  await page.waitForFunction(()=>!document.querySelector('#booking-form button').disabled);
 }
 await page.goto('https://booking.test/');
+await page.waitForSelector('#app:not([hidden])');
+assert.equal(await page.locator('.app-panel[open]').count(),0);
+for(const id of ['booking-section','requests-section','reservations-section'])await page.locator('#'+id+' > summary').click();
 await page.waitForFunction(()=>document.getElementById('slots').children.length===18);
 assert.equal(await page.locator('html').getAttribute('lang'),'sq');
 for (const kind of ['groups','teachers']) {
@@ -345,6 +348,9 @@ await page.goto('https://booking.test/?date=2026-10-23&room=Salla%20014&start=08
 await page.waitForFunction(()=>window.testAuth);
 assert.equal(await page.locator('#app').isVisible(),false);
 await page.evaluate(()=>window.testAuth({uid:'teacher',displayName:'Mësimdhënës',email:'test@example.test'}));
+assert.equal(await page.locator('#booking-section').getAttribute('open'),'');
+assert.equal(await page.locator('#requests-section').getAttribute('open'),null);
+assert.equal(await page.locator('#reservations-section').getAttribute('open'),null);
 assert.equal(await page.locator('#date').inputValue(),'2026-10-23');
 assert.equal(await page.locator('#room').inputValue(),'r_123456abcdef');
 assert.equal(await page.locator('#from').inputValue(),'p03');
@@ -359,6 +365,9 @@ assert.equal(await page.locator('#through').inputValue(),'p18');
 // Local today stays in the main list; earlier dates are collapsed and newest first.
 await page.clock.setFixedTime(new Date('2026-10-22T22:30:00Z'));
 await page.goto('https://booking.test/');
+await page.waitForSelector('#app:not([hidden])');
+assert.equal(await page.locator('.app-panel[open]').count(),0);
+for(const id of ['booking-section','requests-section','reservations-section'])await page.locator('#'+id+' > summary').click();
 await page.waitForFunction(()=>document.getElementById('slots').children.length===18);
 await page.evaluate(async()=>{
  const sample=window.testStore.get('reservations/existing');
@@ -411,6 +420,12 @@ const retryCard=page.locator('#email-delivery-list article').filter({hasText:'Em
 await retryCard.getByRole('button',{name:'Riprovoni dërgimin'}).click();
 await page.waitForFunction(()=>window.testStore.get('cancellationNotifications/mail-own').status==='pending');
 assert.equal(await page.evaluate(()=>window.testStore.get('cancellationNotifications/mail-own').attempts),0);
+await page.goto('https://booking.test/?section=requests&signedout=1');
+await page.waitForFunction(()=>window.testAuth);
+await page.evaluate(async()=>{window.testStore.set('users/admin',{active:true,role:'admin',canCancelAll:true});await window.testAuth({uid:'admin',displayName:'Bardhok Bashota',email:'bardhok.bashota@uni-pr.edu'});});
+assert.equal(await page.locator('#requests-section').getAttribute('open'),'');
+assert.equal(await page.locator('details[open]').count(),1);
+assert.equal(await page.locator('#requests-heading').textContent(),'Kërkesat për miratim');
 assert.deepEqual(errors,[]);
 console.log('Albanian signed-in UI, status labels, boundary times, validation, 16-period booking/cancellation and localized SDK errors passed.');
 }finally{await browser.close();}

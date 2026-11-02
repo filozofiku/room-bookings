@@ -17,6 +17,7 @@ button:hover:not(:disabled){background:#a51f25}button.secondary:hover:not(:disab
 .reservation-actions{display:flex;flex-basis:100%;gap:.75rem;align-items:center}
 .slot[hidden]{display:none}
 #room-availability{margin:1.25rem 0}#room-availability>summary{font-size:1.2rem;font-weight:700}
+.app-panel{margin:1.3rem 0;border-top:1px solid #e1dcdc;padding-top:1rem;scroll-margin-top:1rem}.app-panel>summary{font-size:1.3rem;font-weight:700}.app-panel[open]>summary{margin-bottom:1rem}
 </style></head><body>
 <header><div class="university-brand"><img class="university-logo" src="./university-logo.png" alt="Logoja e Universitetit të Prishtinës" width="846" height="763"><div><div class="university-name">UNIVERSITETI I PRISHTINËS</div><div class="faculty-name">Fakulteti Filozofik</div><h1>Rezervimi i sallave të fakultetit</h1></div></div><div><span id="identity"></span> <button id="login">Hyni me Google</button> <button id="logout" class="secondary" hidden>Dilni</button></div></header>
 <p id="message"></p>
@@ -29,7 +30,7 @@ button:hover:not(:disabled){background:#a51f25}button.secondary:hover:not(:disab
 <section id="app" hidden>
 <div class="row"><div><label for="date">Data</label><input type="date" id="date"></div><div><label for="room">Salla</label><select id="room"></select></div></div>
 <details id="room-availability"><summary>Disponueshmëria e sallës</summary><div id="slots"></div></details>
-<h2 id="booking-heading">Rezervoni një aktivitet</h2><div id="edit-banner" hidden><p id="edit-notice"></p><button id="stop-editing" type="button" class="secondary">Hiqni dorë nga redaktimi</button></div><form id="booking-form" novalidate>
+<details id="booking-section" class="app-panel"><summary id="booking-heading">Rezervoni një aktivitet</summary><div id="edit-banner" hidden><p id="edit-notice"></p><button id="stop-editing" type="button" class="secondary">Hiqni dorë nga redaktimi</button></div><form id="booking-form" novalidate>
 <label for="event-type">Lloji i aktivitetit</label><select id="event-type"></select>
 <fieldset><legend>Grupet e studentëve</legend><p><small>Mund të zgjidhni një ose më shumë grupe. Pa përzgjedhje: pa grup të studentëve.</small></p><label for="groups-search">Kërko grupin e studentëve</label><input id="groups-search" type="search" placeholder="Shkruani emrin e grupit" aria-controls="groups"><p id="groups-results" role="status"></p><div id="groups" class="choices"></div></fieldset>
 <fieldset><legend>Mësimdhënësit</legend><p><small>Mund të zgjidhni një ose më shumë mësimdhënës. Pa përzgjedhje: pa mësimdhënës.</small></p><label for="teachers-search">Kërko mësimdhënësin</label><input id="teachers-search" type="search" placeholder="Shkruani emrin e mësimdhënësit" aria-controls="teachers"><p id="teachers-results" role="status"></p><div id="teachers" class="choices"></div></fieldset>
@@ -46,13 +47,16 @@ button:hover:not(:disabled){background:#a51f25}button.secondary:hover:not(:disab
 <div class="booking-actions"><button type="submit" aria-describedby="booking-message">Bëni rezervimin</button><p id="booking-message" role="status" aria-live="polite" aria-atomic="true"></p></div>
 </form>
 <div id="booking-receipt" class="decision-card" tabindex="-1" role="status" hidden></div>
-<div class="row"><h2 id="requests-heading">Kërkesat e mia</h2><button type="button" id="refresh-requests" class="secondary">Rifreskoni kërkesat</button></div><div id="reservation-requests"></div><details><summary>Vendimet për kërkesat</summary><p><small>Të dhënat më poshtë paraqesin kërkesën në kohën e vendimit. Rezervimi mund të jetë ndryshuar ose anuluar më pas.</small></p><div id="request-decisions"></div></details>
+</details>
+<details id="requests-section" class="app-panel"><summary id="requests-heading">Kërkesat e mia</summary><div class="row"><button type="button" id="refresh-requests" class="secondary">Rifreskoni kërkesat</button></div><div id="reservation-requests"></div><details><summary>Vendimet për kërkesat</summary><p><small>Të dhënat më poshtë paraqesin kërkesën në kohën e vendimit. Rezervimi mund të jetë ndryshuar ose anuluar më pas.</small></p><div id="request-decisions"></div></details>
+</details>
 <details id="email-delivery-section"><summary>Statusi i njoftimeve me email</summary>
 <p>“Në pritje” përfshin njoftimet që presin ekzekutimin e radhës. “Dërguar” do të thotë se shërbimi i emailit e ka pranuar mesazhin; nuk garanton mbërritjen në inbox. Mund të ketë vonesa.</p>
 <button type="button" id="refresh-email-delivery" class="secondary">Rifreskoni statusin</button><p id="email-delivery-feedback" role="status"></p><div id="email-delivery-list"></div></details>
-<h2 id="reservations-heading">Rezervimet e mia</h2>
+<details id="reservations-section" class="app-panel"><summary id="reservations-heading">Rezervimet e mia</summary>
 <label for="reservation-search">Kërkoni rezervimet</label><input id="reservation-search" type="search" placeholder="Titulli, data, salla, mësimdhënësi…" aria-controls="my-reservations past-reservations" aria-describedby="reservation-search-hint"><p id="reservation-search-hint"><small>Kërkimi përfshin rezervimet e ardhshme dhe të kaluara. Mund të kërkoni edhe sipas grupit, llojit të aktivitetit ose krijuesit. Data: VVVV-MM-DD.</small></p><p id="reservation-search-results" role="status" aria-live="polite"></p><p><small>Sot dhe në ditët në vijim.</small></p><div id="my-reservations"></div>
 <details id="past-reservations-section"><summary id="past-reservations-summary">Rezervimet e kaluara</summary><div id="past-reservations"></div></details>
+</details>
 </section>
 <dialog id="reservation-dialog" aria-labelledby="reservation-heading" style="max-width:640px;width:calc(100% - 4rem);max-height:85vh;overflow:auto">
 <h2 id="reservation-heading">Konfirmoni rezervimin</h2>

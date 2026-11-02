@@ -29,6 +29,7 @@ function selectedPeriodIds() {
   return selectPeriods(periods, $('from').value, $('through').value);
 }
 function prepareReservation(period) {
+  $('booking-section').open=true;
   const minutes = time => {
     const [hours, mins] = time.split(':').map(Number);
     return hours * 60 + mins;
@@ -153,6 +154,7 @@ function stopEditing() {
   updateRequestHint();
 }
 function startEditing(id,data) {
+  $('booking-section').open=true;
   $('booking-receipt').hidden=true;
   editing={id,data,revision:data.revision||0};
   $('date').value=data.date;$('room').value=data.roomId;
@@ -483,6 +485,14 @@ async function cancelReservation(id, reason = '') {
     tx.delete(doc(db,'publicBookings',id));
   });
 }
+function openLinkedSection(){
+ const params=new URLSearchParams(location.search);
+ const target=params.get('section')==='requests'?'requests-section':params.get('section')==='booking'||['date','room','start','end'].some(key=>params.has(key))?'booking-section':null;
+ if(!target)return;
+ for(const details of document.querySelectorAll('details'))details.open=false;
+ $(target).open=true;
+ $(target).scrollIntoView({block:'start'});
+}
 function applyBookingLink() {
   const params=new URLSearchParams(location.search);
   if(!['date','room','start','end'].some(key=>params.has(key)))return;
@@ -541,6 +551,7 @@ async function loadApp() {
   $('date').max = settings.endDate;
   $('app').hidden = false;
   message(settings.bookingOpen ? 'Keni hyrë me sukses. Mund të rezervoni një sallë.' : 'Rezervimet janë pezulluar përkohësisht gjatë përditësimit të orarit.');
+  openLinkedSection();
   applyBookingLink();
   await Promise.all([readAvailability(), readMyBookings(), readRequests()]);
 }
