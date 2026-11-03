@@ -269,6 +269,29 @@ service cloud.firestore {
       ]) && request.resource.data.status in ['sending','sent','retrying','failed'];
       allow delete: if false;
     }
+    // Student addresses are private and never included in publicBookings.
+    match /studentNotifications/{id} {
+      function validStudents() {
+        let d=request.resource.data;
+        let source=d.status == 'pending' ? /databases/$(database)/documents/reservations/$(id) : /databases/$(database)/documents/reservationRequests/$(id);
+        return d.keys().hasOnly(['booking','recipients','kind','status','createdAt']) &&
+          d.kind == 'students' && d.status in ['pending','awaiting-approval'] &&
+          d.createdAt == request.time && !exists(source) && d.booking == getAfter(source).data &&
+          d.recipients is list && d.recipients.size() > 0 && d.recipients.size() <= 100 &&
+          d.recipients.toSet().size() == d.recipients.size() &&
+          d.recipients.join(';').matches("^[a-z0-9!#$%&'*+/=?^_`{|}~-]+([.][a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@student[.]uni-pr[.]edu(;[a-z0-9!#$%&'*+/=?^_`{|}~-]+([.][a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@student[.]uni-pr[.]edu)*$");
+      }
+      allow create: if approved() && validStudents();
+      allow read: if mailWorker() || (approved() && (resource.data.booking.ownerUid == request.auth.uid || elevated()));
+      allow update: if approved() && elevated() && resource.data.status == 'awaiting-approval' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
+        request.resource.data.status == (getAfter(/databases/$(database)/documents/requestDecisions/$(id)).data.outcome == 'approved' ? 'pending' : 'cancelled');
+      allow update: if adminEmailRetry();
+      allow update: if mailWorker() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'status','attempts','leaseToken','leaseUntil','sentAt','sentRecipients','lastErrorCode','lastAttemptAt'
+      ]) && request.resource.data.status in ['sending','sent','retrying','failed'];
+      allow delete: if false;
+    }
     match /mailSettings/{id} {
       allow get: if (mailWorker() || (approved() && elevated())) && id == 'publicEvents';
       allow list, write: if false;

@@ -3,7 +3,7 @@ import {slotKeys,conflictMessage} from './booking-resources.js';
 import {BookingError} from './booking-ui.js';
 export const SPECIAL_ROOMS=['r_9c3ca97a27ce','r_a8ae63f60a13'];
 export const isSpecialRoom=id=>SPECIAL_ROOMS.includes(id);
-export async function submitReservationRequest(db,data,user){
+export async function submitReservationRequest(db,data,user,studentEmails=[]){
  const ref=doc(collection(db,'reservationRequests'));
  await runTransaction(db,async tx=>{
   const control=await tx.get(doc(db,'settings','control'));
@@ -16,6 +16,7 @@ export async function submitReservationRequest(db,data,user){
   if(conflict)throw new BookingError(conflict);
   const booking={...data,ownerUid:user.uid,creatorName:user.displayName||'Mësimdhënës',createdAt:serverTimestamp()};
   tx.set(ref,booking);
+  if(studentEmails.length)tx.set(doc(db,'studentNotifications',ref.id),{booking,recipients:studentEmails,kind:'students',status:'awaiting-approval',createdAt:serverTimestamp()});
   tx.set(doc(db,'requestNotifications',ref.id),{booking,kind:'request-submitted',status:'pending',createdAt:serverTimestamp()});
  });
  return ref.id;
@@ -29,6 +30,7 @@ export async function decideReservationRequest(db,id,outcome,reason,user){
   if(!profile.data()?.active||!profile.data()?.canCancelAll)throw new BookingError('Nuk keni leje për të shqyrtuar kërkesat.');
   if(!snap.exists())throw new BookingError('Kërkesa është shqyrtuar tashmë. Rifreskoni listën.');
   const data=snap.data();
+  const students=await tx.get(doc(db,'studentNotifications',id));
   if(outcome==='approved'){
    const control=await tx.get(doc(db,'settings','control'));
    const day=await tx.get(doc(db,'calendarDays',data.date));
@@ -47,6 +49,7 @@ export async function decideReservationRequest(db,id,outcome,reason,user){
    tx.set(occupancyRef,{bookings:locks,changedReservationId:id});
   }
   tx.set(doc(db,'requestDecisions',id),{booking:data,outcome,reason,status:'pending',decidedBy:user.uid,deciderName:user.displayName||'Mësimdhënës',createdAt:serverTimestamp()});
+  if(students.exists())tx.update(doc(db,'studentNotifications',id),{status:outcome==='approved'?'pending':'cancelled'});
   tx.delete(ref);
  });
 }

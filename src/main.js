@@ -1,3 +1,4 @@
+import {parseStudentEmails} from './student-emails.js';
 import {loadEmailDeliveries,deliveryLabel,retryEmail} from './email-delivery.js';
 import {calendarActions,calendarInstant} from './calendar-export.js';
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
@@ -64,6 +65,7 @@ function confirmReservation(data) {
   ];
   if(requestOnly)fields.push(['Miratimi','Kërkesa nuk rezervon sallën. Rezervimi dhe njoftimet publike bëhen vetëm pas miratimit.']);
   if(data.onlineUrl)fields.push(['Linku i ngjarjes online',data.onlineUrl]);
+  if(data.studentEmails?.length)fields.push(['Studentë për njoftim',data.studentEmails.join('; ')]);
   if(data.description)fields.push(['Përshkrimi',data.description]);
   for(const [label,value] of fields){
     const term=document.createElement('dt'),detail=document.createElement('dd');
@@ -146,6 +148,7 @@ async function readAvailability() {
 }
 function stopEditing() {
   editing=null;
+  $('student-emails-field').hidden=false;
   $('edit-banner').hidden=true;
   $('booking-heading').textContent='Rezervoni një aktivitet';
   $('booking-form').querySelector('button').textContent='Bëni rezervimin';
@@ -157,6 +160,7 @@ function startEditing(id,data) {
   $('booking-section').open=true;
   $('booking-receipt').hidden=true;
   editing={id,data,revision:data.revision||0};
+  $('student-emails-field').hidden=true;
   $('date').value=data.date;$('room').value=data.roomId;
   $('title').value=data.title;$('event-type').value=data.eventType||EVENT_TYPES[0];
   $('from').value=data.periodIds[0];$('through').value=data.periodIds.at(-1);
@@ -394,6 +398,8 @@ async function createReservation(event) {
   $('booking-message').textContent = '';
   if (!currentUser || $('reservation-dialog').open || $('booking-form').querySelector('button').disabled) return;
   const edit=editing;
+  let studentEmails;
+  try { studentEmails=edit?[]:parseStudentEmails($('student-emails').value); } catch(e) { return bookingMessage(e.message,true); }
   const date = $('date').value;
   const roomId = $('room').value;
   const title = $('title').value.trim();
@@ -424,12 +430,12 @@ async function createReservation(event) {
   const occupancyRef = doc(db,'eventDays',date);
   try {
     $('booking-form').querySelector('button').disabled = true;
-    if(!await confirmReservation(data))return;
+    if(!await confirmReservation({...data,studentEmails}))return;
     if(currentUser?.uid!==ownerUid)throw new BookingError('Llogaria ndryshoi. Provoni përsëri.');
     if(edit) {
       await updateReservation(db,edit.id,edit.revision,data,currentUser);
     } else if(requestOnly) {
-      await submitReservationRequest(db,data,currentUser);
+      await submitReservationRequest(db,data,currentUser,studentEmails);
     } else await runTransaction(db, async tx => {
       // Read all relevant documents first; writes must follow all transaction reads.
       // Reading settings also makes a concurrent administrative import fail/retry safely.
@@ -448,10 +454,12 @@ async function createReservation(event) {
       if (conflict) throw new BookingError(conflict);
       tx.set(reservationRef, {...data, ownerUid, createdAt:serverTimestamp()});
       tx.set(publicRef, {...data, createdAt:serverTimestamp()});
+      if(studentEmails.length)tx.set(doc(db,'studentNotifications',reservationRef.id),{booking:{...data,ownerUid,createdAt:serverTimestamp()},recipients:studentEmails,kind:'students',status:'pending',createdAt:serverTimestamp()});
       const keys = slotKeys(data);
       for (const key of keys) locks[key] = reservationRef.id;
       if (keys.length) tx.set(occupancyRef, {bookings:locks, changedReservationId:reservationRef.id});
     });
+    $('student-emails').value = '';
     $('title').value = '';
     $('description').value = '';
     $('description-count').textContent = '0 / 500 fjalë';

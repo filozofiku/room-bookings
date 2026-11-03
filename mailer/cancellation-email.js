@@ -1,3 +1,4 @@
+import {parseStudentEmails} from '../src/student-emails.js';
 import {requestSubmittedEmail,REQUEST_REVIEWER_EMAIL} from './request-submitted-email.js';
 import {requestDecisionEmail} from './request-decision-email.js';
 import {modificationEmail} from './modification-email.js';
@@ -43,14 +44,29 @@ export async function deliverCancellation(ref, {db, auth, send, now, timestamp, 
     tx.update(ref,patch);
   });
   try {
-    const owner=work.kind==='request-submitted'?{email:REQUEST_REVIEWER_EMAIL}:await auth.getUser(work.booking.ownerUid);
+    const owner=work.kind==='students'?{email:'students'}:work.kind==='request-submitted'?{email:REQUEST_REVIEWER_EMAIL}:await auth.getUser(work.booking.ownerUid);
     if(!owner.email) throw Object.assign(Error('missing-recipient'),{code:'missing-recipient'});
     const [periods,room]=await Promise.all([
       db.collection('periods').get(),
       work.booking.roomId ? db.doc(`rooms/${work.booking.roomId}`).get() : null
     ]);
     let content;
-    if(work.kind==='request-submitted'){
+    if(work.kind==='students'){
+      const recipients=parseStudentEmails(work.recipients.join(';'));
+      if(!recipients.length)throw Object.assign(Error('missing-recipient'),{code:'missing-recipient'});
+      const slots=periods.docs.map(p=>({id:p.id,...p.data()})).filter(p=>work.booking.periodIds.includes(p.id)).sort((a,b)=>a.start.localeCompare(b.start));
+      if(slots.length!==work.booking.periodIds.length)throw Error('missing-periods');
+      content={subject:'Njoftim për rezervimin e sallës',text:['Përshëndetje,','','Ju njoftojmë për rezervimin e ri:',`Aktiviteti: ${work.booking.title}`,`Data: ${work.booking.date}`,`Ora: ${slots[0].start}–${slots.at(-1).end}`,...(work.booking.roomId?[`Salla: ${room?.data()?.name||work.booking.roomId}`]:[]),`Rezervuar nga: ${work.booking.creatorName}`,...(work.booking.onlineUrl?[`Linku: ${work.booking.onlineUrl}`]:[]),...(work.booking.description?['',work.booking.description]:[]),'','Fakulteti Filozofik · Universiteti i Prishtinës'].join('\n')};
+      const delivered=[...(work.sentRecipients||[])];
+      for(const recipient of recipients){
+        if(delivered.includes(recipient))continue;
+        await send({to:recipient,...content,messageId:`<student-${createHash('sha256').update(ref.id+':'+recipient).digest('hex')}@filozofiku.github.io>`});
+        delivered.push(recipient);
+        await finish({sentRecipients:[...delivered],leaseUntil:timestamp(now()+300000)});
+      }
+      await finish({status:'sent',sentAt:timestamp(now())});
+      return;
+    }else if(work.kind==='request-submitted'){
       content=requestSubmittedEmail(work.booking,periods.docs.map(p=>({id:p.id,...p.data()})),room?.data()?.name);
     }else if(work.outcome){
       content=requestDecisionEmail(work,periods.docs.map(p=>({id:p.id,...p.data()})),room?.data()?.name);
@@ -61,8 +77,8 @@ export async function deliverCancellation(ref, {db, auth, send, now, timestamp, 
     await send({to:owner.email,...content,messageId:`<${work.kind==='request-submitted'?'request-submitted':work.outcome?'request-decision':work.before?'modification':'cancellation'}-${createHash('sha256').update(ref.id).digest('hex')}@filozofiku.github.io>`});
     await finish({status:'sent',sentAt:timestamp(now())});
   } catch(error) {
-    const terminal=['auth/user-not-found','missing-recipient'].includes(error.code) || work.attempts>=5;
-    await finish({status:terminal?'failed':'retrying',lastErrorCode:String(error.code || 'delivery-error').slice(0,80),lastAttemptAt:timestamp(now())});
+    const terminal=error.code!=='worker-budget' && (['auth/user-not-found','missing-recipient'].includes(error.code) || work.attempts>=5);
+    await finish({status:terminal?'failed':'retrying',...(error.code==='worker-budget'?{attempts:Math.max(0,work.attempts-1)}:{}),lastErrorCode:String(error.code || 'delivery-error').slice(0,80),lastAttemptAt:timestamp(now())});
     if(!terminal) throw Error('cancellation-email-retry');
   }
 }
