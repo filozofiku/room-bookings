@@ -7,7 +7,8 @@ const booking={title:'Takim',creatorName:'Zamira',date:'2026-10-30',periodIds:['
 test('new request email contains Albanian details and review link',()=>{
  for(const name of ['Salla 102','Salla 127']){
   const mail=requestSubmittedEmail(booking,periods,name);
-  for(const text of ['Zamira','Takim',name,'2026-10-30','08:00–08:15','Mbledhje',booking.description,'https://filozofiku.github.io/room-bookings/','mos iu përgjigjni'])assert.ok(mail.text.includes(text));
+  assert.doesNotMatch(mail.text,/Zamira|Kërkuesi:/);
+  for(const text of ['Takim',name,'2026-10-30','08:00–08:15','Mbledhje',booking.description,'https://filozofiku.github.io/room-bookings/','mos iu përgjigjni'])assert.ok(mail.text.includes(text));
  }
 });
 test('reviewer notification retries, uses a fixed recipient, and suppresses successful duplicates',async()=>{

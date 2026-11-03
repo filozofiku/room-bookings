@@ -8,8 +8,9 @@ const periods=[{id:'p01',start:'08:00',end:'08:15'},{id:'p02',start:'09:00',end:
 const rooms=[{id:'r1',name:'Salla 014'}],catalog={groups:{g1:'Grupi 1'},teachers:{t1:'Mësimdhënësi 1'}};
 test('modification email explains old/new values in Albanian',()=>{
  const mail=modificationEmail({before,booking,modifierName:'Jon'},periods,rooms,catalog);
+ assert.doesNotMatch(mail.text,/Pa sallë|Pa grup të studentëve|Pa mësimdhënës/);
  assert.equal(mail.subject,'Njoftim për ndryshimin e rezervimit');
- for(const text of ['Titulli i vjetër','Titulli i ri','2026-10-28','2026-10-29','08:00–08:15','09:00–09:15','Salla 014','Pa sallë','Grupi 1','Mësimdhënësi 1','https://example.test','Përshkrimi','Jon','mos iu përgjigjni'])assert.ok(mail.text.includes(text),text);
+ for(const text of ['Titulli i vjetër','Titulli i ri','2026-10-28','2026-10-29','08:00–08:15','09:00–09:15','përzgjedhja e mëparshme u hoq.','Grupi 1','Mësimdhënësi 1','https://example.test','Përshkrimi','Jon','mos iu përgjigjni'])assert.ok(mail.text.includes(text),text);
 });
 test('modification queue sends to original owner and suppresses duplicate delivery',async()=>{
  let record={before,booking,modifierName:'Jon',status:'pending'};

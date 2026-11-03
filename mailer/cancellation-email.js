@@ -14,7 +14,7 @@ export function cancellationEmail(booking, reason, periods, roomName) {
       `Aktiviteti: ${booking.title}`,
       `Data: ${booking.date}`,
       `Ora: ${selected[0].start}–${selected.at(-1).end}`,
-      `Salla: ${roomName || 'Pa sallë'}`, '',
+      ...(booking.roomId?[`Salla: ${roomName || booking.roomId}`]:[]), '',
       'Arsyeja e anulimit:', reason, '',
       'Fakulteti Filozofik',
       'Universiteti i Prishtinës', '',

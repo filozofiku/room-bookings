@@ -19,7 +19,8 @@ test('notification timing uses Tirane timezone and an elapsed 48 hours across DS
 });
 test('Albanian email includes online link, description, resources and do-not-reply text',()=>{
  const email=publicEventEmail(booking,periods,[],{});
- for(const value of ['Panel','2026-10-26','13:00–13:15','Pa sallë','https://example.test/event','Përshkrimi','Organizatori','mos iu përgjigjni'])assert.ok(email.text.includes(value));
+ for(const value of ['Panel','2026-10-26','13:00–13:15','https://example.test/event','Përshkrimi','mos iu përgjigjni'])assert.ok(email.text.includes(value));
+ assert.doesNotMatch(email.text,/Salla:|Grupet e studentëve:|Mësimdhënësit:|Rezervuar nga|Organizatori/);
  assert.equal(email.subject,'Njoftim për aktivitet publik');
 });
 function fixture(){

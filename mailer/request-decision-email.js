@@ -10,7 +10,7 @@ export function requestDecisionEmail(work,periods,roomName) {
       'Përshëndetje,','',
       approved?'Ju njoftojmë se kërkesa juaj për rezervim është miratuar. Rezervimi është krijuar dhe është publikuar në orar.':'Ju njoftojmë se kërkesa juaj për rezervim është refuzuar. Kërkesa është fshirë dhe nuk është krijuar rezervim.','',
       `Aktiviteti: ${work.booking.title}`,`Data: ${work.booking.date}`,
-      `Ora: ${selected[0].start}–${selected.at(-1).end}`,`Salla: ${roomName||work.booking.roomId}`,'',
+      `Ora: ${selected[0].start}–${selected.at(-1).end}`,...(work.booking.roomId?[`Salla: ${roomName||work.booking.roomId}`]:[]),'',
       `${approved?'Miratuar':'Refuzuar'} nga: ${work.deciderName}`,'',
       'Arsyeja e vendimit:',work.reason,'',
       'Orari: https://filozofiku.github.io/#orari/reservations/te-gjitha','',
