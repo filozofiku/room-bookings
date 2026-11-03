@@ -1,3 +1,4 @@
+import {emailDate} from './email-format.js';
 import {parseStudentEmails} from '../src/student-emails.js';
 import {requestSubmittedEmail,REQUEST_REVIEWER_EMAIL} from './request-submitted-email.js';
 import {requestDecisionEmail} from './request-decision-email.js';
@@ -13,7 +14,7 @@ export function cancellationEmail(booking, reason, periods, roomName) {
       'Përshëndetje,', '',
       'Ju njoftojmë se rezervimi juaj është anuluar nga administratori.', '',
       `Aktiviteti: ${booking.title}`,
-      `Data: ${booking.date}`,
+      `Data: ${emailDate(booking.date)}`,
       `Ora: ${selected[0].start}–${selected.at(-1).end}`,
       ...(booking.roomId?[`Salla: ${roomName || booking.roomId}`]:[]), '',
       'Arsyeja e anulimit:', reason, '',
@@ -56,7 +57,7 @@ export async function deliverCancellation(ref, {db, auth, send, now, timestamp, 
       if(!recipients.length)throw Object.assign(Error('missing-recipient'),{code:'missing-recipient'});
       const slots=periods.docs.map(p=>({id:p.id,...p.data()})).filter(p=>work.booking.periodIds.includes(p.id)).sort((a,b)=>a.start.localeCompare(b.start));
       if(slots.length!==work.booking.periodIds.length)throw Error('missing-periods');
-      content={subject:'Njoftim për rezervimin e sallës',text:['Përshëndetje,','','Ju njoftojmë për rezervimin e ri:',`Aktiviteti: ${work.booking.title}`,`Data: ${work.booking.date}`,`Ora: ${slots[0].start}–${slots.at(-1).end}`,...(work.booking.roomId?[`Salla: ${room?.data()?.name||work.booking.roomId}`]:[]),`Rezervuar nga: ${work.booking.creatorName}`,...(work.booking.onlineUrl?[`Linku: ${work.booking.onlineUrl}`]:[]),...(work.booking.description?['',work.booking.description]:[]),'','Fakulteti Filozofik · Universiteti i Prishtinës'].join('\n')};
+      content={descriptionSections:[{label:'Përshkrimi:',text:work.booking.description||''}],subject:'Njoftim për rezervimin e sallës',text:['Përshëndetje,','','Ju njoftojmë për rezervimin e ri:',`Aktiviteti: ${work.booking.title}`,`Data: ${emailDate(work.booking.date)}`,`Ora: ${slots[0].start}–${slots.at(-1).end}`,...(work.booking.roomId?[`Salla: ${room?.data()?.name||work.booking.roomId}`]:[]),...(work.booking.location?[`Lokacioni: ${work.booking.location}`]:[]),`Rezervuar nga: ${work.booking.creatorName}`,...(work.booking.onlineUrl?[`Linku i ngjarjes online: ${work.booking.onlineUrl}`]:[]),...(work.booking.description?['','Përshkrimi:',work.booking.description]:[]),'','Fakulteti Filozofik · Universiteti i Prishtinës'].join('\n')};
       const delivered=[...(work.sentRecipients||[])];
       for(const recipient of recipients){
         if(delivered.includes(recipient))continue;

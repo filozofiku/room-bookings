@@ -10,7 +10,7 @@ test('modification email explains old/new values in Albanian',()=>{
  const mail=modificationEmail({before,booking,modifierName:'Jon'},periods,rooms,catalog);
  assert.doesNotMatch(mail.text,/Pa sallë|Pa grup të studentëve|Pa mësimdhënës/);
  assert.equal(mail.subject,'Njoftim për ndryshimin e rezervimit');
- for(const text of ['Titulli i vjetër','Titulli i ri','2026-10-28','2026-10-29','08:00–08:15','09:00–09:15','përzgjedhja e mëparshme u hoq.','Grupi 1','Mësimdhënësi 1','https://example.test','Përshkrimi','Jon','mos iu përgjigjni'])assert.ok(mail.text.includes(text),text);
+ for(const text of ['Titulli i vjetër','Titulli i ri','28 tetor 2026','29 tetor 2026','08:00–08:15','09:00–09:15','përzgjedhja e mëparshme u hoq.','Grupi 1','Mësimdhënësi 1','https://example.test','Përshkrimi','Jon','mos iu përgjigjni'])assert.ok(mail.text.includes(text),text);
 });
 test('modification queue sends to original owner and suppresses duplicate delivery',async()=>{
  let record={before,booking,modifierName:'Jon',status:'pending'};

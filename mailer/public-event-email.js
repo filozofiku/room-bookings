@@ -1,3 +1,4 @@
+import {emailDate} from './email-format.js';
 import {createHash} from 'node:crypto';
 import {timestamp} from './firestore-rest.js';
 const zone='Europe/Tirane';
@@ -28,12 +29,12 @@ export function publicEventEmail(booking,periods,rooms,catalog){
  const selected=selectedPeriods(booking,periods);
  const room=booking.roomId ? rooms.find(r=>r.id===booking.roomId)?.name : 'Pa sallë';
  if(!room)throw Error('missing-room');
- return {subject:'Njoftim për aktivitet publik',text:[
+ return {subject:'Njoftim për aktivitet publik',descriptionSections:[{label:'Përshkrimi:',text:booking.description||''}],text:[
   'Përshëndetje,','', 'Ju njoftojmë për aktivitetin publik të mëposhtëm:','',
-  `Aktiviteti: ${booking.title}`,`Lloji: ${booking.eventType}`,`Data: ${booking.date}`,
+  `Aktiviteti: ${booking.title}`,`Lloji: ${booking.eventType}`,`Data: ${emailDate(booking.date)}`,
   `Ora: ${selected[0].start}–${selected.at(-1).end} (ora lokale e Prishtinës/Tiranës)`,
-  ...(booking.roomId?[`Salla: ${room}`]:[]),`Mënyra e zhvillimit: ${booking.mode==='online'?'Online':'Fizik'}`,
-  ...(booking.mode==='online' && booking.onlineUrl ? [`Linku: ${booking.onlineUrl}`] : []),
+  ...(booking.roomId?[`Salla: ${room}`]:[]),...(booking.mode==='physical'&&!booking.roomId&&booking.location?[`Lokacioni: ${booking.location}`]:[]),`Mënyra e zhvillimit: ${booking.mode==='online'?'Online':'Fizik'}`,
+  ...(booking.mode==='online' && booking.onlineUrl ? [`Linku i ngjarjes online: ${booking.onlineUrl}`] : []),
   ...((booking.groupIds||[]).length?[`Grupet e studentëve: ${booking.groupIds.map(id=>catalog.groups?.[id]||id).join(', ')}`]:[]),
   ...((booking.teacherIds||[]).length?[`Mësimdhënësit: ${booking.teacherIds.map(id=>catalog.teachers?.[id]||id).join(', ')}`]:[]),
   ...(booking.description?['','Përshkrimi:',booking.description]:[]),'',

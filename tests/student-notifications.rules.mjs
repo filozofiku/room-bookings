@@ -44,6 +44,16 @@ test('student recipients: atomic creation, domain/count validation and privacy',
  approval.delete(doc(manager,'reservationRequests','approval'));
  approval.update(doc(manager,'studentNotifications','approval'),{status:'pending'});
  await assertSucceeds(approval.commit());
+
+ booking.location='Biblioteka qendrore';
+ await assertSucceeds(create('location',['ana@student.uni-pr.edu']));
+ booking.location='x'.repeat(301);
+ await assertFails(create('long-location',['ana@student.uni-pr.edu']));
+ booking.location='Biblioteka';booking.mode='online';booking.onlineUrl='https://example.org';
+ await assertFails(create('online-location',['ana@student.uni-pr.edu']));
+ booking.mode='physical';booking.onlineUrl='';booking.roomId='r_9c3ca97a27ce';
+ await assertFails(create('room-location',['ana@student.uni-pr.edu']));
+ booking.roomId='';delete booking.location;
  await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(),'studentNotifications','valid')));
  await assertSucceeds(getDoc(doc(db,'studentNotifications','valid')));
  }finally{await env.cleanup();}

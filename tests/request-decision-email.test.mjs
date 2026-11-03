@@ -9,7 +9,7 @@ for(const outcome of ['approved','rejected']){
  test(`${outcome} email includes the event, reviewer and exact reason in Albanian`,()=>{
   const content=requestDecisionEmail({booking,outcome,reason,deciderName:'Jon Konjufca'},periods,'Salla 127');
   assert.match(content.subject,outcome==='approved'?/miratuar/:/refuzuar/);
-  for(const value of [booking.title,booking.date,'13:00–13:30','Salla 127','Jon Konjufca',reason,'mos iu përgjigjni'])assert.ok(content.text.includes(value),value);
+  for(const value of [booking.title,'30 tetor 2026','13:00–13:30','Salla 127','Jon Konjufca',reason,'mos iu përgjigjni'])assert.ok(content.text.includes(value),value);
   assert.match(content.text,outcome==='approved'?/Miratuar nga: Jon Konjufca/:/Refuzuar nga: Jon Konjufca/);
  });
  test(`${outcome} delivery resolves requester email, retries safely and suppresses sent duplicates`,async()=>{

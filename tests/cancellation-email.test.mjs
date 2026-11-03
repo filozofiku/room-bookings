@@ -22,7 +22,7 @@ function fixture(send=async()=>{}) {
 test('Albanian notification identifies the cancelled event, time, room and exact reason',()=>{
  const mail=cancellationEmail(booking,reason,periods,'Salla 014');
  assert.equal(mail.subject,'Njoftim për anulimin e rezervimit');
- for(const text of ['rezervimi juaj është anuluar','Paneli','2026-10-26','13:00–13:30','Salla 014',reason])assert.ok(mail.text.includes(text));
+ for(const text of ['rezervimi juaj është anuluar','Paneli','26 tetor 2026','13:00–13:30','Salla 014',reason])assert.ok(mail.text.includes(text));
  assert.doesNotMatch(cancellationEmail({...booking,roomId:''},reason,periods,'').text,/Salla:|Pa sallë/);
 });
 test('recipient is resolved from the owner UID, successful duplicates are suppressed',async()=>{

@@ -40,6 +40,7 @@ button:hover:not(:disabled){background:#a51f25}button.secondary:hover:not(:disab
 <p id="email-notice" hidden>Marrësve në listën e njoftimeve do t’u dërgohet email 48 orë para fillimit. Nëse mbeten më pak se 48 orë, njoftimi futet menjëherë në pritje. Emaili dërgohet në ekzekutimin e parë pas afatit; mund të ketë vonesa.</p>
 <p><small>Nëse aktiviteti ësht Jo publik, aktiviteti do të shfaqet në orarin zyrtar. Nëse aktiviteti ësht Publik, aktiviteti do të shfaqet në orarin zyrtar dhe stafi do të informohet përmes emailit për aktivitetin 48 orë para fillimit të aktivitetit</small></p>
 <label for="mode">Mënyra e zhvillimit</label><select id="mode"><option value="physical">Fizik</option><option value="online">Online</option></select>
+<div id="location-field" hidden><label for="location">Lokacioni</label><input id="location" maxlength="300" placeholder="Shkruani lokacionin e aktivitetit" style="width:90%"></div>
 <div id="online-field" hidden><label for="online-url">Linku i ngjarjes online</label><input type="url" id="online-url" placeholder="https://…" maxlength="2000" style="width:90%"></div>
 <label for="title">Titulli i aktivitetit (publikohet me emrin tuaj dhe kohën e rezervimit)</label><input id="title" placeholder="Mbledhje e departamentit" maxlength="120" required style="width:90%">
 <div class="row"><div><label for="from">Ora e fillimit</label><select id="from"></select></div><div><label for="through">Ora e përfundimit</label><select id="through"></select></div></div>

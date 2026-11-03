@@ -47,7 +47,7 @@ try {
  for(const ref of queue){
   try {
    await deliverCancellation(ref,{db,auth:{getUser:async uid=>(await db.doc(`users/${uid}`).get()).data() || {}},
-    send:async mail=>{const result=await transport.sendMail({...mail,html:emailHtml(mail.text),from:'zzha.filozofik@uni-pr.edu'});if(!result.accepted?.length)throw Error('smtp-not-accepted');},
+    send:async mail=>{const result=await transport.sendMail({...mail,html:emailHtml(mail.text,mail.descriptionSections),from:'zzha.filozofik@uni-pr.edu'});if(!result.accepted?.length)throw Error('smtp-not-accepted');},
     now:Date.now,timestamp,token:randomUUID()});
    if((await ref.get()).data()?.status==='failed')errors++;
   }catch{errors++;}
@@ -60,7 +60,7 @@ try {
    if(Date.now()>deadline){deferred=true;break outer;}
    try{
     const result=await deliverPublicEvent(event.id,recipient,{db,...publicWork,token:randomUUID(),send:async mail=>{
-     const response=await transport.sendMail({...mail,html:emailHtml(mail.text),from:'zzha.filozofik@uni-pr.edu'});
+     const response=await transport.sendMail({...mail,html:emailHtml(mail.text,mail.descriptionSections),from:'zzha.filozofik@uni-pr.edu'});
      if(!response.accepted?.length)throw Error('smtp-not-accepted');
     }});
     if(result==='sent')sent++;

@@ -1,3 +1,4 @@
+import {emailDate} from './email-format.js';
 export function requestDecisionEmail(work,periods,roomName) {
   if(!['approved','rejected'].includes(work.outcome))throw Error('invalid-request-decision');
   const selected=work.booking.periodIds.map(id=>periods.find(p=>p.id===id));
@@ -9,7 +10,7 @@ export function requestDecisionEmail(work,periods,roomName) {
     text:[
       'Përshëndetje,','',
       approved?'Ju njoftojmë se kërkesa juaj për rezervim është miratuar. Rezervimi është krijuar dhe është publikuar në orar.':'Ju njoftojmë se kërkesa juaj për rezervim është refuzuar. Kërkesa është fshirë dhe nuk është krijuar rezervim.','',
-      `Aktiviteti: ${work.booking.title}`,`Data: ${work.booking.date}`,
+      `Aktiviteti: ${work.booking.title}`,`Data: ${emailDate(work.booking.date)}`,
       `Ora: ${selected[0].start}–${selected.at(-1).end}`,...(work.booking.roomId?[`Salla: ${roomName||work.booking.roomId}`]:[]),'',
       `${approved?'Miratuar':'Refuzuar'} nga: ${work.deciderName}`,'',
       'Arsyeja e vendimit:',work.reason,'',

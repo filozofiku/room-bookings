@@ -1,13 +1,14 @@
+import {emailDate} from './email-format.js';
 export const REQUEST_REVIEWER_EMAIL='bardhok.bashota@uni-pr.edu';
 export function requestSubmittedEmail(booking,periods,roomName){
  const selected=booking.periodIds.map(id=>periods.find(p=>p.id===id));
  if(!selected.length||selected.some(p=>!p))throw Error('missing-periods');
  selected.sort((a,b)=>a.start.localeCompare(b.start));
- return {subject:'Kërkesë e re për rezervimin e sallës',text:[
+ return {descriptionSections:[{label:'Përshkrimi:',text:booking.description||''}],subject:'Kërkesë e re për rezervimin e sallës',text:[
   'Përshëndetje,','',
   'Është paraqitur një kërkesë e re për rezervimin e një salle që kërkon miratim.','',
   `Aktiviteti: ${booking.title}`,`Lloji: ${booking.eventType}`,
-  ...(booking.roomId?[`Salla: ${roomName||booking.roomId}`]:[]),`Data: ${booking.date}`,`Ora: ${selected[0].start}–${selected.at(-1).end}`,
+  ...(booking.roomId?[`Salla: ${roomName||booking.roomId}`]:[]),`Data: ${emailDate(booking.date)}`,`Ora: ${selected[0].start}–${selected.at(-1).end}`,
   ...(booking.description?['','Përshkrimi:',booking.description]:[]),'',
   'Për të parë gjendjen aktuale dhe për ta miratuar ose refuzuar kërkesën, hyni në aplikacion dhe hapni rubrikën “Kërkesat për miratim”:',
   'https://filozofiku.github.io/room-bookings/?section=requests','',
