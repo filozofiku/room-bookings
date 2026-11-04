@@ -51,7 +51,7 @@ else if(path==='/auth.js')body=authModule;
 else if(path==='/firestore.js')body=firestoreModule;
 else if(path==='/src/firebase.js')body='export const auth={};export const db={};';
 else if(['/src/main.js','/src/update-reservation.js','/src/reservation-requests.js','/src/email-delivery.js'].includes(path))body=readFileSync(path.slice(1),'utf8').replaceAll("'firebase/auth'","'/auth.js'").replaceAll("'firebase/firestore'","'/firestore.js'");
-else if(['/src/booking-ui.js','/src/booking-resources.js','/src/calendar-export.js'].includes(path))body=readFileSync(path.slice(1),'utf8');
+else if(['/src/booking-ui.js','/src/booking-resources.js','/src/calendar-export.js','/src/student-emails.js'].includes(path))body=readFileSync(path.slice(1),'utf8');
 else return route.abort();
 return route.fulfill({contentType,body});
 });

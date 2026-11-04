@@ -1,5 +1,5 @@
 import {collection,doc,getDocs,getDoc,query,where,runTransaction,serverTimestamp} from 'firebase/firestore';
-export const EMAIL_QUEUES={studentNotifications:'Njoftim për studentët',cancellationNotifications:'Anulim',modificationNotifications:'Ndryshim',requestDecisions:'Vendim për kërkesën',requestNotifications:'Kërkesë për miratim'};
+export const EMAIL_QUEUES={studentChangeNotifications:'Ndryshim / anulim për studentët',studentNotifications:'Njoftim për studentët',cancellationNotifications:'Anulim',modificationNotifications:'Ndryshim',requestDecisions:'Vendim për kërkesën',requestNotifications:'Kërkesë për miratim'};
 export function deliveryLabel(status){return {pending:'Në pritje',retrying:'Në pritje — riprovim automatik',sending:'Në proces dërgimi',sent:'Dërguar',failed:'Dështuar',skipped:'Nuk u dërgua','awaiting-approval':'Në pritje të miratimit',cancelled:'Nuk u dërgua — kërkesë e refuzuar',recorded:'Pa email — ndryshim nga vetë krijuesi'}[status]||'Status i panjohur';}
 export async function retryEmail(db,path,user){
  if(![...Object.keys(EMAIL_QUEUES),'publicEventDeliveries'].includes(path.split('/')[0]))throw Error('invalid-queue');

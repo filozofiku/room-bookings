@@ -35,6 +35,29 @@ test('student recipients: atomic creation, domain/count validation and privacy',
  await assertSucceeds(request.commit());
  await assertFails(setDoc(doc(db,'studentNotifications','approval'),{status:'pending'},{merge:true}));
  const manager=env.authenticatedContext('manager',{name:'Manager'}).firestore();
+
+ // Both owners and elevated users must atomically notify the original student list.
+ for(const [actor,uid] of [[db,'owner'],[manager,'manager']]){
+  const id='change-'+uid;await assertSucceeds(create(id,['ana@student.uni-pr.edu']));
+  const originalBooking=(await getDoc(doc(actor,'reservations',id))).data();
+  const changed={...originalBooking,title:'Changed',revision:1,updatedAt:serverTimestamp()};
+  const edit=(include=true,recipients=['ana@student.uni-pr.edu'])=>{
+   const batch=writeBatch(actor),{ownerUid,...published}=changed;
+   batch.set(doc(actor,'reservations',id),changed);batch.set(doc(actor,'publicBookings',id),published);
+   batch.set(doc(actor,'modificationNotifications',id+'__1'),{reservationId:id,before:originalBooking,booking:changed,previousKeys:[],modifiedBy:uid,modifierName:uid==='owner'?'Owner':'Manager',createdAt:serverTimestamp(),status:uid==='owner'?'recorded':'pending'});
+   if(include)batch.set(doc(actor,'studentChangeNotifications',id+'__edit__1'),{reservationId:id,booking:changed,before:originalBooking,recipients,kind:'students',eventAction:'modified',status:'pending',createdAt:serverTimestamp()});return batch.commit();
+  };
+  await assertFails(edit(false));await assertFails(edit(true,['other@student.uni-pr.edu']));await assertSucceeds(edit());
+  const current=(await getDoc(doc(actor,'reservations',id))).data();
+  const cancel=(include=true)=>{
+   const batch=writeBatch(actor);batch.delete(doc(actor,'reservations',id));batch.delete(doc(actor,'publicBookings',id));
+   if(uid==='manager')batch.set(doc(actor,'cancellationNotifications',id),{booking:current,reason:'Reason',cancelledBy:uid,createdAt:serverTimestamp(),status:'pending'});
+   if(include)batch.set(doc(actor,'studentChangeNotifications',id+'__cancel'),{reservationId:id,booking:current,recipients:['ana@student.uni-pr.edu'],kind:'students',eventAction:'cancelled',reason:'Reason',status:'pending',createdAt:serverTimestamp()});return batch.commit();
+  };
+  await assertFails(cancel(false));await assertSucceeds(cancel());
+  await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(),'studentChangeNotifications',id+'__cancel')));
+  await assertSucceeds(getDoc(doc(db,'studentChangeNotifications',id+'__cancel')));
+ }
  const original=(await getDoc(doc(manager,'reservationRequests','approval'))).data();
  const approval=writeBatch(manager),confirmed={...original,createdAt:serverTimestamp()},{ownerUid,...published}=confirmed;
  approval.set(doc(manager,'reservations','approval'),confirmed);

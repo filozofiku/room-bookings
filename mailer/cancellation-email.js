@@ -32,7 +32,7 @@ export async function deliverCancellation(ref, {db, auth, send, now, timestamp, 
     const snap=await tx.get(ref);
     if(!snap.exists) return null;
     const data=snap.data();
-    if(['sent','failed'].includes(data.status)) return null;
+    if(!['pending','retrying','sending'].includes(data.status)) return null;
     if(data.status==='sending' && data.leaseUntil.toMillis()>now()) throw Error('delivery-in-progress');
     const attempts=(data.attempts||0)+1;
     tx.update(ref,{status:'sending',attempts,leaseToken:token,leaseUntil:timestamp(now()+300000)});
@@ -57,10 +57,27 @@ export async function deliverCancellation(ref, {db, auth, send, now, timestamp, 
       if(!recipients.length)throw Object.assign(Error('missing-recipient'),{code:'missing-recipient'});
       const slots=periods.docs.map(p=>({id:p.id,...p.data()})).filter(p=>work.booking.periodIds.includes(p.id)).sort((a,b)=>a.start.localeCompare(b.start));
       if(slots.length!==work.booking.periodIds.length)throw Error('missing-periods');
-      content={descriptionSections:[{label:'Përshkrimi:',text:work.booking.description||''}],subject:'Njoftim për rezervimin e sallës',text:['Përshëndetje,','','Ju njoftojmë për rezervimin e ri:',`Aktiviteti: ${work.booking.title}`,`Data: ${emailDate(work.booking.date)}`,`Ora: ${slots[0].start}–${slots.at(-1).end}`,...(work.booking.roomId?[`Salla: ${room?.data()?.name||work.booking.roomId}`]:[]),...(work.booking.location?[`Lokacioni: ${work.booking.location}`]:[]),`Rezervuar nga: ${work.booking.creatorName}`,...(work.booking.onlineUrl?[`Linku i ngjarjes online: ${work.booking.onlineUrl}`]:[]),...(work.booking.description?['','Përshkrimi:',work.booking.description]:[]),'','Fakulteti Filozofik · Universiteti i Prishtinës'].join('\n')};
+      const currentStudentEvent=async()=>{
+        const current=(await db.doc(`publicBookings/${work.reservationId||ref.id}`).get()).data();
+        return work.eventAction==='cancelled'?!current:!!current&&(current.revision||0)===(work.booking.revision||0);
+      };
+      if(!await currentStudentEvent()){await finish({status:'skipped'});return;}
+      content={descriptionSections:[{label:'Përshkrimi:',text:work.booking.description||''}],subject:'Njoftim për rezervimin e sallës',text:['Përshëndetje,','','Ju njoftojmë për rezervimin e ri:',`Aktiviteti: ${work.booking.title}`,`Data: ${emailDate(work.booking.date)}`,`Ora: ${slots[0].start}–${slots.at(-1).end}`,...(work.booking.roomId?[`Salla: ${room?.data()?.name||work.booking.roomId}`]:[]),...(work.booking.location?[`Lokacioni: ${work.booking.location}`]:[]),...(work.booking.onlineUrl?[`Linku i ngjarjes online: ${work.booking.onlineUrl}`]:[]),...(work.booking.description?['','Përshkrimi:',work.booking.description]:[]),'','Fakulteti Filozofik · Universiteti i Prishtinës'].join('\n')};
+      if(work.eventAction==='cancelled'){
+        content=cancellationEmail(work.booking,work.reason||'',periods.docs.map(p=>({id:p.id,...p.data()})),room?.data()?.name);
+        content.text=content.text.replace('Ju njoftojmë se rezervimi juaj është anuluar nga administratori.','Ju njoftojmë se aktiviteti i mëposhtëm është anuluar.');
+        if(!work.reason)content.text=content.text.replace('Arsyeja e anulimit:\n\n','');
+        content.subject='Njoftim për anulimin e aktivitetit';
+      }else if(work.eventAction==='modified'){
+        const [rooms,catalog]=await Promise.all([db.collection('rooms').get(),db.doc('resourceCatalog/current').get()]);
+        content=modificationEmail({...work,modifierName:'administratori'},periods.docs.map(p=>({id:p.id,...p.data()})),rooms.docs.map(r=>({id:r.id,...r.data()})),catalog.data()||{});
+        content.text=content.text.replace('Rezervimi juaj është ndryshuar nga administratori.','Ju njoftojmë se aktiviteti i mëposhtëm është ndryshuar.');
+        content.subject='Njoftim për ndryshimin e aktivitetit';
+      }
       const delivered=[...(work.sentRecipients||[])];
       for(const recipient of recipients){
         if(delivered.includes(recipient))continue;
+        if(!await currentStudentEvent()){await finish({status:'skipped'});return;}
         await send({to:recipient,...content,messageId:`<student-${createHash('sha256').update(ref.id+':'+recipient).digest('hex')}@filozofiku.github.io>`});
         delivered.push(recipient);
         await finish({sentRecipients:[...delivered],leaseUntil:timestamp(now()+300000)});

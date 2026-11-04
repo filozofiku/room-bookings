@@ -129,6 +129,11 @@ service cloud.firestore {
       return a.date == b.date && a.roomId == b.roomId && a.periodIds == b.periodIds &&
         a.get('groupIds',[]).toSet() == b.groupIds.toSet() && a.get('teacherIds',[]).toSet() == b.teacherIds.toSet();
     }
+    function studentChangeRecorded(id, suffix) {
+      return !exists(/databases/$(database)/documents/studentNotifications/$(id)) ||
+        (!exists(/databases/$(database)/documents/studentChangeNotifications/$(id + suffix)) &&
+         existsAfter(/databases/$(database)/documents/studentChangeNotifications/$(id + suffix)));
+    }
     function modificationRecorded(id, before, after) {
       let path = /databases/$(database)/documents/modificationNotifications/$(id + '__' + string(after.revision));
       return existsAfter(path);
@@ -197,9 +202,9 @@ service cloud.firestore {
         request.resource.data.createdAt == resource.data.createdAt && request.resource.data.updatedAt == request.time &&
         request.resource.data.revision is int && request.resource.data.revision == resource.data.get('revision',0)+1 &&
         editOccupancy(reservationId,resource.data,request.resource.data) &&
-        modificationRecorded(reservationId,resource.data,request.resource.data) && publicMatches(reservationId,request.resource.data);
+        studentChangeRecorded(reservationId,'__edit__' + string(request.resource.data.revision)) && modificationRecorded(reservationId,resource.data,request.resource.data) && publicMatches(reservationId,request.resource.data);
       allow delete: if approved() && controls().bookingOpen == true &&
-        mayCancel(resource.data) && cancellationRecorded(reservationId, resource.data) &&
+        mayCancel(resource.data) && studentChangeRecorded(reservationId,'__cancel') && cancellationRecorded(reservationId, resource.data) &&
         controls().slotStorage == 'resources-v2' &&
         (resources(resource.data).size() == 0 || occupancyWritten(reservationId, resource.data)) &&
         !existsAfter(/databases/$(database)/documents/publicBookings/$(reservationId));
@@ -272,7 +277,31 @@ service cloud.firestore {
       allow delete: if false;
     }
     // Student addresses are private and never included in publicBookings.
+    match /studentChangeNotifications/{id} {
+      function validChange() {
+        let d=request.resource.data;
+        let path=/databases/$(database)/documents/reservations/$(d.reservationId);
+        let before=get(path).data;
+        return d.keys().hasOnly(['reservationId','booking','before','recipients','kind','eventAction','reason','status','createdAt']) &&
+          controls().bookingOpen && mayCancel(before) && d.kind == 'students' &&
+          d.status == 'pending' && d.createdAt == request.time &&
+          d.recipients == get(/databases/$(database)/documents/studentNotifications/$(d.reservationId)).data.recipients &&
+          (d.eventAction == 'modified' ?
+            (d.before == before && d.booking == getAfter(path).data && d.booking.revision == before.get('revision',0)+1 && id == d.reservationId + '__edit__' + string(d.booking.revision)) :
+            (d.eventAction == 'cancelled' && d.booking == before && !existsAfter(path) && id == d.reservationId + '__cancel' && d.reason is string && d.reason.size() <= 2000));
+      }
+      allow create: if approved() && validChange();
+      allow read: if mailWorker() || (approved() && (resource.data.booking.ownerUid == request.auth.uid || elevated()));
+      allow update: if adminEmailRetry();
+      allow update: if mailWorker() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'status','attempts','leaseToken','leaseUntil','sentAt','sentRecipients','lastErrorCode','lastAttemptAt'
+      ]) && request.resource.data.status in ['sending','sent','retrying','failed','skipped'];
+      allow delete: if false;
+    }
     match /studentNotifications/{id} {
+      allow get: if approved() && elevated();
+      allow get: if approved() && !exists(/databases/$(database)/documents/studentNotifications/$(id)) &&
+        mayCancel(get(/databases/$(database)/documents/reservations/$(id)).data);
       function validStudents() {
         let d=request.resource.data;
         let source=d.status == 'pending' ? /databases/$(database)/documents/reservations/$(id) : /databases/$(database)/documents/reservationRequests/$(id);
@@ -291,7 +320,7 @@ service cloud.firestore {
       allow update: if adminEmailRetry();
       allow update: if mailWorker() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'status','attempts','leaseToken','leaseUntil','sentAt','sentRecipients','lastErrorCode','lastAttemptAt'
-      ]) && request.resource.data.status in ['sending','sent','retrying','failed'];
+      ]) && request.resource.data.status in ['sending','sent','retrying','failed','skipped'];
       allow delete: if false;
     }
     match /mailSettings/{id} {

@@ -487,6 +487,7 @@ async function cancelReservation(id, reason = '') {
     const existing = await tx.get(reservationRef);
     if (!existing.exists()) throw new BookingError('Rezervimi nuk ekziston më.');
     const booking = existing.data();
+    const students=await tx.get(doc(db,'studentNotifications',id));
     if (!canCancelAll && booking.ownerUid !== currentUser.uid) throw new BookingError('Ky rezervim nuk ju përket juve.');
     const otherOwner = booking.ownerUid !== currentUser.uid;
     if (otherOwner && (!reason.trim() || reason.length > 2000)) throw new BookingError('Shkruani arsyen e anulimit (deri në 2000 karaktere).');
@@ -497,6 +498,7 @@ async function cancelReservation(id, reason = '') {
     slotKeys(booking).forEach(p => delete locks[p]);
     if (slotKeys(booking).length) tx.set(occupancyRef, {bookings:locks, changedReservationId:id});
     if (otherOwner) tx.set(doc(db,'cancellationNotifications',id), {booking,reason:reason.trim(),cancelledBy:currentUser.uid,createdAt:serverTimestamp(),status:'pending'});
+    if(students.exists())tx.set(doc(db,'studentChangeNotifications',`${id}__cancel`),{reservationId:id,booking,recipients:students.data().recipients,kind:'students',eventAction:'cancelled',reason:reason.trim(),status:'pending',createdAt:serverTimestamp()});
     tx.delete(reservationRef);
     tx.delete(doc(db,'publicBookings',id));
   });

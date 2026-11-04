@@ -22,7 +22,8 @@ const modifications=await db.pending('modificationNotifications');
 const decisions=await db.pending('requestDecisions');
 const requests=await db.pending('requestNotifications');
 const students=await db.pending('studentNotifications');
-const queue=[...students,...cancellations,...modifications,...decisions,...requests];
+const studentChanges=await db.pending('studentChangeNotifications');
+const queue=[...studentChanges,...students,...cancellations,...modifications,...decisions,...requests];
 console.log(`Pending reservation notifications: ${queue.length} (${modifications.length} modifications, ${decisions.length} request decisions, ${requests.length} new requests)`);
 let publicWork=null;
 if((process.env.PUBLIC_EVENT_EMAIL_ENABLED==='true' || mode==='check-public')){
