@@ -1,0 +1,97 @@
+/* Shared visual language for the faculty timetable and room-booking portal. */
+:root{--accent:#99080d;--accent-hover:#78060a;--ink:#292c32;--ink-soft:#50596e;--muted:#73767e;--line:#e8eaf0;--page:#f0f1f5;--white:#fff;--tint:#faeaea;--shadow:0 2px 7px #202b4010;color-scheme:light;background:var(--page);color:var(--ink);font-family:Arial,"Segoe UI",sans-serif}
+*{box-sizing:border-box}
+body{font-family:Arial,"Segoe UI",sans-serif;line-height:1.55;background:var(--page);color:var(--ink);margin:0 0 0 236px;max-width:none;padding:0;min-width:0}
+a{color:var(--accent)}
+.university-rail{position:fixed;z-index:10;inset:0 auto 0 0;width:236px;background:white;border-right:1px solid var(--line);display:flex;flex-direction:column;color:var(--ink-soft)}
+.rail-brand{display:flex;align-items:center;gap:12px;padding:28px 20px;min-height:119px;border-bottom:1px solid var(--line);font-size:15px;font-weight:700;line-height:1.4;color:var(--ink)}
+.rail-brand small{display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:4px}
+.rail-monogram{display:grid;place-items:center;background:var(--accent);color:white;width:44px;height:44px;flex-shrink:0;border-radius:50%;font-size:18px;letter-spacing:.02em;box-shadow:0 3px 8px #99080d24}
+.rail-caption{font-size:10px;font-weight:700;letter-spacing:.12em;padding:36px 23px 14px;color:var(--muted)}
+.rail-links{display:grid;gap:7px;padding:0 10px}
+.rail-links a{display:flex;align-items:center;gap:13px;min-height:54px;padding:12px 13px;border-radius:9px;font-size:14px;font-weight:600;color:var(--ink-soft);text-decoration:none;border:1px solid transparent}
+.rail-links svg{width:22px;height:22px;flex-shrink:0}
+.rail-links a[aria-current="page"]{background:var(--tint);color:var(--accent)}
+.rail-links a:hover{background:#f5f5f8;color:var(--accent)}
+.rail-footer{margin-top:auto;padding:24px;font-size:11px;line-height:1.9;color:var(--muted);border-top:1px solid var(--line)}
+.rail-footer strong{font-weight:500;color:var(--ink-soft)}
+/* White institutional header and restrained content hierarchy. */
+.booking-portal>header,.hero{background:white;color:var(--ink);border:0;border-bottom:1px solid var(--line);padding:25px 32px;box-shadow:none}
+.university-logo{width:68px;padding:0;border-radius:0;background:white}
+.university-name,.brand-name{color:var(--accent);letter-spacing:.04em;font-size:12px;font-weight:700}
+.faculty-name,.brand-sub{color:var(--muted);font-size:12px}
+h1,.hero h1{font-size:28px;line-height:1.25;letter-spacing:-.025em;font-weight:700;color:var(--ink)}
+.booking-portal header h1{font-size:23px;margin-top:7px}
+.hero>.wrap{padding:0;max-width:1440px}
+.brand{margin:0 0 23px;gap:14px}
+.eyebrow{color:var(--accent);font-size:10px;letter-spacing:.1em;margin:0 0 8px}
+.hero-p{color:var(--muted);max-width:760px;font-size:14px}
+.hero-bottom{margin-top:18px;gap:8px 12px}
+.count{background:#f6f6f9;border:1px solid var(--line);color:var(--ink-soft);border-radius:7px;font-size:11px;padding:5px 10px}
+.micro{color:var(--muted);font-size:11px}
+.wrap{max-width:1500px;padding-left:32px;padding-right:32px}
+.page{padding-top:28px}
+button,input,select,textarea{font-family:inherit}
+input,select,textarea{border:1px solid #dde0e8;border-radius:9px;background:#fafafd;color:var(--ink);padding:11px 12px;accent-color:var(--accent)}
+input:focus,select:focus,textarea:focus{border-color:#ba7376;background:white}
+label{color:var(--ink-soft);font-size:13px;font-weight:600}
+button,a{touch-action:manipulation}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:3px solid #99080d;outline-offset:3px}
+.card{border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow)}
+.section-heading,.result-title{font-weight:600;letter-spacing:-.015em;color:var(--ink-soft)}
+.subheading,.result-meta,.availability-meta,.hint,.footnote{color:var(--muted)}
+.navigation{gap:16px;margin-bottom:25px}
+.nav-btn{flex:1;min-height:70px;padding:18px 20px;text-align:left;border:1px solid var(--line);background:white;border-radius:13px;color:var(--ink);font-size:15px;font-weight:600;box-shadow:var(--shadow)}
+.nav-btn:before{content:"";display:inline-block;width:9px;height:20px;border-radius:4px;background:#f4e9ea;vertical-align:middle;margin-right:13px;border-left:3px solid var(--accent)}
+.nav-btn.active{background:white;color:var(--accent);border-color:#dcb1b3;box-shadow:inset 0 -3px var(--accent),var(--shadow)}
+.nav-btn.active:before{background:var(--accent)}
+.filters{padding:25px;margin-bottom:25px}
+.tool-btn{border-color:var(--line);font-weight:500;color:var(--ink-soft);border-radius:8px;min-height:38px}
+.weekday-header{background:white}
+.weekday-header>div{color:var(--muted);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:17px 8px}
+.day-column,.day-column:nth-child(even){background-color:#f5f5f8}
+.time-axis{background:#fafafd}
+.event{border-radius:7px;box-shadow:0 1px 2px #202b400d}
+.event-sub{color:#5d6573}
+.today-section{padding:22px}
+.today-section h3{font-size:16px;font-weight:600;padding-bottom:16px;border-bottom:1px solid var(--line);color:var(--ink-soft)}
+.today-room,.today-event{border-color:var(--line);border-radius:10px}
+.today-room{background:#fafafd}
+.today-book{background:var(--accent);font-size:13px;border-radius:8px;padding:10px 14px}
+.today-book:hover{background:var(--accent-hover)}
+#todayHeading{font-size:25px;margin:0;color:var(--ink-soft)}
+#todayDate{color:var(--muted);margin-top:5px}
+.room-choice{border-color:var(--line);box-shadow:var(--shadow);border-radius:12px}
+/* Booking cards use the same spacing, controls and navigation language. */
+.booking-portal>section,.booking-portal>#message{max-width:1140px;margin:24px 32px}
+.booking-portal>section{padding:24px;border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow)}
+.booking-portal #message:empty{display:none}
+.booking-portal button{background:var(--accent);border:1px solid var(--accent);border-radius:8px;padding:10px 16px;min-height:42px;font-size:14px;font-weight:600}
+.booking-portal button:hover:not(:disabled){background:var(--accent-hover)}
+.booking-portal button.secondary{background:white;color:var(--ink-soft);border-color:#dfe1e9}
+.booking-portal button.secondary:hover:not(:disabled){background:#f3f3f7;color:var(--ink)}
+.booking-portal button.danger{background:#fff;color:var(--accent);border-color:#dcb1b3}
+#identity{font-size:12px;color:var(--ink-soft);display:inline-block;margin-right:8px}
+#app>.row{background:#f7f7fa;border:1px solid var(--line);padding:17px 20px;border-radius:11px;justify-content:flex-start;gap:24px}
+#app>.row>div{flex:1;min-width:180px}
+#app>.row select,#app>.row input{width:100%}
+#app>.row label{margin-top:0}
+#booking-help>summary{font-size:14px;font-weight:600;color:var(--ink-soft)}
+#booking-help{font-size:14px;color:var(--ink-soft)}
+.app-panel{border:1px solid var(--line);padding:20px;border-radius:12px;margin:20px 0;scroll-margin-top:20px;background:#fff}
+.app-panel>summary,#room-availability>summary{font-size:17px;font-weight:600;color:var(--ink-soft)}
+.app-panel[open]>summary{border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:20px}
+fieldset{border-color:var(--line);border-radius:10px;padding:16px;background:#fafafd}
+legend{font-size:13px;font-weight:600;color:var(--ink-soft);padding:0 7px}
+.choices label{font-size:14px;min-height:30px;color:var(--ink)}
+.choices input{width:17px;height:17px}
+.booking-portal .slot{border-color:var(--line);padding:14px 4px;font-size:14px;overflow-wrap:anywhere}
+.booking-portal small{color:var(--muted)}
+.decision-card,.request-card{background:#fafafd;border-color:var(--line);border-radius:11px}
+.booking-portal dialog,.detail-modal{border:1px solid var(--line);border-top:4px solid var(--accent);border-radius:15px;box-shadow:0 20px 80px #202b4026}
+.booking-portal dialog::backdrop,.detail-modal::backdrop{background:#28304366}
+@media(min-width:1700px){.booking-portal>section,.booking-portal>#message{margin-left:auto;margin-right:auto}}
+@media(max-width:1100px){body{margin-left:204px}.university-rail{width:204px}.rail-brand{padding:25px 14px;font-size:13px;gap:9px}.rail-links a{font-size:13px;gap:10px}.wrap{padding-left:24px;padding-right:24px}.booking-portal>header,.hero{padding-left:24px;padding-right:24px}.booking-portal>section,.booking-portal>#message{margin-left:24px;margin-right:24px}.nav-btn{padding:15px 12px;font-size:13px}.navigation{gap:10px}}
+@media(max-width:800px){body{margin:0}.university-rail{position:static;width:auto;display:block;border:0;border-bottom:1px solid var(--line)}.rail-brand,.rail-caption,.rail-footer{display:none}.rail-links{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:10px 16px}.rail-links a{min-width:0;min-height:42px;font-size:12px;padding:9px 12px;gap:8px}.rail-links svg{width:18px;height:18px}.booking-portal>header,.hero{padding:22px 20px}.wrap{padding-left:20px;padding-right:20px}.university-logo{width:56px}.brand{margin-bottom:20px}.hero h1{font-size:28px}.booking-portal header h1{font-size:21px}.booking-portal>section,.booking-portal>#message{margin:18px 16px}.booking-portal>section{padding:18px}.booking-portal>header{gap:20px}.navigation{display:grid;grid-template-columns:1fr 1fr;gap:9px}.navigation .refresh-btn{margin-left:0}.nav-btn{min-height:58px;font-size:12px;padding:13px 10px}.nav-btn:before{margin-right:8px;width:6px;height:17px}.app-panel{padding:16px}.filters{padding:20px}.today-grid{gap:16px}}
+@media(max-width:480px){.wrap{padding-left:16px;padding-right:16px}.booking-portal>header,.hero{padding:20px 16px}.university-name,.brand-name{font-size:10px}.faculty-name,.brand-sub{font-size:11px}.hero-p{font-size:13px}.booking-portal header h1{font-size:18px}.navigation{gap:7px}.nav-btn{font-size:11px;padding:12px 8px;text-align:center}.nav-btn:before{display:none}.booking-portal>section{padding:14px}.app-panel{padding:14px}#app>.row{padding:14px;gap:12px}#app>.row>div{min-width:100%}.booking-portal input,.booking-portal select,.booking-portal textarea{font-size:16px}.today-section{padding:17px}.rail-links{padding-left:12px;padding-right:12px}.hero-bottom{gap:7px}.micro{width:100%}.brand{gap:11px}}
+@media print{body{margin:0!important;background:white}.university-rail{display:none!important}.hero,.booking-portal>header{box-shadow:none;border:0}.card{box-shadow:none}.navigation{display:none!important}}

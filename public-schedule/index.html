@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#242222">
+  <meta name="theme-color" content="#99080d">
   <meta name="description" content="Orari mësimor i Fakultetit Filozofik, Universiteti i Prishtinës. Kërko sipas grupit të studentëve, mësimdhënësit ose sallës dhe gjej sallat e lira.">
   <title>Orari mësimor | Universiteti i Prishtinës</title>
   <style>
@@ -133,8 +133,8 @@
     @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
   .reservation-event{border-left-width:4px}
 </style>
-</head>
-<body>
+<link rel="stylesheet" href="./university-shell.css"></head>
+<body class="schedule-portal">
 <header class="hero">
   <div class="wrap">
     <div class="brand">
@@ -151,7 +151,7 @@
       <span class="micro" id="updateDate"></span>
     </div>
   </div>
-</header>
+</header><aside class="university-rail" aria-label="Portali i fakultetit"><div class="rail-brand"><span class="rail-monogram">FF</span><div>Fakulteti Filozofik<small>Universiteti i Prishtinës</small></div></div><div class="rail-caption">PORTALI AKADEMIK</div><nav class="rail-links" aria-label="Faqet e fakultetit"><a href="#orari/subgroups/" data-portal-page="schedules" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18m-13 4h2m4 0h2"/></svg><span>Orari mësimor</span></a><a href="#sot" data-portal-page="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Sot</span></a><a href="#sallat-e-lira" data-portal-page="free"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21h16M6 21V3h12v18M10 12h1"/></svg><span>Sallat e lira</span></a><a href="https://filozofiku.github.io/room-bookings/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18m6 5 2 2 4-4"/></svg><span>Rezervimi i sallave</span></a></nav><div class="rail-footer">Universiteti i Prishtinës<br><strong>Fakulteti Filozofik</strong></div></aside>
 <div class="wrap"><div id="loadStatus" class="load-status" role="status" aria-live="polite">Duke ngarkuar oraret zyrtare…</div></div>
 <main class="wrap page" id="mainContent" hidden>
   <nav class="navigation" aria-label="Funksionet kryesore">
@@ -432,6 +432,10 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
   }
   function switchPage(page, update=true){
     state.page = page;
+    document.querySelectorAll('[data-portal-page]').forEach(link=>{
+      if(link.dataset.portalPage===page)link.setAttribute('aria-current','page');
+      else link.removeAttribute('aria-current');
+    });
     $("todayPanel").hidden = page !== "today";
     $("navToday").classList.toggle("active",page==="today");
     $("navToday").setAttribute("aria-current",page==="today"?"page":"false");
@@ -690,6 +694,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
   $("entity").addEventListener("change",e=>{state.item=ordered[state.type].find(x=>x.n===e.target.value)||null;display();});
   $("viewWeek").addEventListener("click",()=>{state.view="week";renderView();});
   $("viewList").addEventListener("click",()=>{state.view="list";renderView();});
+  document.querySelectorAll('[data-portal-page]').forEach(link=>link.addEventListener('click',event=>{event.preventDefault();switchPage(link.dataset.portalPage);}));
   $("navSchedules").addEventListener("click",()=>switchPage("schedules"));
   $("navToday").addEventListener("click",()=>switchPage("today"));
   $("navFree").addEventListener("click",()=>switchPage("free"));
