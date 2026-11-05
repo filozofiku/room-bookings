@@ -95,3 +95,14 @@ The recipient is fixed in the worker, not supplied by the requesting browser.
 The notification survives review/deletion of the request and uses the existing
 retry and duplicate-suppression mechanism. Delivery can be delayed until the next
 worker run. Requests submitted before this change are not backfilled.
+
+## Mobile Today view
+
+`#sot` shows today's scheduled classes and confirmed reservations, ongoing events,
+and currently free rooms. Dates and clocks use Europe/Tirane; the view updates
+its clock every 30 seconds and reloads today's feed at midnight. Room links select
+the next full period and up to 90 available minutes. Availability requires a
+confirmed live feed and an open calendar date. Existing booking permissions and
+special-room approvals still apply. Test with `node tests/today.browser.mjs`
+(`TEST_MODULES_DIR` may point to the Playwright installation; the public repo's
+HTML exports are expected in `/tmp/fet-schedule-publish`).

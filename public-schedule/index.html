@@ -128,6 +128,7 @@
     .close-dialog:hover{background:#eef2f5}
     @media (max-width:830px){.fields{grid-template-columns:1fr 1fr}.fields>:last-child{grid-column:1/-1}.free-filters{grid-template-columns:repeat(3,1fr)}.filters{padding:19px}}
     @media (max-width:600px){.hero{padding:22px 0 30px}.brand{margin-bottom:26px}.page{padding-top:16px}.navigation{display:grid;grid-template-columns:1fr 1fr}.nav-btn{padding:10px 7px}.refresh-btn{grid-column:1/-1}.fields,.free-filters{grid-template-columns:1fr;gap:12px}.fields>:last-child{grid-column:auto}.filters{padding:17px}.result-title{font-size:18px}.tools{width:100%}.agenda{padding:4px 13px 15px}.agenda-row{grid-template-columns:86px minmax(0,1fr);gap:7px}.agenda-time{font-size:11px}.room-list{grid-template-columns:repeat(2,minmax(0,1fr))}.room-choice{padding:12px;font-size:13px}.count{font-size:11px}.micro{width:100%}}
+    .today-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:18px;margin:20px 0}.today-section{padding:18px;min-width:0}.today-items{display:grid;gap:12px}.today-event{display:block;text-align:left;width:100%;padding:14px;border:1px solid #ddd;border-left:5px solid var(--event-border,var(--accent));border-radius:10px;background:white;color:var(--ink);font:inherit;overflow-wrap:anywhere;min-height:48px}.today-event strong,.today-event small{display:block;margin-top:5px}.today-book{display:inline-block;background:var(--accent);color:white;padding:12px 16px;border-radius:10px;text-decoration:none;font-weight:700}.today-room{padding:14px;border:1px solid #ddd;border-radius:10px}.today-room p{margin:8px 0}.today-section h3{margin-top:0}
     @media print{body{background:#fff}.hero{background:white!important;color:#15293e;padding:0 0 10px}.hero-p,.hero-bottom,.brand-mark,.navigation,.filters,.tools,.footnote,.hint,.load-status{display:none!important}.brand{margin:0 0 10px}.brand-name,.brand-sub,.eyebrow{color:#15293e}.page{padding:0}.calendar-box{border:0;box-shadow:none}.calendar-scroll{display:none!important}.agenda{display:block!important}.agenda-row{break-inside:avoid}.agenda-day{break-inside:avoid}.result-title{font-size:19px}}
     @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
   .reservation-event{border-left-width:4px}
@@ -155,6 +156,7 @@
 <main class="wrap page" id="mainContent" hidden>
   <nav class="navigation" aria-label="Funksionet kryesore">
     <button type="button" class="nav-btn active" id="navSchedules" aria-current="page">Orari mësimor</button>
+    <button type="button" class="nav-btn" id="navToday">Sot</button>
     <button type="button" class="nav-btn" id="navFree">Sallat e lira</button>
     <button type="button" class="nav-btn refresh-btn" id="refreshFiles" title="Rifresko të dhënat e fundit">↻ Rifresko të dhënat</button>
   </nav>
@@ -209,6 +211,16 @@
     </div>
   </section>
 
+  <section id="todayPanel" hidden aria-labelledby="todayHeading">
+    <h2 id="todayHeading">Sot</h2><p id="todayDate"></p>
+    <a class="today-book" id="todayBook" href="https://filozofiku.github.io/room-bookings/">Bëni rezervimin ↗</a>
+    <p id="todayStatus" role="status"></p>
+    <div class="today-grid">
+      <section class="card today-section"><h3>Po zhvillohen tani</h3><div id="todayNow" class="today-items"></div></section>
+      <section class="card today-section"><h3>Sallat e lira tani</h3><p>Ora lokale e Prishtinës. Lidhjet përzgjedhin periudhën e ardhshme të plotë, deri në 90 minuta kur është e mundur. Salla 102 dhe Salla 127 kërkojnë miratim për përdoruesit e rregullt.</p><div id="todayRooms" class="today-items"></div></section>
+      <section class="card today-section"><h3>Të gjitha aktivitetet e sotme</h3><div id="todayEvents" class="today-items"></div></section>
+    </div>
+  </section>
   <section id="freePanel" hidden aria-labelledby="freeHeading">
     <div class="card filters">
       <h2 class="section-heading" id="freeHeading">Gjej sallat e lira</h2>
@@ -258,6 +270,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
       : result.status === 'loading' ? 'Duke ngarkuar rezervimet…' : result.message;
     display();
     renderFree();
+    renderToday();
   }
   function datesInView() { return weekDates($('bookingDate').value || localDate()); }
   function dateForDay(d) {
@@ -413,12 +426,19 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
   }
 
   function setHash(){
-    const hash = state.page === "free" ? "#sallat-e-lira" :
+    const hash = state.page === "today" ? "#sot" : state.page === "free" ? "#sallat-e-lira" :
       "#orari/" + state.type + "/" + encodeURIComponent(state.item?.n ?? "");
     if(location.hash !== hash) history.replaceState(null,"",hash);
   }
   function switchPage(page, update=true){
     state.page = page;
+    $("todayPanel").hidden = page !== "today";
+    $("navToday").classList.toggle("active",page==="today");
+    $("navToday").setAttribute("aria-current",page==="today"?"page":"false");
+    if(page==="today") {
+      if($("bookingDate").value!==localDate()) {$("bookingDate").value=localDate();$("bookingDate").dispatchEvent(new Event("change"));}
+      renderToday();
+    }
     $("dateNavigation").hidden = page !== "free";
     $("weekNavigation").hidden = page !== "schedules";
     $("schedulesPanel").hidden = page !== "schedules";
@@ -561,6 +581,56 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     }));
     $("detailDialog").showModal();
   }
+  function renderToday(){
+    if(!data || state.page!=="today")return;
+    const now=new Date(),date=localDate(now);
+    const clock=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Tirane',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(now);
+    const minute=parseMinutes(clock),d=dayIndex(data.days,new Date(date+'T12:00:00Z').getUTCDay());
+    $('todayDate').textContent=new Intl.DateTimeFormat('sq-AL',{timeZone:'Europe/Tirane',dateStyle:'full'}).format(now)+' · '+clock;
+    $('todayBook').href='https://filozofiku.github.io/room-bookings/?'+new URLSearchParams({date,section:'booking'});
+    const ready=publicState.status==='ready'&&publicState.date===date;
+    const day=ready?publicState.day:null;
+    $('todayStatus').textContent=ready&&day?'Përditësohet automatikisht.': 'Të dhënat e sotme nuk janë konfirmuar. Disponueshmëria nuk mund të verifikohet.';
+    const unique=new Map();
+    if(day?.fetActive)for(const entity of data.rooms)for(const e of entity.e)if(e.d===d)unique.set(JSON.stringify(e),e);
+    // Include scheduled activities without a room, without repeating each student-group view.
+    if(day?.fetActive)for(const entity of data.subgroups)for(const e of entity.e)if(e.d===d&&!e.r)unique.set(JSON.stringify(e),e);
+    const events=[...unique.values(),...(ready?reservationEvents(publicState.rows,'',[date],data.days,data.times,'reservations'):[])].sort((a,b)=>a.s-b.s||a.t.localeCompare(b.t,'sq'));
+    const active=e=>parseMinutes(data.times[e.s])<=minute&&parseMinutes(data.times[e.e])>minute;
+    const render=(id,list)=>{
+      const box=$(id);box.replaceChildren();
+      if(!list.length){box.textContent=ready&&day?'Nuk ka aktivitete.':'Duke pritur të dhënat e sotme…';return;}
+      for(const e of list){const button=document.createElement('button');button.type='button';button.className='today-event '+colorClass(e);
+        const label=active(e)?'Në zhvillim':parseMinutes(data.times[e.e])<=minute?'Përfunduar':'Në vijim';
+        button.innerHTML=`<span>${esc(hours(e))} · ${label}</span><strong>${esc(e.t)}</strong><small>${esc([e.r,e.g,e.p].filter(Boolean).join(' · '))}</small>`;
+        button.addEventListener('click',()=>showEvent(e));box.append(button);}
+    };
+    render('todayNow',events.filter(active));render('todayEvents',events);
+    const box=$('todayRooms');box.replaceChildren();
+    if(!ready||!day||(day.fetActive&&d<0)){box.textContent='Disponueshmëria nuk mund të verifikohet.';return;}
+    if(!day.bookingAllowed){box.textContent='Data është e mbyllur për rezervime.';return;}
+    const times=data.times.map(parseMinutes),s=times.findIndex(t=>t>=minute);
+    if(minute<times[0]||minute>=times.at(-1)||s<0||s>=times.length-1){box.textContent='Jashtë orarit të rezervimeve.';return;}
+    for(const room of ordered.rooms){
+      if(!publicState.rooms.some(r=>r.name===room.n))continue;
+      const busy=(start,end)=>(day.fetActive&&room.e.some(e=>e.d===d&&times[e.s]<end&&times[e.e]>start))||publicState.rows.some(b=>b.date===date&&overlaps(b,room.n,minuteLabel(start),minuteLabel(end)));
+      if(busy(minute,Math.max(minute+1,times[s])))continue;
+      let end=s;
+      while(end<times.length-1&&times[end+1]-times[s]<=90&&!busy(times[end],times[end+1]))end++;
+      const card=document.createElement('div');card.className='today-room';
+      const features=roomFeatures[room.n];
+      card.innerHTML=`<strong>${esc(room.l)}</strong>${features?`<p>${features[0]} ulëse${features[1]?' · Smartboard':''}${features[2]?' · Tabelë e bardhë':''}</p>`:''}`;
+      if(end>s){const link=document.createElement('a');link.className='today-book';link.textContent=`Rezervoni ${data.times[s]}–${data.times[end]} ↗`;link.href='https://filozofiku.github.io/room-bookings/?'+new URLSearchParams({date,room:room.n,start:data.times[s],end:data.times[end]});card.append(link);}
+      else {const note=document.createElement('p');note.textContent='E lirë tani; nuk ka periudhë të plotë për rezervim.';card.append(note);}
+      box.append(card);
+    }
+    if(!box.children.length)box.textContent='Nuk ka salla të lira tani.';
+  }
+  setInterval(()=>{
+    if(state.page!=='today'||!data)return;
+    if($('bookingDate').value!==localDate()){$('bookingDate').value=localDate();$('bookingDate').dispatchEvent(new Event('change'));}
+    else renderToday();
+  },30000);
   function renderFree(){
     const day = publicState.day;
     const d = day ? dayIndex(data.days, day.weekday) : -1;
@@ -621,6 +691,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
   $("viewWeek").addEventListener("click",()=>{state.view="week";renderView();});
   $("viewList").addEventListener("click",()=>{state.view="list";renderView();});
   $("navSchedules").addEventListener("click",()=>switchPage("schedules"));
+  $("navToday").addEventListener("click",()=>switchPage("today"));
   $("navFree").addEventListener("click",()=>switchPage("free"));
   $("printSchedule").addEventListener("click",()=>window.print());
   $("closeDialog").addEventListener("click",()=>$("detailDialog").close());
@@ -633,6 +704,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
   });
   function routeFromHash(){
     let hash; try{hash=decodeURIComponent(location.hash.slice(1));}catch{hash="";}
+    if(hash==="sot"){switchPage("today",false);return;}
     if(hash==="sallat-e-lira"){switchPage("free",false);return;}
     const m=hash.match(/^orari\/(rooms|teachers|subgroups|reservations|other)\/(.*)$/);
     if(m){state.type=m[1]==="other"?"reservations":m[1];state.query="";$("category").value=state.type;$("lookup").value="";
