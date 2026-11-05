@@ -218,8 +218,9 @@
     <div class="today-grid">
       <section class="card today-section"><h3>Po zhvillohen tani</h3><div id="todayNow" class="today-items"></div></section>
       <section class="card today-section"><h3>Sallat e lira tani</h3><p>Ora lokale e Prishtinës. Lidhjet përzgjedhin periudhën e ardhshme të plotë, deri në 90 minuta kur është e mundur. Salla 102 dhe Salla 127 kërkojnë miratim për përdoruesit e rregullt.</p><div id="todayRooms" class="today-items"></div></section>
-      <section class="card today-section"><h3>Të gjitha aktivitetet e sotme</h3><div id="todayEvents" class="today-items"></div></section>
     </div>
+    <section class="card today-section" style="margin-bottom:18px"><h3>Kanë përfunduar</h3><div id="todayFinished" class="today-items"></div></section>
+    <section class="card today-section"><h3>Do të mbahet</h3><div id="todayUpcoming" class="today-items"></div></section>
   </section>
   <section id="freePanel" hidden aria-labelledby="freeHeading">
     <div class="card filters">
@@ -609,7 +610,9 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
         button.innerHTML=`<span>${esc(hours(e))} · ${label}</span><strong>${esc(e.t)}</strong><small>${esc([e.r,e.g,e.p].filter(Boolean).join(' · '))}</small>`;
         button.addEventListener('click',()=>showEvent(e));box.append(button);}
     };
-    render('todayNow',events.filter(active));render('todayEvents',events);
+    render('todayNow',events.filter(active));
+    render('todayFinished',events.filter(e=>parseMinutes(data.times[e.e])<=minute));
+    render('todayUpcoming',events.filter(e=>parseMinutes(data.times[e.s])>minute));
     const box=$('todayRooms');box.replaceChildren();
     if(!ready||!day||(day.fetActive&&d<0)){box.textContent='Disponueshmëria nuk mund të verifikohet.';return;}
     if(!day.bookingAllowed){box.textContent='Data është e mbyllur për rezervime.';return;}
