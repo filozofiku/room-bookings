@@ -115,7 +115,8 @@ its selection locally. `i18n.js` contains interface translations;
 programmes. Add translations there when new official names are introduced.
 Translated labels never replace resource names used for matching, URLs, or
 bookings. Personal names and organizer-written event titles/descriptions remain
-as entered. The booking application and all outgoing email templates remain in
+as entered. The booking application shares the language preference and uses
+`src/booking-i18n.js` for its interface. All outgoing email templates remain in
 Albanian. Calendar controls on the public site follow the selected language.
 
 Check switching, saved preferences, search, modal details, dates and mobile layout

@@ -9,7 +9,7 @@ export async function retryEmail(db,path,user){
 export async function loadEmailDeliveries(db,user,elevated){
  const notices=(await Promise.all(Object.keys(EMAIL_QUEUES).map(async name=>{
  const ref=collection(db,name),snapshot=await getDocs(elevated?ref:query(ref,where('booking.ownerUid','==',user.uid)));
- return snapshot.docs.map(d=>({path:`${name}/${d.id}`,kind:EMAIL_QUEUES[name],...d.data()}));}))).flat();
+ return snapshot.docs.map(d=>({...d.data(),path:`${name}/${d.id}`,kind:EMAIL_QUEUES[name]}));}))).flat();
  if(!elevated)return {notices,publicEvents:[]};
  const [deliveries,events,settings]=await Promise.all([getDocs(collection(db,'publicEventDeliveries')),getDocs(query(collection(db,'publicBookings'),where('isPublic','==',true))),getDoc(doc(db,'mailSettings','publicEvents'))]);
  const records=deliveries.docs.map(d=>({path:`publicEventDeliveries/${d.id}`,...d.data()}));

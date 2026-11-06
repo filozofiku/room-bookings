@@ -14,10 +14,10 @@ export function calendarFile(event){
   const start=calendarInstant(event.date,event.start),end=calendarInstant(event.date,event.end);
   return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Fakulteti Filozofik//Rezervimet//SQ','CALSCALE:GREGORIAN','BEGIN:VEVENT',`UID:${escapeText(event.id)}@filozofiku.github.io`,`DTSTAMP:${new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'')}`,`DTSTART:${start}`,`DTEND:${end}`,`SUMMARY:${escapeText(event.title)}`,`LOCATION:${escapeText(event.room||'Pa sallë')}`,`DESCRIPTION:${escapeText([event.description,event.onlineUrl].filter(Boolean).join('\n\n'))}`,'END:VEVENT','END:VCALENDAR'].map(fold).join('\r\n')+'\r\n';
 }
-export function calendarActions(event){
- const box=document.createElement('details');box.className='calendar-actions';const summary=document.createElement('summary');summary.textContent='Shto në kalendar';box.append(summary);
- const note=document.createElement('p');note.textContent='Kopje personale: ndryshimet dhe anulimet e mëvonshme nuk përditësohen automatikisht. Orët janë sipas zonës Europe/Tirane.';box.append(note);
+export function calendarActions(event,t=value=>value){
+ const box=document.createElement('details');box.className='calendar-actions';const summary=document.createElement('summary');summary.textContent=t('Shto në kalendar');box.append(summary);
+ const note=document.createElement('p');note.textContent=t('Kopje personale: ndryshimet dhe anulimet e mëvonshme nuk përditësohen automatikisht. Orët janë sipas zonës Europe/Tirane.');box.append(note);
  const url=new URL('https://calendar.google.com/calendar/render');url.search=new URLSearchParams({action:'TEMPLATE',text:event.title,dates:`${calendarInstant(event.date,event.start)}/${calendarInstant(event.date,event.end)}`,details:[event.description,event.onlineUrl].filter(Boolean).join('\n\n'),location:event.room||'Pa sallë',ctz:'Europe/Tirane'});
  const link=document.createElement('a');link.href=url.href;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Google Calendar';box.append(link,document.createTextNode(' · '));
- const download=document.createElement('button');download.type='button';download.textContent='Shkarko .ics (Outlook / Apple Calendar)';download.onclick=()=>{const blobUrl=URL.createObjectURL(new Blob([calendarFile(event)],{type:'text/calendar;charset=utf-8'}));const a=document.createElement('a');a.href=blobUrl;a.download='rezervimi.ics';a.click();setTimeout(()=>URL.revokeObjectURL(blobUrl),1000);};box.append(download);return box;
+ const download=document.createElement('button');download.type='button';download.textContent=t('Shkarko .ics (Outlook / Apple Calendar)');download.onclick=()=>{const blobUrl=URL.createObjectURL(new Blob([calendarFile(event)],{type:'text/calendar;charset=utf-8'}));const a=document.createElement('a');a.href=blobUrl;a.download=t('rezervimi.ics');a.click();setTimeout(()=>URL.revokeObjectURL(blobUrl),1000);};box.append(download);return box;
 }

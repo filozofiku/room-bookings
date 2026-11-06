@@ -306,3 +306,13 @@ ndryshimet para/pas dhe të dhënat e reja. Zbatohen vonesat e GitHub Actions.
 Njoftimet publike ende të padërguara përdorin të dhënat më të fundit të rezervimit.
 Ky ndryshim nuk ridërgon njoftim te e gjithë lista publike nëse ai është dërguar
 më parë; emaili i redaktimit i drejtohet krijuesit të rezervimit.
+
+## Interface languages
+
+Both room booking and My Reservations offer Albanian and English through the
+upper-right language picker. They share the `faculty-language` preference with
+the public timetable. Booking-specific translations are in
+`src/booking-i18n.js`; the public-site dictionary and programme translations are
+reused. Language changes preserve form values and selected resources. Stored
+reservation values, organizer-written content, decision reasons and all outgoing
+email templates keep their original language; notification emails remain Albanian.
