@@ -72,10 +72,10 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .booking-portal button.secondary:hover:not(:disabled){background:#f3f3f7;color:var(--ink)}
 .booking-portal button.danger{background:#fff;color:var(--accent);border-color:#dcb1b3}
 #identity{font-size:12px;color:var(--ink-soft);display:inline-block;margin-right:8px}
-#app>.row{background:#f7f7fa;border:1px solid var(--line);padding:17px 20px;border-radius:11px;justify-content:flex-start;gap:24px}
-#app>.row>div{flex:1;min-width:180px}
-#app>.row select,#app>.row input{width:100%}
-#app>.row label{margin-top:0}
+#reservation-entry>.row{background:#f7f7fa;border:1px solid var(--line);padding:17px 20px;border-radius:11px;justify-content:flex-start;gap:24px}
+#reservation-entry>.row>div{flex:1;min-width:180px}
+#reservation-entry>.row select,#reservation-entry>.row input{width:100%}
+#reservation-entry>.row label{margin-top:0}
 #booking-help>summary{font-size:14px;font-weight:600;color:var(--ink-soft)}
 #booking-help{font-size:14px;color:var(--ink-soft)}
 .app-panel{border:1px solid var(--line);padding:20px;border-radius:12px;margin:20px 0;scroll-margin-top:20px;background:#fff}
@@ -93,7 +93,7 @@ legend{font-size:13px;font-weight:600;color:var(--ink-soft);padding:0 7px}
 @media(min-width:1700px){.booking-portal>section,.booking-portal>#message{margin-left:auto;margin-right:auto}}
 @media(max-width:1100px){body{margin-left:204px}.university-rail{width:204px}.rail-brand{padding:25px 14px;font-size:13px;gap:9px}.rail-links a{font-size:13px;gap:10px}.wrap{padding-left:24px;padding-right:24px}.booking-portal>header,.hero{padding-left:24px;padding-right:24px}.booking-portal>section,.booking-portal>#message{margin-left:24px;margin-right:24px}.nav-btn{padding:15px 12px;font-size:13px}.navigation{gap:10px}}
 @media(max-width:800px){body{margin:0}.university-rail{position:static;width:auto;display:block;border:0;border-bottom:1px solid var(--line)}.rail-brand,.rail-caption,.rail-footer{display:none}.rail-links{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:10px 16px}.rail-links a{min-width:0;min-height:42px;font-size:12px;padding:9px 12px;gap:8px}.rail-links svg{width:18px;height:18px}.booking-portal>header,.hero{padding:22px 20px}.wrap{padding-left:20px;padding-right:20px}.university-logo{width:56px}.brand{margin-bottom:20px}.hero h1{font-size:28px}.booking-portal header h1{font-size:21px}.booking-portal>section,.booking-portal>#message{margin:18px 16px}.booking-portal>section{padding:18px}.booking-portal>header{gap:20px}.navigation{display:grid;grid-template-columns:1fr 1fr;gap:9px}.navigation .refresh-btn{margin-left:0}.nav-btn{min-height:58px;font-size:12px;padding:13px 10px}.nav-btn:before{margin-right:8px;width:6px;height:17px}.app-panel{padding:16px}.filters{padding:20px}.today-grid{gap:16px}}
-@media(max-width:480px){.wrap{padding-left:16px;padding-right:16px}.booking-portal>header,.hero{padding:20px 16px}.university-name,.brand-name{font-size:10px}.faculty-name,.brand-sub{font-size:11px}.hero-p{font-size:13px}.booking-portal header h1{font-size:18px}.navigation{gap:7px}.nav-btn{font-size:11px;padding:12px 8px;text-align:center}.nav-btn:before{display:none}.booking-portal>section{padding:14px}.app-panel{padding:14px}#app>.row{padding:14px;gap:12px}#app>.row>div{min-width:100%}.booking-portal input,.booking-portal select,.booking-portal textarea{font-size:16px}.today-section{padding:17px}.rail-links{padding-left:12px;padding-right:12px}.hero-bottom{gap:7px}.micro{width:100%}.brand{gap:11px}}
+@media(max-width:480px){.wrap{padding-left:16px;padding-right:16px}.booking-portal>header,.hero{padding:20px 16px}.university-name,.brand-name{font-size:10px}.faculty-name,.brand-sub{font-size:11px}.hero-p{font-size:13px}.booking-portal header h1{font-size:18px}.navigation{gap:7px}.nav-btn{font-size:11px;padding:12px 8px;text-align:center}.nav-btn:before{display:none}.booking-portal>section{padding:14px}.app-panel{padding:14px}#reservation-entry>.row{padding:14px;gap:12px}#reservation-entry>.row>div{min-width:100%}.booking-portal input,.booking-portal select,.booking-portal textarea{font-size:16px}.today-section{padding:17px}.rail-links{padding-left:12px;padding-right:12px}.hero-bottom{gap:7px}.micro{width:100%}.brand{gap:11px}}
 @media print{body{margin:0!important;background:white}.university-rail{display:none!important}.hero,.booking-portal>header{box-shadow:none;border:0}.card{box-shadow:none}.navigation{display:none!important}}
 /* Compact sidebar control beside the faculty identity. */
 .rail-brand{gap:8px;padding:24px 12px}
@@ -109,3 +109,5 @@ legend{font-size:13px;font-weight:600;color:var(--ink-soft);padding:0 7px}
 @media(min-width:801px) and (max-width:1100px){.rail-brand{padding:24px 10px;gap:6px}.rail-brand>div{font-size:11px}.rail-brand small{font-size:9px}.rail-monogram{width:30px;height:30px;font-size:14px}}
 @media(max-width:800px){.rail-brand{display:flex;min-height:70px;padding:14px 16px}.rail-brand>div{flex:initial;margin-right:4px}.sidebar-collapsed .rail-links{display:none}}
 @media print{#weekNavigation{display:none!important}}
+
+#management-heading{font-size:24px;color:var(--ink-soft);margin:0 0 8px}#management-scope{color:var(--muted);font-size:14px;margin:0 0 24px}.booking-portal #email-delivery-section{border:1px solid var(--line);padding:20px;border-radius:12px;margin:20px 0}.booking-portal #email-delivery-section>summary{font-size:17px;font-weight:600;color:var(--ink-soft)}

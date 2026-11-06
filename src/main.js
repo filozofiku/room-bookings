@@ -1,3 +1,4 @@
+const managementView=new URLSearchParams(location.search).get('section')==='my-reservations';
 import {parseStudentEmails} from './student-emails.js';
 import {loadEmailDeliveries,deliveryLabel,retryEmail} from './email-delivery.js';
 import {calendarActions,calendarInstant} from './calendar-export.js';
@@ -149,6 +150,7 @@ async function readAvailability() {
   });
 }
 function stopEditing() {
+  $('reservation-entry').hidden=managementView;
   editing=null;
   $('student-emails-field').hidden=false;
   $('edit-banner').hidden=true;
@@ -159,6 +161,7 @@ function stopEditing() {
   updateRequestHint();
 }
 function startEditing(id,data) {
+  $('reservation-entry').hidden=false;
   $('booking-section').open=true;
   $('booking-receipt').hidden=true;
   editing={id,data,revision:data.revision||0};
@@ -259,7 +262,7 @@ async function readRequests() {
   if(!currentUser)return;
   const own=path=>canCancelAll?collection(db,path):query(collection(db,path),where(path==='requestDecisions'?'booking.ownerUid':'ownerUid','==',currentUser.uid));
   const [pending,decisions]=await Promise.all([getDocs(own('reservationRequests')),getDocs(own('requestDecisions'))]);
-  $('requests-heading').textContent=canCancelAll?'Kërkesat për miratim':'Kërkesat e mia';
+  $('requests-heading').textContent=managementView||canCancelAll?'Kërkesat për miratim':'Kërkesat e mia';
   const wrapper=$('reservation-requests');wrapper.replaceChildren();
   if(!pending.docs.length)wrapper.textContent='Nuk ka kërkesa në pritje.';
   for(const item of pending.docs.sort((a,b)=>a.data().date.localeCompare(b.data().date))){
@@ -294,7 +297,7 @@ async function readMyBookings() {
   if (!currentUser) return;
   const reservations = collection(db, 'reservations');
   const snap = await getDocs(canCancelAll ? reservations : query(reservations, where('ownerUid','==',currentUser.uid)));
-  $('reservations-heading').textContent = canCancelAll ? 'Të gjitha rezervimet' : 'Rezervimet e mia';
+  $('reservations-heading').textContent = managementView||canCancelAll ? 'Të gjitha rezervimet' : 'Rezervimet e mia';
   const today=todayDate();
   const byDate=(a,b)=>a.data().date.localeCompare(b.data().date)||a.data().periodIds[0].localeCompare(b.data().periodIds[0]);
   const upcoming=snap.docs.filter(item=>item.data().date>=today).sort(byDate);
@@ -504,6 +507,12 @@ async function cancelReservation(id, reason = '') {
   });
 }
 function openLinkedSection(){
+ if(managementView){
+  for(const id of ['requests-section','email-delivery-section','reservations-section'])$(id).open=true;
+  readEmailDelivery();
+  return;
+ }
+
  const params=new URLSearchParams(location.search);
  const target=params.get('section')==='requests'?'requests-section':params.get('section')==='booking'||['date','room','start','end'].some(key=>params.has(key))?'booking-section':null;
  if(!target)return;
@@ -568,7 +577,12 @@ async function loadApp() {
   $('date').min = settings.startDate;
   $('date').max = settings.endDate;
   $('app').hidden = false;
-  message(settings.bookingOpen ? 'Keni hyrë me sukses. Mund të rezervoni një sallë.' : 'Rezervimet janë pezulluar përkohësisht gjatë përditësimit të orarit.');
+  if(managementView){
+   $('management-scope').hidden=false;
+   $('management-scope').textContent=canCancelAll?'Shfaqen kërkesat dhe rezervimet e të gjithë përdoruesve.':'Shfaqen vetëm kërkesat, njoftimet dhe rezervimet tuaja.';
+  }
+
+  message(managementView?'Keni hyrë me sukses. Këtu mund të menaxhoni rezervimet dhe njoftimet tuaja.':settings.bookingOpen ? 'Keni hyrë me sukses. Mund të rezervoni një sallë.' : 'Rezervimet janë pezulluar përkohësisht gjatë përditësimit të orarit.');
   openLinkedSection();
   applyBookingLink();
   await Promise.all([readAvailability(), readMyBookings(), readRequests()]);
@@ -626,6 +640,15 @@ function updateLocationField(){ $('location-field').hidden=$('mode').value!=='ph
 $('mode').onchange = () => { $('online-field').hidden = $('mode').value !== 'online';updateLocationField(); };
 updateLocationField();
 for (const id of ['from','through']) $(id).addEventListener('change', () => { $('selection-hint').textContent = ''; });
+if(managementView){
+ $('reservation-entry').hidden=true;
+ $('management-heading').hidden=false;
+ $('booking-help').closest('section').hidden=true;
+ document.querySelector('header h1').textContent='Rezervimet e mia';
+ document.title='Rezervimet e mia | Universiteti i Prishtinës';
+ for(const link of document.querySelectorAll('.rail-links a'))link.removeAttribute('aria-current');
+ document.querySelector('[data-my-reservations]').setAttribute('aria-current','page');
+}
 onAuthStateChanged(auth,async user => {
   stopEditing();
   if($('reservation-dialog').open)$('reservation-dialog').close('back');
@@ -638,5 +661,5 @@ onAuthStateChanged(auth,async user => {
   $('app').hidden = true;
   emailViewGeneration++;$('email-delivery-list').replaceChildren();$('email-delivery-feedback').textContent='';$('email-delivery-section').open=false;
   if (user) try { await loadApp(); } catch(e){message(errText(e),true);}
-  else message('Hyni me llogarinë tuaj Google për të parë disponueshmërinë dhe për të rezervuar salla.');
+  else message(managementView?'Hyni me llogarinë tuaj Google për të parë kërkesat, njoftimet me email dhe rezervimet tuaja.':'Hyni me llogarinë tuaj Google për të parë disponueshmërinë dhe për të rezervuar salla.');
 });

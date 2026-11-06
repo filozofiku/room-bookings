@@ -429,6 +429,32 @@ await page.evaluate(async()=>{window.testStore.set('users/admin',{active:true,ro
 assert.equal(await page.locator('#requests-section').getAttribute('open'),'');
 assert.equal(await page.locator('details[open]').count(),1);
 assert.equal(await page.locator('#requests-heading').textContent(),'Kërkesat për miratim');
+// The dedicated management route keeps authentication and role scoping.
+await page.clock.setFixedTime(new Date('2026-10-23T10:00:00Z'));
+await page.goto('https://booking.test/?section=my-reservations&signedout=1');
+await page.waitForFunction(()=>window.testAuth);
+assert.equal(await page.locator('#app').isVisible(),false);
+assert.equal(await page.locator('header h1').textContent(),'Rezervimet e mia');
+assert.equal(await page.locator('[data-my-reservations]').getAttribute('aria-current'),'page');
+assert.match(await page.locator('#message').textContent(),/Hyni me llogarinë tuaj Google/);
+await page.evaluate(()=>window.testAuth({uid:'teacher',displayName:'Mësimdhënës',email:'test@example.test'}));
+await page.waitForSelector('#app:not([hidden])');
+assert.equal(await page.locator('#reservation-entry').isVisible(),false);
+for(const id of ['requests-section','email-delivery-section','reservations-section'])assert.equal(await page.locator('#'+id).getAttribute('open'),'');
+assert.equal(await page.locator('#requests-heading').textContent(),'Kërkesat për miratim');
+assert.equal(await page.locator('#reservations-heading').textContent(),'Të gjitha rezervimet');
+assert.match(await page.locator('#management-scope').textContent(),/vetëm.*tuaja/);
+assert.equal(await page.locator('#booking-help').isVisible(),false);
+await page.locator('#my-reservations').getByRole('button',{name:'Redaktoni',exact:true}).first().click();
+assert.equal(await page.locator('#reservation-entry').isVisible(),true);
+await page.locator('#stop-editing').click();
+assert.equal(await page.locator('#reservation-entry').isVisible(),false);
+await page.setViewportSize({width:390,height:844});
+assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+await page.setViewportSize({width:1280,height:720});
+
+await page.evaluate(async()=>{window.testStore.set('users/admin',{active:true,role:'admin',canCancelAll:true});await window.testAuth({uid:'admin',displayName:'Administrator',email:'admin@example.test'});});
+assert.match(await page.locator('#management-scope').textContent(),/të gjithë përdoruesve/);
 assert.deepEqual(errors,[]);
 console.log('Albanian signed-in UI, status labels, boundary times, validation, 16-period booking/cancellation and localized SDK errors passed.');
 }finally{await browser.close();}
