@@ -218,7 +218,7 @@
     <p id="todayStatus" role="status"></p>
     <div class="today-grid">
       <section class="card today-section"><h3>Po zhvillohen tani</h3><div id="todayNow" class="today-items"></div></section>
-      <section class="card today-section"><h3>Sallat e lira tani</h3><p>Ora lokale e Prishtinës. Lidhjet përzgjedhin periudhën e ardhshme të plotë, deri në 90 minuta kur është e mundur. Salla 102 dhe Salla 127 kërkojnë miratim për përdoruesit e rregullt.</p><div id="todayRooms" class="today-items"></div></section>
+      <section class="card today-section"><label for="todayDuration">Kohëzgjatja e rezervimit</label><select id="todayDuration" style="margin-bottom:18px" aria-describedby="todayDurationHint"><option value="45">1 orë akademike</option><option value="90" selected>2 orë akademike</option><option value="135">3 orë akademike</option></select><h3>Sallat e lira tani</h3><p id="todayDurationHint">Ora lokale e Prishtinës. Shfaqen vetëm sallat e lira tani dhe për të gjithë kohëzgjatjen e zgjedhur (45, 90 ose 135 minuta), duke filluar nga periudha e ardhshme e plotë. Salla 102 dhe Salla 127 kërkojnë miratim për përdoruesit e rregullt.</p><div id="todayRooms" class="today-items"></div></section>
     </div>
     <section class="card today-section" style="margin-bottom:18px"><h3>Kanë përfunduar</h3><div id="todayFinished" class="today-items"></div></section>
     <section class="card today-section"><h3>Do të mbahet</h3><div id="todayUpcoming" class="today-items"></div></section>
@@ -619,21 +619,22 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     if(!day.bookingAllowed){box.textContent='Data është e mbyllur për rezervime.';return;}
     const times=data.times.map(parseMinutes),s=times.findIndex(t=>t>=minute);
     if(minute<times[0]||minute>=times.at(-1)||s<0||s>=times.length-1){box.textContent='Jashtë orarit të rezervimeve.';return;}
+    const duration=Number($('todayDuration').value);
+    const end=times.indexOf(times[s]+duration);
+    if(end<0){box.textContent='Nuk ka kohë të mjaftueshme brenda orarit për kohëzgjatjen e zgjedhur.';return;}
     for(const room of ordered.rooms){
       if(!publicState.rooms.some(r=>r.name===room.n))continue;
       const busy=(start,end)=>(day.fetActive&&room.e.some(e=>e.d===d&&times[e.s]<end&&times[e.e]>start))||publicState.rows.some(b=>b.date===date&&overlaps(b,room.n,minuteLabel(start),minuteLabel(end)));
-      if(busy(minute,Math.max(minute+1,times[s])))continue;
-      let end=s;
-      while(end<times.length-1&&times[end+1]-times[s]<=90&&!busy(times[end],times[end+1]))end++;
+      if(busy(minute,times[end]))continue;
       const card=document.createElement('div');card.className='today-room';
       const features=roomFeatures[room.n];
       card.innerHTML=`<strong>${esc(room.l)}</strong>${features?`<p>${features[0]} ulëse${features[1]?' · Smartboard':''}${features[2]?' · Tabelë e bardhë':''}</p>`:''}`;
-      if(end>s){const link=document.createElement('a');link.className='today-book';link.textContent=`Rezervoni ${data.times[s]}–${data.times[end]} ↗`;link.href='https://filozofiku.github.io/room-bookings/?'+new URLSearchParams({date,room:room.n,start:data.times[s],end:data.times[end]});card.append(link);}
-      else {const note=document.createElement('p');note.textContent='E lirë tani; nuk ka periudhë të plotë për rezervim.';card.append(note);}
+      const link=document.createElement('a');link.className='today-book';link.textContent=`Rezervoni ${data.times[s]}–${data.times[end]} ↗`;link.href='https://filozofiku.github.io/room-bookings/?'+new URLSearchParams({date,room:room.n,start:data.times[s],end:data.times[end]});card.append(link);
       box.append(card);
     }
-    if(!box.children.length)box.textContent='Nuk ka salla të lira tani.';
+    if(!box.children.length)box.textContent='Nuk ka salla të lira për kohëzgjatjen e zgjedhur.';
   }
+  $('todayDuration').addEventListener('change',renderToday);
   setInterval(()=>{
     if(state.page!=='today'||!data)return;
     if($('bookingDate').value!==localDate()){$('bookingDate').value=localDate();$('bookingDate').dispatchEvent(new Event('change'));}
