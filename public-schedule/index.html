@@ -161,13 +161,9 @@
     <button type="button" class="nav-btn refresh-btn" id="refreshFiles" title="Rifresko të dhënat e fundit">↻ Rifresko të dhënat</button>
   </nav>
 
-  <div class="card filters">
-    <div id="dateNavigation" hidden><label for="bookingDate">Data</label>
+  <div id="dateNavigation" class="card filters" hidden><label for="bookingDate">Data</label>
     <input type="date" id="bookingDate"></div>
-
-    <p class="hint">Rezervimet shfaqen në orar, vetëm në javën e zgjedhur. Kliko rezervimin për emrin dhe kohën e krijimit.</p>
-    <p id="bookingStatus" role="status" aria-live="polite">Duke ngarkuar rezervimet…</p>
-  </div>
+  <p id="bookingStatus" role="status" aria-live="polite">Duke ngarkuar rezervimet…</p>
 
   <section id="schedulesPanel" aria-labelledby="scheduleHeading">
     <div class="card filters">
@@ -267,8 +263,9 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
   let publicState = {status:'loading'};
   function renderBookings(result) {
     publicState = result;
+    $('bookingStatus').hidden=result.status==='ready';
     $('bookingStatus').textContent = result.status === 'ready'
-      ? `Java ${weekDates(result.date)[0]} – ${weekDates(result.date)[6]}`
+      ? ''
       : result.status === 'loading' ? 'Duke ngarkuar rezervimet…' : result.message;
     display();
     renderFree();

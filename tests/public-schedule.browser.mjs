@@ -38,6 +38,8 @@ try {
   const roomName = await page.locator('#entity').inputValue();
   const result = {status:'ready',date:'2026-10-23',day:{weekday:'5',fetActive:false,bookingAllowed:true},rooms:[{id:'r1',name:roomName}],rows:[]};
   await page.evaluate(value => window.testReport(value),result);
+  assert.equal(await page.locator('#bookingStatus').isVisible(),false);
+  assert.doesNotMatch(await page.locator('body').innerText(),/Rezervimet shfaqen në orar, vetëm në javën e zgjedhur/);
   assert.equal(await page.locator('#weekBody .day-column').count(),5);
   assert.equal(await page.locator('#agendaView .agenda-day').count(),5);
   for(const date of ['2026-10-24','2026-10-25']) {
