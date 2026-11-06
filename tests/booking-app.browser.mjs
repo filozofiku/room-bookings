@@ -47,6 +47,7 @@ await page.route('https://booking.test/**',route=>{
 const path=new URL(route.request().url()).pathname;
 let body,contentType='text/javascript';
 if(path==='/'){body=readFileSync('index.html','utf8');contentType='text/html';}
+else if(path==='/university-shell.js')body=readFileSync('public/university-shell.js','utf8');
 else if(path==='/university-shell.css'){body=readFileSync('public/university-shell.css','utf8');contentType='text/css';}
 else if(path==='/university-logo.png')return route.fulfill({contentType:'image/png',body:readFileSync('public/university-logo.png')});
 else if(path==='/auth.js')body=authModule;
