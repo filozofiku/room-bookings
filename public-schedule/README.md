@@ -106,3 +106,18 @@ confirmed live feed and an open calendar date. Existing booking permissions and
 special-room approvals still apply. Test with `node tests/today.browser.mjs`
 (`TEST_MODULES_DIR` may point to the Playwright installation; the public repo's
 HTML exports are expected in `/tmp/fet-schedule-publish`).
+
+## Public-site languages
+
+The upper-right language picker offers Albanian (default) and English and stores
+its selection locally. `i18n.js` contains interface translations;
+`timetable-en.js` contains display translations for official courses and student
+programmes. Add translations there when new official names are introduced.
+Translated labels never replace resource names used for matching, URLs, or
+bookings. Personal names and organizer-written event titles/descriptions remain
+as entered. The booking application and all outgoing email templates remain in
+Albanian. Calendar controls on the public site follow the selected language.
+
+Check switching, saved preferences, search, modal details, dates and mobile layout
+with `TEST_MODULES_DIR=/path/to/test-dependencies node tests/language.browser.mjs`
+while serving the public timetable at `http://127.0.0.1:8765` (or `PREVIEW_URL`).

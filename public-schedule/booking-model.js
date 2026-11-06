@@ -48,10 +48,10 @@ export function reservationEvents(rows, room, dates, days, times, kind = 'rooms'
     });
   });
 }
-export function bookingTimestamp(value) {
+export function bookingTimestamp(value, locale = 'sq-AL') {
   const date = typeof value?.toDate === 'function' ? value.toDate() :
     typeof value?.seconds === 'number' ? new Date(value.seconds * 1000) : null;
-  return date && Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat('sq-AL', {
+  return date && Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat(locale, {
     timeZone:'Europe/Tirane',dateStyle:'medium',timeStyle:'short'
   }).format(date) : 'Koha nuk është e disponueshme';
 }

@@ -132,11 +132,16 @@
     @media print{body{background:#fff}.hero{background:white!important;color:#15293e;padding:0 0 10px}.hero-p,.hero-bottom,.brand-mark,.navigation,.filters,.tools,.footnote,.hint,.load-status{display:none!important}.brand{margin:0 0 10px}.brand-name,.brand-sub,.eyebrow{color:#15293e}.page{padding:0}.calendar-box{border:0;box-shadow:none}.calendar-scroll{display:none!important}.agenda{display:block!important}.agenda-row{break-inside:avoid}.agenda-day{break-inside:avoid}.result-title{font-size:19px}}
     @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
   .reservation-event{border-left-width:4px}
+.hero{position:relative}.hero .brand{padding-right:130px}.language-control{position:absolute;top:24px;right:32px;display:flex;align-items:center;gap:9px}.language-control label{margin:0;font-size:12px}.language-control select{width:100px;height:38px;padding:0 10px;background:white}.language-control{z-index:2}
+@media(max-width:800px){.language-control{top:20px;right:20px;display:block}.language-control label{font-size:10px;margin-bottom:4px}.hero .brand{padding-right:112px}.language-control select{height:36px}}
+@media(max-width:480px){.language-control{right:16px}.brand-name{overflow-wrap:normal}}
+@media print{.language-control{display:none!important}}
 </style>
 <link rel="stylesheet" href="./university-shell.css"><script defer src="./university-shell.js"></script></head>
 <body class="schedule-portal">
 <header class="hero">
   <div class="wrap">
+    <div class="language-control"><label for="languagePicker">Gjuha</label><select id="languagePicker"><option value="sq">Shqip</option><option value="en">English</option></select></div>
     <div class="brand">
       <img class="university-logo" src="./university-logo.png" alt="Logoja e Universitetit të Prishtinës" width="846" height="763">
       <div><div class="brand-name">UNIVERSITETI I PRISHTINËS</div><div class="brand-sub">Fakulteti Filozofik</div></div>
@@ -255,18 +260,25 @@
 </dialog>
 <!-- Timetables are loaded directly from three files in the same folder. -->
 <script type="module">
+  import {t,locale,getLanguage,initLanguage,roomLabel} from './i18n.js';
+  import {englishTimetableLabel} from './timetable-en.js';
   import {calendarActions} from "./calendar-export.js";
 import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTimestamp, eventLanes, eventCategory, EVENT_CATEGORY_LABELS} from './booking-model.js';
 (() => {
   "use strict";
   let data;
+  let selectedEvent=null;
+  const label=value=>getLanguage()==='en'?t(englishTimetableLabel(roomLabel(value))):value;
+  const eventTitle=event=>event.booking?event.t:label(event.t);
+  const tags=value=>String(value||'').split(' · ').map(part=>t(part)).join(' · ');
+  const entityLabel=entity=>state.type==='teachers'?entity.l:label(entity.l);
   let publicState = {status:'loading'};
   function renderBookings(result) {
     publicState = result;
     $('bookingStatus').hidden=result.status==='ready';
     $('bookingStatus').textContent = result.status === 'ready'
       ? ''
-      : result.status === 'loading' ? 'Duke ngarkuar rezervimet…' : result.message;
+      : result.status === 'loading' ? t('Duke ngarkuar rezervimet…') : t(result.message||'');
     display();
     renderFree();
     renderToday();
@@ -275,7 +287,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
   function dateForDay(d) {
     return datesInView().find(date => dayIndex(data.days,new Date(`${date}T12:00:00Z`).getUTCDay()) === d);
   }
-  function dayHeading(d) { return `${data.days[d]} · ${dateForDay(d)}`; }
+  function dayHeading(d) { return `${t(data.days[d])} · ${dateForDay(d)}`; }
   function visibleEvents() {
     const recurring = (state.item?.e || []).filter(e => publicState.days?.[dateForDay(e.d)]?.fetActive !== false);
     if (publicState.status !== 'ready') return recurring;
@@ -283,7 +295,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
   }
   function updateWeekRange() {
     const dates = datesInView();
-    $('weekRange').textContent = `Java ${dates[0]} – ${dates[6]}`;
+    $('weekRange').textContent = t('Java {start} – {end}',{start:dates[0],end:dates[6]});
   }
   function moveWeek(offset) {
     const date = new Date(`${datesInView()[0]}T12:00:00Z`);
@@ -314,7 +326,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
   const $ = id => document.getElementById(id);
   const esc = input => String(input ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const normal = value => String(value).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLocaleLowerCase("sq");
-  const niceSort = (a,b) => a.l.localeCompare(b.l,"sq",{numeric:true,sensitivity:"base"});
+  const niceSort = (a,b) => label(a.l).localeCompare(label(b.l),locale(),{numeric:true,sensitivity:"base"});
   const ordered = {};
   // Faculty-provided inventory: seats, Smartboard, Tabelë e bardhë.
   const roomFeatures = {
@@ -353,7 +365,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
 
   function parseMinutes(s){
     const m = /^(\d{1,2}):(\d{2})$/.exec(s.trim());
-    if(!m)throw Error(`Ora e pavlefshme në orarin zyrtar: ${s}`);
+    if(!m)throw Error(t('Ora e pavlefshme në orarin zyrtar: {time}',{time:s}));
     return Number(m[1])*60+Number(m[2]);
   }
   function minuteLabel(min){return `${String(Math.floor(min/60)).padStart(2,"0")}:${String(min%60).padStart(2,"0")}`;}
@@ -361,31 +373,31 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     // DOMParser treats the downloaded HTML as an inert document; scripts are never executed.
     const doc = new DOMParser().parseFromString(html,"text/html");
     const tables = [...doc.querySelectorAll('table[id^="table_"]')];
-    if(!tables.length)throw Error(`Nuk u gjetën tabelat zyrtare në ${filename}.`);
+    if(!tables.length)throw Error(t('Nuk u gjetën tabelat zyrtare në {file}.',{file:filename}));
     const firstHeaders = [...tables[0].querySelectorAll("thead th.xAxis")].map(e=>e.textContent.trim());
-    if(firstHeaders.length < 2)throw Error(`Nuk u gjetën orët në ${filename}.`);
+    if(firstHeaders.length < 2)throw Error(t('Nuk u gjetën orët në {file}.',{file:filename}));
     const minutes = firstHeaders.map(parseMinutes);
     const interval = minutes[1]-minutes[0];
-    if(interval <= 0 || minutes.some((m,i)=>i>0 && m-minutes[i-1]!==interval))throw Error(`Intervalet kohore nuk janë të rregullta në ${filename}.`);
+    if(interval <= 0 || minutes.some((m,i)=>i>0 && m-minutes[i-1]!==interval))throw Error(t('Intervalet kohore nuk janë të rregullta në {file}.',{file:filename}));
     const timeLabels = [...firstHeaders,minuteLabel(minutes.at(-1)+interval)];
     const firstDays = [...tables[0].querySelectorAll("tbody th.yAxis")].map(x=>x.textContent.trim());
-    if(!firstDays.length || new Set(firstDays).size!==firstDays.length)throw Error(`Nuk mund të lexohen ditët në ${filename}.`);
+    if(!firstDays.length || new Set(firstDays).size!==firstDays.length)throw Error(t('Nuk mund të lexohen ditët në {file}.',{file:filename}));
     const entities = tables.map(table=>{
       const name=table.querySelector("caption span.name")?.textContent.trim();
-      if(!name)throw Error(`Emri i sallës/grupit/mësimdhënësit mungon në ${filename}.`);
+      if(!name)throw Error(t('Emri i sallës/grupit/mësimdhënësit mungon në {file}.',{file:filename}));
       const l = kind==="subgroups" ? name.replace(/\s+Automatic (?:Group )?Automatic Subgroup$/i,"").replace(/\s+Automatic Group$/i,"").replace(/\s+Automatic Subgroup$/i,"") : name;
       const headers = [...table.querySelectorAll("thead th.xAxis")].map(x=>x.textContent.trim());
-      if(headers.length!==firstHeaders.length || headers.some((t,i)=>t!==firstHeaders[i]))throw Error(`Orët nuk janë të njëjta në tabelën ${name} (${filename}).`);
+      if(headers.length!==firstHeaders.length || headers.some((t,i)=>t!==firstHeaders[i]))throw Error(t('Orët nuk janë të njëjta në tabelën {name} ({file}).',{name,file:filename}));
       const dayRows = [...table.querySelectorAll("tbody tr")].filter(tr=>tr.querySelector("th.yAxis"));
-      if(dayRows.length!==firstDays.length)throw Error(`Ditët nuk janë të njëjta për ${name} (${filename}).`);
+      if(dayRows.length!==firstDays.length)throw Error(t('Ditët nuk janë të njëjta për {name} ({file}).',{name,file:filename}));
       const events = [];
       dayRows.forEach((tr,d)=>{
         const dayName=tr.querySelector("th.yAxis").textContent.trim();
-        if(dayName!==firstDays[d])throw Error(`Renditja e ditëve nuk përputhet për ${name} (${filename}).`);
+        if(dayName!==firstDays[d])throw Error(t('Renditja e ditëve nuk përputhet për {name} ({file}).',{name,file:filename}));
         let pos=0;
         for(const cell of [...tr.children].filter(x=>x.tagName.toLowerCase()==="td")){
           const span = Number(cell.getAttribute("colspan")||1);
-          if(!Number.isInteger(span)||span<1||pos+span>firstHeaders.length)throw Error(`Problem me kohëzgjatjen e aktivitetit për ${name}.`);
+          if(!Number.isInteger(span)||span<1||pos+span>firstHeaders.length)throw Error(t('Problem me kohëzgjatjen e aktivitetit për {name}.',{name}));
           if(!cell.classList.contains("empty")){
             const value=cls=>[...cell.querySelectorAll("."+cls)].map(e=>e.textContent.trim()).filter(Boolean).join(" · ");
             // A future export may mark a room unavailable without assigning a class.
@@ -397,7 +409,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
           }
           pos+=span;
         }
-        if(pos!==firstHeaders.length)throw Error(`Tabela jo e plotë për ${name}, ${dayName} (${filename}).`);
+        if(pos!==firstHeaders.length)throw Error(t('Tabela jo e plotë për {name}, {day} ({file}).',{name,day:dayName,file:filename}));
       });
       return {n:name,l,e:events};
     });
@@ -410,15 +422,15 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     const results=await Promise.all(Object.entries(FILENAMES).map(async ([kind,filename])=>{
       let response;
       try {response=await fetch(filename,{cache:"no-store"});}
-      catch {throw Error(`Nuk mund të lexohet ${filename}. Hap faqen nga GitHub Pages (HTTPS), jo drejtpërdrejt si file://, dhe sigurohu që skedarët ndodhen në të njëjtën dosje.`);}
-      if(!response.ok)throw Error(`Nuk u gjet skedari ${filename} (HTTP ${response.status}). Ngarko të tre oraret në të njëjtën dosje me index.html.`);
+      catch {throw Error(t('Nuk mund të lexohet {file}. Hap faqen nga GitHub Pages (HTTPS), jo drejtpërdrejt si file://, dhe sigurohu që skedarët ndodhen në të njëjtën dosje.',{file:filename}));}
+      if(!response.ok)throw Error(t('Nuk u gjet skedari {file} (HTTP {status}). Ngarko të tre oraret në të njëjtën dosje me index.html.',{file:filename,status:response.status}));
       return [kind,parseFET(await response.text(),kind,filename)];
     }));
     const all=Object.fromEntries(results);
     const baseline=all.rooms;
     for(const [kind,part] of results){
-      if(part.days.join("\0")!==baseline.days.join("\0")||part.times.join("\0")!==baseline.times.join("\0"))throw Error(`Ditët ose orët ndryshojnë mes skedarëve FET (${KIND_LABELS[kind]} dhe sallave). Ngarko eksportet e së njëjtës gjenerim.`);
-      if(part.stamp && baseline.stamp && part.stamp!==baseline.stamp)throw Error(`Skedarët janë gjeneruar në kohë të ndryshme (${kind}: ${part.stamp}; rooms: ${baseline.stamp}). Ngarko të tre HTML-të nga e njëjta gjenerim i FET.`);
+      if(part.days.join("\0")!==baseline.days.join("\0")||part.times.join("\0")!==baseline.times.join("\0"))throw Error(t('Ditët ose orët ndryshojnë mes skedarëve FET ({kind} dhe sallave). Ngarko eksportet e së njëjtës gjenerim.',{kind:t(KIND_LABELS[kind])}));
+      if(part.stamp && baseline.stamp && part.stamp!==baseline.stamp)throw Error(t('Skedarët janë gjeneruar në kohë të ndryshme ({kind}: {stamp}; rooms: {baseline}). Ngarko të tre HTML-të nga e njëjta gjenerim i FET.',{kind,stamp:part.stamp,baseline:baseline.stamp}));
     }
     return {subgroups:all.subgroups.entities,teachers:all.teachers.entities,rooms:all.rooms.entities,
       times:baseline.times,days:baseline.days,date:baseline.stamp||"Datë e pacaktuar"};
@@ -454,13 +466,13 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
   }
   function options(){
     for (const id of ["lookup","entity"]) $(id).parentElement.hidden = state.type === "reservations";
-    const filtered = ordered[state.type].filter(e => normal(e.l).includes(normal(state.query)) || normal(e.n).includes(normal(state.query)));
+    const filtered = ordered[state.type].filter(e => normal(entityLabel(e)).includes(normal(state.query)) || normal(e.l).includes(normal(state.query)) || normal(e.n).includes(normal(state.query)));
     const previous = state.item?.n;
     if(previous && !filtered.some(e=>e.n===previous)) state.item = null;
     if(!state.item) state.item = filtered[0] ?? null;
     const select = $("entity");
-    select.innerHTML = filtered.length ? filtered.map(e => `<option value="${esc(e.n)}">${esc(e.l)}</option>`).join("") :
-      `<option value="">Nuk u gjet asnjë rezultat</option>`;
+    select.innerHTML = filtered.length ? filtered.map(e => `<option value="${esc(e.n)}">${esc(entityLabel(e))}</option>`).join("") :
+      `<option value="">${esc(t("Nuk u gjet asnjë rezultat"))}</option>`;
     select.disabled = !filtered.length;
     if(state.item) select.value = state.item.n;
     display();
@@ -481,10 +493,10 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
   function hours(e){return `${data.times[e.s]}–${data.times[e.e]}`;}
   function colorClass(event){return "category-"+eventCategory(event);}
   function extraForEvent(event){
-    if(event.booking) return event.r;
-    if(state.type==="subgroups") return [event.p,event.r].filter(Boolean).join(" · ");
-    if(state.type==="teachers") return [event.g,event.r].filter(Boolean).join(" · ");
-    return [event.g,event.p].filter(Boolean).join(" · ");
+    if(event.booking) return label(event.r);
+    if(state.type==="subgroups") return [t(event.p),label(event.r)].filter(Boolean).join(" · ");
+    if(state.type==="teachers") return [label(event.g),label(event.r)].filter(Boolean).join(" · ");
+    return [label(event.g),t(event.p)].filter(Boolean).join(" · ");
   }
   function visibleDays(events) {
     const weekend = [dayIndex(data.days,6), dayIndex(data.days,0)];
@@ -496,7 +508,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     const evs=visibleEvents();
     const days=visibleDays(evs);
     document.documentElement.style.setProperty('--day-count',days.length);
-    $("weekHeader").innerHTML = `<div>Ora</div>`+days.map(({day,d})=>`<div>${esc(dayHeading(d))}</div>`).join("");
+    $("weekHeader").innerHTML = `<div>${esc(t("Ora"))}</div>`+days.map(({day,d})=>`<div>${esc(dayHeading(d))}</div>`).join("");
     let times=`<div class="time-axis">`;
     for(let s=0;s<data.times.length-1;s++){if(parseMinutes(data.times[s])%60===0)times+=`<div class="time-label" style="top:${s*15}px">${esc(data.times[s])}</div>`;}
     times+=`<div class="time-label" style="top:${(data.times.length-1)*15}px">${esc(data.times.at(-1))}</div></div>`;
@@ -511,9 +523,9 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
         const index = evs.indexOf(event);
         const ht=(event.e-event.s)*15-3;
         const {lane,count}=layouts[dayPosition].get(event);
-        return `<button class="event ${colorClass(event)} ${event.booking?"reservation-event":""} ${ht<=48?"tiny":""}" data-event="${index}" type="button" aria-label="${esc(event.t)} · ${esc(EVENT_CATEGORY_LABELS[eventCategory(event)])} – ${esc(day)} ${hours(event)}" title="${esc(event.t)} · ${esc(EVENT_CATEGORY_LABELS[eventCategory(event)])} · ${hours(event)} · ${esc(extraForEvent(event))}" style="left:calc(${lane/count*100}% + 3px);right:auto;width:calc(${100/count}% - 6px);top:${event.s*15+2}px;height:${ht}px"><span class="event-title">${esc(event.t)}</span><span class="event-sub">${esc(extraForEvent(event))}</span></button>`;
+        return `<button class="event ${colorClass(event)} ${event.booking?"reservation-event":""} ${ht<=48?"tiny":""}" data-event="${index}" type="button" aria-label="${esc(eventTitle(event))} · ${esc(t(EVENT_CATEGORY_LABELS[eventCategory(event)]))} – ${esc(t(day))} ${hours(event)}" title="${esc(eventTitle(event))} · ${esc(t(EVENT_CATEGORY_LABELS[eventCategory(event)]))} · ${hours(event)} · ${esc(extraForEvent(event))}" style="left:calc(${lane/count*100}% + 3px);right:auto;width:calc(${100/count}% - 6px);top:${event.s*15+2}px;height:${ht}px"><span class="event-title">${esc(eventTitle(event))}</span><span class="event-sub">${esc(extraForEvent(event))}</span></button>`;
       }).join("");
-      return `<div class="day-column" aria-label="${esc(day)}">${cells}</div>`;
+      return `<div class="day-column" aria-label="${esc(t(day))}">${cells}</div>`;
     }).join("");
     $("weekBody").innerHTML = times+columns;
     $("weekBody").querySelectorAll("[data-event]").forEach(button=>button.addEventListener("click",()=>showEvent(evs[Number(button.dataset.event)])));
@@ -525,8 +537,8 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
       return `<section class="agenda-day"><h3>${esc(dayHeading(d))}</h3>${rows.length?
         rows.map((e)=>{
           const index=evs.indexOf(e);
-          return `<div class="agenda-row"><div class="agenda-time">${hours(e)}</div><button class="agenda-entry ${colorClass(e)} ${e.booking?"reservation-event":""}" data-agenda="${index}" type="button" aria-label="${esc(e.t)} · ${esc(EVENT_CATEGORY_LABELS[eventCategory(e)])} · ${hours(e)}"><strong>${esc(e.t)}</strong><span>${esc(e.a)}${e.a&&extraForEvent(e)?" · ":""}${esc(extraForEvent(e))}</span></button></div>`;
-        }).join(""):`<p class="no-events">Nuk ka aktivitete të planifikuara.</p>`}</section>`;
+          return `<div class="agenda-row"><div class="agenda-time">${hours(e)}</div><button class="agenda-entry ${colorClass(e)} ${e.booking?"reservation-event":""}" data-agenda="${index}" type="button" aria-label="${esc(eventTitle(e))} · ${esc(t(EVENT_CATEGORY_LABELS[eventCategory(e)]))} · ${hours(e)}"><strong>${esc(eventTitle(e))}</strong><span>${esc(tags(e.a))}${e.a&&extraForEvent(e)?" · ":""}${esc(extraForEvent(e))}</span></button></div>`;
+        }).join(""):`<p class="no-events">${esc(t("Nuk ka aktivitete të planifikuara."))}</p>`}</section>`;
     }).join("");
     $("agendaView").querySelectorAll("[data-agenda]").forEach(button=>button.addEventListener("click",()=>showEvent(evs[Number(button.dataset.agenda)])));
   }
@@ -545,10 +557,10 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     if (container.hidden) return;
     const features = roomFeatures[state.item.n];
     const labels = features ? [
-      `Kapaciteti: ${features[0]} ulëse`,
-      `Smartboard: ${features[1] ? 'Po' : 'Jo'}`,
-      `Tabelë e bardhë: ${features[2] ? 'Po' : 'Jo'}`
-    ] : ['Karakteristikat e kësaj salle nuk janë të disponueshme.'];
+      t('Kapaciteti: {count} ulëse',{count:features[0]}),
+      t('Smartboard: {value}',{value:t(features[1]?'Po':'Jo')}),
+      t('Tabelë e bardhë: {value}',{value:t(features[2]?'Po':'Jo')})
+    ] : [t('Karakteristikat e kësaj salle nuk janë të disponueshme.')];
     for (const label of labels) {
       const badge = document.createElement('span');
       badge.textContent = label;
@@ -557,43 +569,44 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
   }
   function display(){
     displayRoomFeatures();
-    $("selectedTitle").textContent=state.item?.l || "Nuk ka rezultate";
-    $("selectedMeta").textContent=state.item?`${categoryLabel[state.type]} · ${visibleEvents().length} aktivitete · ${datesInView()[0]} – ${datesInView()[6]}`:"Provo një emër tjetër.";
+    $("selectedTitle").textContent=state.item?entityLabel(state.item):t("Nuk ka rezultate");
+    $("selectedMeta").textContent=state.item?t('{category} · {count} aktivitete · {start} – {end}',{category:t(categoryLabel[state.type]),count:visibleEvents().length,start:datesInView()[0],end:datesInView()[6]}):t("Provo një emër tjetër.");
     week();agenda();renderView();
     if(state.page==="schedules"&&!state.suspendHash)setHash();
   }
   function showEvent(e){
-    $("modalTitle").textContent=e.t;
-    $("modalTag").textContent=e.a || "Aktivitet mësimor";
-    const pairs=[["Kategoria e aktivitetit",EVENT_CATEGORY_LABELS[eventCategory(e)]],["Dita",data.days[e.d]],["Ora",hours(e)],["Studentët / Grupi",e.g],["Mësimdhënësi",e.p],["Salla",e.r]];
-    if(e.booking) pairs.push(["Përshkrimi",e.description],["Data",e.date],["Rezervuar nga",e.creatorName],["Rezervimi u krijua më",bookingTimestamp(e.createdAt)],["Mënyra e zhvillimit",e.mode === "online" ? "Online" : e.mode === "physical" ? "Fizik" : ""]);
-    $("modalDetails").innerHTML=pairs.filter(([,v])=>v).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
+    selectedEvent=e;
+    $("modalTitle").textContent=eventTitle(e);
+    $("modalTag").textContent=tags(e.a) || t("Aktivitet mësimor");
+    const pairs=[["Kategoria e aktivitetit",t(EVENT_CATEGORY_LABELS[eventCategory(e)])],["Dita",t(data.days[e.d])],["Ora",hours(e)],["Studentët / Grupi",label(e.g)],["Mësimdhënësi",t(e.p)],["Salla",label(e.r)]];
+    if(e.booking) pairs.push(["Përshkrimi",e.description],["Data",e.date],["Rezervuar nga",t(e.creatorName)],["Rezervimi u krijua më",t(bookingTimestamp(e.createdAt,locale()))],["Mënyra e zhvillimit",e.mode === "online" ? "Online" : e.mode === "physical" ? t("Fizik") : ""]);
+    $("modalDetails").innerHTML=pairs.filter(([,v])=>v).map(([k,v])=>`<dt>${esc(t(k))}</dt><dd>${esc(v)}</dd>`).join("");
     if(e.booking && e.mode === 'online' && /^https?:\/\//i.test(e.onlineUrl || '')) {
       const dt=document.createElement('dt'), dd=document.createElement('dd'), link=document.createElement('a');
-      dt.textContent='Linku i ngjarjes online'; link.textContent=e.onlineUrl; link.href=e.onlineUrl; link.target='_blank'; link.rel='noopener noreferrer';
+      dt.textContent=t('Linku i ngjarjes online'); link.textContent=e.onlineUrl; link.href=e.onlineUrl; link.target='_blank'; link.rel='noopener noreferrer';
       dd.append(link); $('modalDetails').append(dt,dd);
     }
     $('modalCalendar').replaceChildren();
     const eventDate=e.booking?e.date:dateForDay(e.d);
     const status=document.createElement('p');
-    status.textContent=e.booking?'Statusi: E konfirmuar':`Shto vetëm këtë aktivitet më ${eventDate}, sipas javës së shfaqur.`;
+    status.textContent=e.booking?t('Statusi: E konfirmuar'):t('Shto vetëm këtë aktivitet më {date}, sipas javës së shfaqur.',{date:eventDate});
     $('modalCalendar').append(status,calendarActions({
       id:e.id||JSON.stringify([eventDate,e.s,e.e,e.t,e.r,e.g,e.p]),
-      title:e.t,date:eventDate,start:data.times[e.s],end:data.times[e.e],room:e.r,
-      description:[e.description,e.g?`Studentët / Grupi: ${e.g}`:'',e.p?`Mësimdhënësi: ${e.p}`:''].filter(Boolean).join('\n\n'),onlineUrl:e.onlineUrl
-    }));
-    $("detailDialog").showModal();
+      title:eventTitle(e),date:eventDate,start:data.times[e.s],end:data.times[e.e],room:label(e.r),
+      description:[e.description,e.g?t('Studentët / Grupi: {group}',{group:label(e.g)}):'',e.p?t('Mësimdhënësi: {teacher}',{teacher:e.p}):''].filter(Boolean).join('\n\n'),onlineUrl:e.onlineUrl
+    },t));
+    if(!$("detailDialog").open)$("detailDialog").showModal();
   }
   function renderToday(){
     if(!data || state.page!=="today")return;
     const now=new Date(),date=localDate(now);
     const clock=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Tirane',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(now);
     const minute=parseMinutes(clock),d=dayIndex(data.days,new Date(date+'T12:00:00Z').getUTCDay());
-    $('todayDate').textContent=new Intl.DateTimeFormat('sq-AL',{timeZone:'Europe/Tirane',dateStyle:'full'}).format(now)+' · '+clock;
+    $('todayDate').textContent=new Intl.DateTimeFormat(locale(),{timeZone:'Europe/Tirane',dateStyle:'full'}).format(now)+' · '+clock;
     $('todayBook').href='https://filozofiku.github.io/room-bookings/?'+new URLSearchParams({date,section:'booking'});
     const ready=publicState.status==='ready'&&publicState.date===date;
     const day=ready?publicState.day:null;
-    $('todayStatus').textContent=ready&&day?'Përditësohet automatikisht.': 'Të dhënat e sotme nuk janë konfirmuar. Disponueshmëria nuk mund të verifikohet.';
+    $('todayStatus').textContent=ready&&day?t('Përditësohet automatikisht.'): t('Të dhënat e sotme nuk janë konfirmuar. Disponueshmëria nuk mund të verifikohet.');
     const unique=new Map();
     if(day?.fetActive)for(const entity of data.rooms)for(const e of entity.e)if(e.d===d)unique.set(JSON.stringify(e),e);
     // Include scheduled activities without a room, without repeating each student-group view.
@@ -602,34 +615,34 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     const active=e=>parseMinutes(data.times[e.s])<=minute&&parseMinutes(data.times[e.e])>minute;
     const render=(id,list)=>{
       const box=$(id);box.replaceChildren();
-      if(!list.length){box.textContent=ready&&day?'Nuk ka aktivitete.':'Duke pritur të dhënat e sotme…';return;}
+      if(!list.length){box.textContent=ready&&day?t('Nuk ka aktivitete.'):t('Duke pritur të dhënat e sotme…');return;}
       for(const e of list){const button=document.createElement('button');button.type='button';button.className='today-event '+colorClass(e);
-        const label=active(e)?'Në zhvillim':parseMinutes(data.times[e.e])<=minute?'Përfunduar':'Në vijim';
-        button.innerHTML=`<span>${esc(hours(e))} · ${label}</span><strong>${esc(e.t)}</strong><small>${esc([e.r,e.g,e.p].filter(Boolean).join(' · '))}</small>`;
+        const statusLabel=active(e)?t('Në zhvillim'):parseMinutes(data.times[e.e])<=minute?t('Përfunduar'):t('Në vijim');
+        button.innerHTML=`<span>${esc(hours(e))} · ${statusLabel}</span><strong>${esc(eventTitle(e))}</strong><small>${esc([label(e.r),label(e.g),t(e.p)].filter(Boolean).join(' · '))}</small>`;
         button.addEventListener('click',()=>showEvent(e));box.append(button);}
     };
     render('todayNow',events.filter(active));
     render('todayFinished',events.filter(e=>parseMinutes(data.times[e.e])<=minute));
     render('todayUpcoming',events.filter(e=>parseMinutes(data.times[e.s])>minute));
     const box=$('todayRooms');box.replaceChildren();
-    if(!ready||!day||(day.fetActive&&d<0)){box.textContent='Disponueshmëria nuk mund të verifikohet.';return;}
-    if(!day.bookingAllowed){box.textContent='Data është e mbyllur për rezervime.';return;}
+    if(!ready||!day||(day.fetActive&&d<0)){box.textContent=t('Disponueshmëria nuk mund të verifikohet.');return;}
+    if(!day.bookingAllowed){box.textContent=t('Data është e mbyllur për rezervime.');return;}
     const times=data.times.map(parseMinutes),s=times.findIndex(t=>t>=minute);
-    if(minute<times[0]||minute>=times.at(-1)||s<0||s>=times.length-1){box.textContent='Jashtë orarit të rezervimeve.';return;}
+    if(minute<times[0]||minute>=times.at(-1)||s<0||s>=times.length-1){box.textContent=t('Jashtë orarit të rezervimeve.');return;}
     const duration=Number($('todayDuration').value);
     const end=times.indexOf(times[s]+duration);
-    if(end<0){box.textContent='Nuk ka kohë të mjaftueshme brenda orarit për kohëzgjatjen e zgjedhur.';return;}
+    if(end<0){box.textContent=t('Nuk ka kohë të mjaftueshme brenda orarit për kohëzgjatjen e zgjedhur.');return;}
     for(const room of ordered.rooms){
       if(!publicState.rooms.some(r=>r.name===room.n))continue;
       const busy=(start,end)=>(day.fetActive&&room.e.some(e=>e.d===d&&times[e.s]<end&&times[e.e]>start))||publicState.rows.some(b=>b.date===date&&overlaps(b,room.n,minuteLabel(start),minuteLabel(end)));
       if(busy(minute,times[end]))continue;
       const card=document.createElement('div');card.className='today-room';
       const features=roomFeatures[room.n];
-      card.innerHTML=`<strong>${esc(room.l)}</strong>${features?`<p>${features[0]} ulëse${features[1]?' · Smartboard':''}${features[2]?' · Tabelë e bardhë':''}</p>`:''}`;
-      const link=document.createElement('a');link.className='today-book';link.textContent=`Rezervoni ${data.times[s]}–${data.times[end]} ↗`;link.href='https://filozofiku.github.io/room-bookings/?'+new URLSearchParams({date,room:room.n,start:data.times[s],end:data.times[end]});card.append(link);
+      card.innerHTML=`<strong>${esc(label(room.l))}</strong>${features?`<p>${esc(t('{count} ulëse',{count:features[0]}))}${features[1]?' · Smartboard':''}${features[2]?' · '+esc(t('Tabelë e bardhë')):''}</p>`:''}`;
+      const link=document.createElement('a');link.className='today-book';link.textContent=t('Rezervoni {start}–{end} ↗',{start:data.times[s],end:data.times[end]});link.href='https://filozofiku.github.io/room-bookings/?'+new URLSearchParams({date,room:room.n,start:data.times[s],end:data.times[end]});card.append(link);
       box.append(card);
     }
-    if(!box.children.length)box.textContent='Nuk ka salla të lira për kohëzgjatjen e zgjedhur.';
+    if(!box.children.length)box.textContent=t('Nuk ka salla të lira për kohëzgjatjen e zgjedhur.');
   }
   $('todayDuration').addEventListener('change',renderToday);
   setInterval(()=>{
@@ -641,18 +654,18 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     const day = publicState.day;
     const d = day ? dayIndex(data.days, day.weekday) : -1;
     const selectedDate=new Date(`${$('bookingDate').value}T12:00:00Z`);
-    $('freeDay').textContent=Number.isFinite(selectedDate.getTime())?['E diel','E hënë','E martë','E mërkurë','E enjte','E premte','E shtunë'][selectedDate.getUTCDay()]:'—';
+    $('freeDay').textContent=Number.isFinite(selectedDate.getTime())?t(['E diel','E hënë','E martë','E mërkurë','E enjte','E premte','E shtunë'][selectedDate.getUTCDay()]):'—';
     const s=Number($("freeStart").value),e=Number($("freeEnd").value);
     const capacityInput=$('freeCapacity'),capacity=capacityInput.value===''?null:Number(capacityInput.value);
     const invalidCapacity=capacityInput.validity.badInput || (capacity!==null&&(!Number.isSafeInteger(capacity)||capacity<1));
     const smartboard=$('freeSmartboard').value,whiteboard=$('freeWhiteboard').value;
     const invalid = e<=s||invalidCapacity;
-    $('freeError').textContent=e<=s?'Ora e përfundimit duhet të jetë pas orës së fillimit.':'Numri i studentëve duhet të jetë numër i plotë më i madh se zero.';
+    $('freeError').textContent=e<=s?t('Ora e përfundimit duhet të jetë pas orës së fillimit.'):t('Numri i studentëve duhet të jetë numër i plotë më i madh se zero.');
     $("freeError").hidden=!invalid;$("freeValid").hidden=invalid;
     if(invalid)return;
     const unavailable = publicState.status !== 'ready' || !day || (day.fetActive && d < 0);
     if (unavailable || !day.bookingAllowed) {
-      $('freeCount').textContent = unavailable ? 'Disponueshmëria nuk mund të verifikohet' : 'Data është e mbyllur për rezervime';
+      $('freeCount').textContent = unavailable ? t('Disponueshmëria nuk mund të verifikohet') : t('Data është e mbyllur për rezervime');
       $('freeSummary').textContent = $('bookingDate').value;
       $('roomResults').replaceChildren();
       return;
@@ -666,7 +679,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     const free=ordered.rooms.filter(room => matchesFeatures(room) && publicState.rooms.some(r => r.name === room.n) &&
       (!day.fetActive || !room.e.some(event=>event.d===d&&event.s<e&&event.e>s)) &&
       !publicState.rows.some(b => b.date === publicState.date && overlaps(b,room.n,data.times[s],data.times[e])));
-    $("freeCount").textContent=`${free.length} nga ${data.rooms.length} salla të lira që përputhen me kërkimin`;
+    $("freeCount").textContent=t('{count} nga {total} salla të lira që përputhen me kërkimin',{count:free.length,total:data.rooms.length});
     $("freeSummary").textContent=`${publicState.date} · ${data.times[s]}–${data.times[e]}`;
     const bookingLink=room=>{
       const url=new URL('https://filozofiku.github.io/room-bookings/');
@@ -674,8 +687,8 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
       return url.href;
     };
     $("roomResults").innerHTML=free.length?
-      free.map(room=>`<a class="room-choice" href="${esc(bookingLink(room))}" aria-label="${esc('Rezervoni '+room.l)}"><span>${esc(room.l)}</span><span class="arrow" aria-hidden="true">↗</span></a>`).join("") :
-      `<div class="card empty-state" style="grid-column:1/-1"><strong>Nuk ka salla të lira</strong>Provo një interval tjetër ose ndrysho filtrat e kapacitetit dhe pajisjeve.</div>`;
+      free.map(room=>`<a class="room-choice" href="${esc(bookingLink(room))}" aria-label="${esc(t('Rezervoni {room}',{room:label(room.l)}))}"><span>${esc(label(room.l))}</span><span class="arrow" aria-hidden="true">↗</span></a>`).join("") :
+      `<div class="card empty-state" style="grid-column:1/-1"><strong>${esc(t("Nuk ka salla të lira"))}</strong>${esc(t("Provo një interval tjetër ose ndrysho filtrat e kapacitetit dhe pajisjeve."))}</div>`;
 
   }
   function initFree(){
@@ -705,9 +718,9 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
   $("detailDialog").addEventListener("click",event=>{if(event.target===$("detailDialog"))$("detailDialog").close();});
   $("copyLink").addEventListener("click",async()=>{
     const btn=$("copyLink"),url=location.href;
-    try{await navigator.clipboard.writeText(url);btn.textContent="Lidhja u kopjua ✓";}
-    catch{window.prompt("Kopjo lidhjen:",url);}
-    setTimeout(()=>{btn.textContent="Kopjo lidhjen";},2000);
+    try{await navigator.clipboard.writeText(url);btn.textContent=t("Lidhja u kopjua ✓");}
+    catch{window.prompt(t("Kopjo lidhjen:"),url);}
+    setTimeout(()=>{btn.textContent=t("Kopjo lidhjen");},2000);
   });
   function routeFromHash(){
     let hash; try{hash=decodeURIComponent(location.hash.slice(1));}catch{hash="";}
@@ -727,13 +740,13 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
       }
       for(const kind of ["subgroups","teachers","rooms"])ordered[kind]=[...data[kind]].sort(niceSort);
       ordered.reservations=[{n:"te-gjitha",l:"Rezervimet",e:[]}];
-      if(!data.rooms.length)throw Error("Nuk ka salla në orarin zyrtar. Nuk mund të llogaritet disponueshmëria.");
+      if(!data.rooms.length)throw Error(t("Nuk ka salla në orarin zyrtar. Nuk mund të llogaritet disponueshmëria."));
       document.documentElement.style.setProperty("--day-count",data.days.length);
       document.documentElement.style.setProperty("--timetable-height",`${(data.times.length-1)*15}px`);
-      $("statSubgroups").textContent=data.subgroups.length+" grupe";
-      $("statTeachers").textContent=data.teachers.length+" mësimdhënës";
-      $("statRooms").textContent=data.rooms.length+" salla";
-      $("updateDate").textContent="FET · "+data.date;
+      $("statSubgroups").textContent=t('{count} grupe',{count:data.subgroups.length});
+      $("statTeachers").textContent=t('{count} mësimdhënës',{count:data.teachers.length});
+      $("statRooms").textContent=t('{count} salla',{count:data.rooms.length});
+      $("updateDate").textContent="FET · "+t(data.date);
       initFree();
       startBookings();
       state.suspendHash=true;setCategory("subgroups");routeFromHash();state.suspendHash=false;
@@ -744,9 +757,19 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     }catch(error){
       console.error("Error while loading FET timetables:",error);
       $("loadStatus").classList.add("failed");
-      $("loadStatus").textContent="Nuk u ngarkuan oraret.\n"+error.message+"\n\nPërditëso faqen pasi t'i kesh ngarkuar skedarët e saktë.";
+      $("loadStatus").textContent=t("Nuk u ngarkuan oraret.\n{error}\n\nPërditëso faqen pasi t'i kesh ngarkuar skedarët e saktë.",{error:t(error.message)});
     }
   }
+  initLanguage(()=>{
+    if(!data){start();return;}
+    for(const kind of ['subgroups','teachers','rooms'])ordered[kind].sort((a,b)=>label(a.l).localeCompare(label(b.l),locale(),{numeric:true,sensitivity:'base'}));
+    $('statSubgroups').textContent=t('{count} grupe',{count:data.subgroups.length});
+    $('statTeachers').textContent=t('{count} mësimdhënës',{count:data.teachers.length});
+    $('statRooms').textContent=t('{count} salla',{count:data.rooms.length});
+    options();updateWeekRange();renderFree();renderToday();
+    if(publicState.status!=='ready')$('bookingStatus').textContent=publicState.status==='loading'?t('Duke ngarkuar rezervimet…'):t(publicState.message||'');
+    if($('detailDialog').open&&selectedEvent)showEvent(selectedEvent);
+  });
   start();
 })();
 </script>
