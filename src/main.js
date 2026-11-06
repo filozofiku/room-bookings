@@ -1,4 +1,5 @@
-const managementView=new URLSearchParams(location.search).get('section')==='my-reservations';
+const requestedSection=new URLSearchParams(location.search).get('section');
+const managementView=['my-reservations','requests'].includes(requestedSection);
 import {parseStudentEmails} from './student-emails.js';
 import {loadEmailDeliveries,deliveryLabel,retryEmail} from './email-delivery.js';
 import {calendarActions,calendarInstant} from './calendar-export.js';
@@ -478,7 +479,7 @@ async function createReservation(event) {
     bookingMessage(edit ? (edit.data.ownerUid===ownerUid?'Rezervimi u ndryshua me sukses.':'Rezervimi u ndryshua. Njoftimi me email është në pritje të dërgimit.') : requestOnly?'Kërkesa u dërgua për miratim. Salla ende nuk është rezervuar.':'Rezervimi u krijua me sukses.');
     const receipt=$('booking-receipt');receipt.replaceChildren(statusBadge(requestOnly?'pending':'confirmed'));
     const summary=document.createElement('p');summary.style.whiteSpace='pre-wrap';summary.textContent=requestDetails({...data,creatorName:currentUser.displayName||''});receipt.append(summary);
-    const next=document.createElement('p');next.textContent=requestOnly?'Kërkesa do të shqyrtohet nga një përdorues me autorizim. Salla ende nuk është rezervuar. Për vendimin do të njoftoheni me email; dërgimi mund të vonohet.':'Rezervimi shfaqet në orarin zyrtar. Mund ta redaktoni ose anuloni te rezervimet më poshtë.';receipt.append(next);
+    const next=document.createElement('p');next.textContent=requestOnly?'Kërkesa do të shqyrtohet nga një përdorues me autorizim. Salla ende nuk është rezervuar. Për vendimin do të njoftoheni me email; dërgimi mund të vonohet.':'Rezervimi shfaqet në orarin zyrtar. Mund ta redaktoni ose anuloni te “Rezervimet e mia”.';receipt.append(next);
     if(!requestOnly)receipt.append(bookingCalendar(edit?.id||reservationRef.id,data));receipt.hidden=false;receipt.focus();
     await Promise.all([readAvailability(),readMyBookings(),readRequests()]);
   } catch (e) { bookingMessage(errText(e),true); }
@@ -508,6 +509,12 @@ async function cancelReservation(id, reason = '') {
 }
 function openLinkedSection(){
  if(managementView){
+  if(requestedSection==='requests'){
+   for(const details of document.querySelectorAll('details'))details.open=false;
+   $('requests-section').open=true;
+   $('requests-section').scrollIntoView({block:'start'});
+   return;
+  }
   for(const id of ['requests-section','email-delivery-section','reservations-section'])$(id).open=true;
   readEmailDelivery();
   return;
@@ -640,6 +647,7 @@ function updateLocationField(){ $('location-field').hidden=$('mode').value!=='ph
 $('mode').onchange = () => { $('online-field').hidden = $('mode').value !== 'online';updateLocationField(); };
 updateLocationField();
 for (const id of ['from','through']) $(id).addEventListener('change', () => { $('selection-hint').textContent = ''; });
+for(const id of ['requests-section','email-delivery-section','reservations-section'])$(id).hidden=!managementView;
 if(managementView){
  $('reservation-entry').hidden=true;
  $('management-heading').hidden=false;

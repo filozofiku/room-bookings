@@ -66,6 +66,10 @@ async function submitBooking(){
 await page.goto('https://booking.test/');
 await page.waitForSelector('#app:not([hidden])');
 assert.equal(await page.locator('.app-panel[open]').count(),0);
+// Verify booking-only navigation, then expose shared controls in this mock
+// fixture to exercise the existing combined booking/management workflows.
+for(const id of ['requests-section','email-delivery-section','reservations-section'])assert.equal(await page.locator('#'+id).isVisible(),false);
+await page.evaluate(()=>{for(const id of ['requests-section','email-delivery-section','reservations-section'])document.getElementById(id).hidden=false;});
 for(const id of ['booking-section','requests-section','reservations-section'])await page.locator('#'+id+' > summary').click();
 await page.waitForFunction(()=>document.getElementById('slots').children.length===18);
 assert.equal(await page.locator('html').getAttribute('lang'),'sq');
@@ -370,6 +374,10 @@ await page.clock.setFixedTime(new Date('2026-10-22T22:30:00Z'));
 await page.goto('https://booking.test/');
 await page.waitForSelector('#app:not([hidden])');
 assert.equal(await page.locator('.app-panel[open]').count(),0);
+// Verify booking-only navigation, then expose shared controls in this mock
+// fixture to exercise the existing combined booking/management workflows.
+for(const id of ['requests-section','email-delivery-section','reservations-section'])assert.equal(await page.locator('#'+id).isVisible(),false);
+await page.evaluate(()=>{for(const id of ['requests-section','email-delivery-section','reservations-section'])document.getElementById(id).hidden=false;});
 for(const id of ['booking-section','requests-section','reservations-section'])await page.locator('#'+id+' > summary').click();
 await page.waitForFunction(()=>document.getElementById('slots').children.length===18);
 await page.evaluate(async()=>{
@@ -440,7 +448,10 @@ assert.match(await page.locator('#message').textContent(),/Hyni me llogarinë tu
 await page.evaluate(()=>window.testAuth({uid:'teacher',displayName:'Mësimdhënës',email:'test@example.test'}));
 await page.waitForSelector('#app:not([hidden])');
 assert.equal(await page.locator('#reservation-entry').isVisible(),false);
-for(const id of ['requests-section','email-delivery-section','reservations-section'])assert.equal(await page.locator('#'+id).getAttribute('open'),'');
+for(const id of ['requests-section','email-delivery-section','reservations-section']){
+ assert.equal(await page.locator('#'+id).isVisible(),true);
+ assert.equal(await page.locator('#'+id).getAttribute('open'),'');
+}
 assert.equal(await page.locator('#requests-heading').textContent(),'Kërkesat për miratim');
 assert.equal(await page.locator('#reservations-heading').textContent(),'Të gjitha rezervimet');
 assert.match(await page.locator('#management-scope').textContent(),/vetëm.*tuaja/);
