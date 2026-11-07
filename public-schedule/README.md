@@ -122,3 +122,9 @@ Albanian. Calendar controls on the public site follow the selected language.
 Check switching, saved preferences, search, modal details, dates and mobile layout
 with `TEST_MODULES_DIR=/path/to/test-dependencies node tests/language.browser.mjs`
 while serving the public timetable at `http://127.0.0.1:8765` (or `PREVIEW_URL`).
+
+## Live Google Calendar subscriptions
+
+The calendar action subscribes to one activity's read-only feed. Classes repeat weekly through 31 December 2026 at Europe/Tirane wall time; reservations do not repeat. Changes and cancellations appear when Google refreshes the subscription. Existing imported copies remain independent. Downloads are labelled as local snapshots.
+
+`calendar-config.json` supplies the separately deployed Apps Script `/exec` endpoint. See [`calendar-service/README.md`](../calendar-service/README.md) in the booking repository for deployment instructions. The endpoint uses only public data and has no email access. `calendar-classes.json` maps official activities to stable FET IDs. The public-site Actions workflow rebuilds this catalog on every deployment; when changing CSV metadata, regenerate it with the CSV before publishing to preserve original activity IDs.

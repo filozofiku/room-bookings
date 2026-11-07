@@ -1,0 +1,6 @@
+{
+  "name": "faculty-public-timetable",
+  "private": true,
+  "type": "module",
+  "dependencies": {"linkedom": "0.18.14", "csv-parse": "6.1.0"}
+}

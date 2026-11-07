@@ -58,6 +58,7 @@ else if(['/src/booking-ui.js','/src/booking-resources.js','/src/calendar-export.
 else return route.abort();
 return route.fulfill({contentType,body});
 });
+await page.route('https://filozofiku.github.io/calendar-config.json',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({endpoint:'https://script.google.com/macros/s/TEST/exec'})}));
 async function submitBooking(){
  await page.locator('#booking-form button').click();
  if(await page.locator('#reservation-dialog').isVisible())await page.locator('#reservation-dialog button[value="confirm"]').click();
@@ -165,9 +166,10 @@ await page.waitForFunction(()=>document.getElementById('message').textContent.in
 await page.waitForFunction(()=>!document.getElementById('booking-receipt').hidden);
 assert.equal(await page.locator('#booking-receipt .status-confirmed').textContent(),'E konfirmuar');
 await page.locator('#booking-receipt .calendar-actions summary').click();
+await page.locator('#booking-receipt .calendar-actions a').waitFor({state:'visible'});
 const calendarUrl=new URL(await page.locator('#booking-receipt .calendar-actions a').getAttribute('href'));
-assert.equal(calendarUrl.searchParams.get('location'),'Pa sallë');
-assert.match(calendarUrl.searchParams.get('details'),/https:\/\/example.test\/event/);
+assert.equal(new URL(calendarUrl.searchParams.get('cid')).searchParams.get('booking'),'new');
+assert.equal(new URL(calendarUrl.searchParams.get('cid')).searchParams.has('class'),false);
 const downloaded=page.waitForEvent('download');await page.locator('#booking-receipt .calendar-actions button').click();assert.equal((await downloaded).suggestedFilename(),'rezervimi.ics');
 assert.equal(await page.evaluate(()=>window.testStore.get('reservations/new').description),paragraphs);
 assert.equal(await page.evaluate(()=>window.testStore.get('publicBookings/new').description),paragraphs);

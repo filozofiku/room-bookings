@@ -1,3 +1,4 @@
+import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import assert from 'node:assert/strict';
 const require = createRequire(process.env.TEST_MODULES_DIR ? `${process.env.TEST_MODULES_DIR}/package.json` : import.meta.url);
@@ -13,16 +14,21 @@ try {
       onDate(date => {window.testDate = date;report({status:'loading'});});
     }
   `}));
+  await page.route('https://filozofiku.github.io/calendar-config.json',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({endpoint:'https://script.google.com/macros/s/TEST/exec'})}));
+  await page.route('https://filozofiku.github.io/calendar-classes.json',route=>route.fulfill({contentType:'application/json',body:readFileSync('public-schedule/calendar-classes.json','utf8')}));
   await page.goto(process.env.PREVIEW_URL || 'http://127.0.0.1:8765');
   await page.waitForFunction(() => window.testReport && !document.getElementById('mainContent').hidden);
   await page.locator('#bookingDate').evaluate((el,date)=>{el.value=date},'2026-10-23');
   // Anonymous visitors can export a class occurrence from the displayed week.
   await page.locator('#weekBody .event').first().click();
-  assert.match(await page.locator('#modalCalendar').textContent(),/sipas javës së shfaqur/);
+  assert.match(await page.locator('#modalCalendar').textContent(),/Përsëritet çdo javë deri më 31 dhjetor 2026/);
   await page.locator('#modalCalendar summary').click();
+  await page.locator('#modalCalendar a').waitFor({state:'visible'});
   const classUrl=new URL(await page.locator('#modalCalendar a').getAttribute('href'));
-  const classDates=classUrl.searchParams.get('dates');
-  assert.match(classDates,/^202610(19|20|21|22|23|24|25)T/);
+  const classFeed=new URL(classUrl.searchParams.get('cid'));
+  assert.match(classFeed.searchParams.get('class'),/^class-\d+$/);
+  assert.equal(classFeed.searchParams.has('booking'),false);
+  assert.equal(await page.locator('#modalCalendar input').inputValue(),classFeed.href);
   const classDownload=page.waitForEvent('download');await page.locator('#modalCalendar button').click();assert.equal((await classDownload).suggestedFilename(),'rezervimi.ics');
   await page.click('#closeDialog');
   assert.equal(await page.locator('#bookingDate').isVisible(),false);
@@ -116,8 +122,10 @@ try {
   assert.match(await page.locator('#modalDetails').textContent(),/12:00–12:30/);
   assert.match(await page.locator('#modalCalendar').textContent(),/E konfirmuar/);
   await page.locator('#modalCalendar summary').click();
+  await page.locator('#modalCalendar a').waitFor({state:'visible'});
   const calendarUrl=new URL(await page.locator('#modalCalendar a').getAttribute('href'));
-  assert.equal(calendarUrl.searchParams.get('dates'),'20261023T100000Z/20261023T103000Z');
+  assert.ok(new URL(calendarUrl.searchParams.get('cid')).searchParams.get('booking'));
+  assert.equal(new URL(calendarUrl.searchParams.get('cid')).searchParams.has('class'),false);
   const download=page.waitForEvent('download');await page.locator('#modalCalendar button').click();assert.equal((await download).suggestedFilename(),'rezervimi.ics');
   assert.match(await page.locator('#modalDetails').textContent(),/Rezervimi u krijua/);
   await page.click('#closeDialog');

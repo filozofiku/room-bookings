@@ -316,3 +316,9 @@ the public timetable. Booking-specific translations are in
 reused. Language changes preserve form values and selected resources. Stored
 reservation values, organizer-written content, decision reasons and all outgoing
 email templates keep their original language; notification emails remain Albanian.
+
+### Calendar subscriptions
+
+The Google Calendar action uses a live, read-only calendar subscription rather than an editable personal copy. Deploy the separate [calendar service](calendar-service/README.md), configure its `/exec` URL in `public-schedule/calendar-config.json`, and publish both sites. Existing imported events cannot be migrated automatically. Google controls refresh timing; email notifications remain unchanged.
+
+Official classes use stable FET activity IDs and recur weekly through 31 December 2026 in Europe/Tirane time. Reservations are single events fetched directly from public Firestore documents; deleting a reservation empties its subscribed feed. The public-site deployment rebuilds the class catalog from the official HTML exports. When changing the CSV, also run `node scripts/build-calendar-classes.mjs /path/to/public-site data/timetable.csv` to retain activity IDs through metadata changes. The `.ics` download is explicitly labelled as a local snapshot.

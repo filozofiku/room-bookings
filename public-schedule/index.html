@@ -587,11 +587,14 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
       dd.append(link); $('modalDetails').append(dt,dd);
     }
     $('modalCalendar').replaceChildren();
-    const eventDate=e.booking?e.date:dateForDay(e.d);
+    const firstClassDate=new Date('2026-09-15T12:00:00Z');
+    while(!e.booking&&(firstClassDate.getUTCDay()+6)%7!==e.d)firstClassDate.setUTCDate(firstClassDate.getUTCDate()+1);
+    const eventDate=e.booking?e.date:firstClassDate.toISOString().slice(0,10);
     const status=document.createElement('p');
-    status.textContent=e.booking?t('Statusi: E konfirmuar'):t('Shto vetëm këtë aktivitet më {date}, sipas javës së shfaqur.',{date:eventDate});
+    status.textContent=e.booking?t('Statusi: E konfirmuar'):t('Përsëritet çdo javë deri më 31 dhjetor 2026.');
     $('modalCalendar').append(status,calendarActions({
-      id:e.id||JSON.stringify([eventDate,e.s,e.e,e.t,e.r,e.g,e.p]),
+      id:e.id||JSON.stringify([e.t,e.a,e.g,e.p,e.d,e.s]),weekly:!e.booking,
+      classKey:JSON.stringify([e.d,data.times[e.s],data.times[e.e],e.t,e.a,e.g,e.p,e.r].map((value,index)=>index===0?value:String(value||'').normalize('NFC').replace(/\s+/g,' ').trim())),
       title:eventTitle(e),date:eventDate,start:data.times[e.s],end:data.times[e.e],room:label(e.r),
       description:[e.description,e.g?t('Studentët / Grupi: {group}',{group:label(e.g)}):'',e.p?t('Mësimdhënësi: {teacher}',{teacher:e.p}):''].filter(Boolean).join('\n\n'),onlineUrl:e.onlineUrl
     },t));
