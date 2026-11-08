@@ -36,7 +36,7 @@ async function subscription(event){
     const response=await fetch('https://filozofiku.github.io/calendar-classes.json',{cache:'no-store'});if(!response.ok)throw Error('classes');
     const catalog=await response.json();const item=catalog.classes.find(c=>c.key===event.classKey);if(!item)throw Error('class');id=item.id;
   }
-  const feed=new URL(config.endpoint);feed.searchParams.set(event.weekly?'class':'booking',id);return feed.href;
+  const feed=new URL(config.endpoint);feed.searchParams.set(event.weekly?'class':'booking',id);return {feed:feed.href,syncEndpoint:/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(config.syncEndpoint||'')?config.syncEndpoint:null};
 }
 export function calendarActions(event,t=value=>value){
  const box=document.createElement('details');box.className='calendar-actions';const summary=document.createElement('summary');summary.textContent=t('Shto në kalendar');box.append(summary);
@@ -44,9 +44,12 @@ export function calendarActions(event,t=value=>value){
  const link=document.createElement('a');link.target='_blank';link.rel='noopener noreferrer';link.textContent=t('Abonohu në Google Calendar');link.hidden=true;box.append(link);
  const instructions=document.createElement('p');instructions.textContent=t('Duke përgatitur abonimin…');box.append(instructions);
  const address=document.createElement('input');address.type='url';address.readOnly=true;address.hidden=true;address.setAttribute('aria-label',t('Adresa e abonimit në kalendar'));address.style.cssText='width:100%;max-width:100%;box-sizing:border-box';address.onclick=()=>address.select();box.append(address);
- let requested=false;box.addEventListener('toggle',()=>{if(!box.open||requested)return;requested=true;subscription(event).then(feed=>{
+ let requested=false;box.addEventListener('toggle',()=>{if(!box.open||requested)return;requested=true;subscription(event).then(({feed,syncEndpoint})=>{
    const url=new URL('https://calendar.google.com/calendar/render');url.searchParams.set('cid',feed.replace(/^https:/,'webcal:'));link.href=url.href;link.hidden=false;
+   if(syncEndpoint){const connect=new URL(syncEndpoint);const source=new URL(feed);connect.search=source.search;connect.searchParams.set('lang',document.documentElement.lang==='en'?'en':'sq');link.href=connect.href;link.textContent=t('Lidh Google Calendar (kontroll çdo 5 minuta)');note.textContent=t('Lidhni llogarinë tuaj Google për kontroll automatik çdo pesë minuta. Kërkohet autorizimi juaj. Hiqni abonimet e vjetra për të shmangur kopjet e dyfishta.');}
+
    instructions.textContent=t('Nëse lidhja nuk funksionon, në Google Calendar në kompjuter zgjidhni Kalendare të tjera → Nga URL dhe ngjitni këtë adresë.');address.value=feed;address.hidden=false;
+   if(syncEndpoint){instructions.textContent=t('Alternativë: abonimi përmes URL-së përditësohet më ngadalë, sipas Google.');}
  }).catch(()=>{requested=false;instructions.textContent=t('Abonimi nuk është ende i disponueshëm. Provoni përsëri më vonë.');});});
  const copyNote=document.createElement('p');copyNote.textContent=t('Skedari .ics është kopje lokale dhe nuk përditësohet automatikisht.');box.append(copyNote);
  const download=document.createElement('button');download.type='button';download.textContent=t('Shkarko .ics (Outlook / Apple Calendar)');download.onclick=()=>{const blobUrl=URL.createObjectURL(new Blob([calendarFile(event)],{type:'text/calendar;charset=utf-8'}));const a=document.createElement('a');a.href=blobUrl;a.download=t('rezervimi.ics');a.click();setTimeout(()=>URL.revokeObjectURL(blobUrl),1000);};box.append(download);return box;
