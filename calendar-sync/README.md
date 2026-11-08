@@ -33,3 +33,11 @@ node --test tests/calendar-sync.test.mjs
 `CalendarSync.gs` is generated and self-contained. Redeploy new versions using **Manage deployments → Edit → New version**, preserving its URL and **User accessing** setting. All external effects in tests are mocked. Production activation must include an actual account-authorized connect/edit/cancel test by the account owner; do not claim minute-level live synchronization before that test succeeds.
 
 Official references: [Calendar API scopes](https://developers.google.com/workspace/calendar/api/auth), [installable triggers](https://developers.google.com/apps-script/guides/triggers/installable), and [Apps Script web-app deployment](https://developers.google.com/apps-script/guides/web).
+
+## Update the connection screen and repair calendar visibility
+
+Replace `Code.gs` in the **existing Faculty Google Calendar Sync project** with the latest `CalendarSync.gs` from this directory. Choose **Deploy → Manage deployments → Edit (pencil) → New version → Deploy**. Keep the same `/exec` URL and **Execute as: User accessing the web app**. No manifest or permission changes are needed for this update. Existing user selections and calendars are retained.
+
+Reload the connection page, then click **Connect this activity** or **Check for changes now**. These explicit actions mark the app-created calendar as selected and visible. The screen displays its actual name, ID and a direct calendar link, plus links to individual events. Look in this separate faculty calendar, rather than the account's primary calendar. The name may be shared by multiple accounts; the displayed calendar ID identifies the destination precisely.
+
+Every synchronization now reads the Google event before trusting saved sync state. Missing events are recreated, and changed Google event versions are reconciled even if the source activity has not changed. Successful writes must return the expected event ID before they are saved as synchronized. Manual checks fetch the public source fresh. Add/remove actions have distinct confirmations, and failed operations expose error details instead of silently returning “Ready”. Older URL subscriptions and manually imported copies remain separate and must be removed individually.

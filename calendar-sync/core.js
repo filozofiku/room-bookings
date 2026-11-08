@@ -16,9 +16,11 @@ export function synchronize({item,event,calendarId,api,digest,save}){
  const path=`/calendars/${encodeURIComponent(calendarId)}/events`,id=digest(selectionKey(item)),target=path+'/'+id;
  if(event.cancelled){api(target,'DELETE',undefined,[404,410]);return {removed:true};}
  const body=googleEvent(event),hash=digest(JSON.stringify(body));
- if(item.hash===hash)return {unchanged:true};
  const existing=api(target,'GET',undefined,[404,410]);
- if(existing&&existing.status!=='cancelled')api(target,'PATCH',body);
- else{try{api(path,'POST',{id,...body});}catch(error){if(error.status!==409)throw error;api(target,'PATCH',body);}}
- save({...item,hash,title:event.title});return {updated:true};
+ if(existing&&existing.status!=='cancelled'&&item.hash===hash&&item.etag&&existing.etag===item.etag)return {unchanged:true};
+ let result;
+ if(existing&&existing.status!=='cancelled')result=api(target,'PATCH',body);
+ else{try{result=api(path,'POST',{id,...body});}catch(error){if(error.status!==409)throw error;result=api(target,'PATCH',body);}}
+ if(!result||result.id!==id||result.status==='cancelled')throw Error('Google did not confirm the calendar event. Please retry.');
+ save({...item,hash,title:event.title,etag:result.etag||null,eventUrl:result.htmlLink||null});return {updated:true};
 }

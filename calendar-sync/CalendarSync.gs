@@ -118,18 +118,20 @@ var FacultyCalendarSync = (() => {
       return { removed: true };
     }
     const body = googleEvent(event), hash = digest2(JSON.stringify(body));
-    if (item.hash === hash) return { unchanged: true };
     const existing = api2(target, "GET", void 0, [404, 410]);
-    if (existing && existing.status !== "cancelled") api2(target, "PATCH", body);
+    if (existing && existing.status !== "cancelled" && item.hash === hash && item.etag && existing.etag === item.etag) return { unchanged: true };
+    let result;
+    if (existing && existing.status !== "cancelled") result = api2(target, "PATCH", body);
     else {
       try {
-        api2(path, "POST", { id, ...body });
+        result = api2(path, "POST", { id, ...body });
       } catch (error) {
         if (error.status !== 409) throw error;
-        api2(target, "PATCH", body);
+        result = api2(target, "PATCH", body);
       }
     }
-    save2({ ...item, hash, title: event.title });
+    if (!result || result.id !== id || result.status === "cancelled") throw Error("Google did not confirm the calendar event. Please retry.");
+    save2({ ...item, hash, title: event.title, etag: result.etag || null, eventUrl: result.htmlLink || null });
     return { updated: true };
   }
 
@@ -157,20 +159,22 @@ var FacultyCalendarSync = (() => {
       heading: "Connected activities",
       done: "Activity connected. It will now be checked every five minutes."
     } : { title: "Lidh Google Calendar", intro: "Shtoni aktivitetet e zgjedhura n\xEB nj\xEB kalendar t\xEB ve\xE7ant\xEB t\xEB fakultetit n\xEB llogarin\xEB tuaj Google. Ndryshimet kontrollohen \xE7do pes\xEB minuta, edhe kur kjo faqe \xEBsht\xEB e mbyllur. Koha mund t\xEB ndryshoj\xEB n\xEBse Google vonon kontrollin ose arrihet kuota e llogaris\xEB.", permission: "Kjo lidhje menaxhon vet\xEBm kalendar\xEBt q\xEB krijon. Nuk lexon kalendarin tuaj kryesor dhe nuk d\xEBrgon email p\xEBr rezervimet.", add: "Lidh k\xEBt\xEB aktivitet", refresh: "Kontrollo ndryshimet tani", stop: "Ndalo t\xEB gjitha p\xEBrdit\xEBsimet automatike", stopConfirm: "T\xEB ndalohen p\xEBrdit\xEBsimet automatike p\xEBr t\xEB gjitha aktivitetet e lidhura? Aktivitetet ekzistuese do t\xEB mbeten n\xEB kalendar.", remove: "Hiq nga kalendari", removeConfirm: "T\xEB hiqet ky aktivitet nga kalendari dhe t\xEB ndalen p\xEBrdit\xEBsimet e tij?", busy: "Duke punuar\u2026", ready: "Gati", empty: "Nuk ka aktivitete t\xEB lidhura.", last: "Kontrolli i fundit", automatic: "P\xEBrdit\xEBsimet automatike jan\xEB aktive (\xE7do pes\xEB minuta).", inactive: "P\xEBrdit\xEBsimet automatike jan\xEB ndalur.", error: "Veprimi nuk u krye. Kontrolloni autorizimin dhe konfigurimin e sh\xEBrbimit, pastaj provoni p\xEBrs\xEBri.", retry: "Disa aktivitete nuk u rifreskuan; kontrolli i ardhsh\xEBm do t\xEB provoj\xEB p\xEBrs\xEBri.", migration: "Hiqni abonimet e vjetra p\xEBrmes URL-s\xEB p\xEBr t\xEB nj\xEBjtat aktivitete p\xEBr t\xEB shmangur kopjet e dyfishta.", heading: "Aktivitetet e lidhura", done: "Aktiviteti u lidh. Tani do t\xEB kontrollohet \xE7do pes\xEB minuta." };
+    Object.assign(labels, en ? { destination: "Destination calendar", calendarId: "Calendar ID", openCalendar: "Open this calendar", openEvent: "Open event", notConnected: "A separate faculty calendar will be created when you connect your first activity.", hidden: "This calendar is hidden in Google Calendar. Connect an activity or check now to make it visible.", calendarError: "Calendar details could not be verified. Check your account access and try again.", removed: "The activity was removed from this calendar. Older URL subscriptions and copies are separate.", stopped: "Automatic updates stopped. Existing calendar events remain.", details: "Error details" } : { destination: "Kalendari ku shtohen aktivitetet", calendarId: "ID-ja e kalendarit", openCalendar: "Hap k\xEBt\xEB kalendar", openEvent: "Hap aktivitetin", notConnected: "Nj\xEB kalendar i ve\xE7ant\xEB i fakultetit do t\xEB krijohet kur t\xEB lidhni aktivitetin e par\xEB.", hidden: "Ky kalendar \xEBsht\xEB i fshehur n\xEB Google Calendar. Lidhni nj\xEB aktivitet ose kontrolloni tani p\xEBr ta b\xEBr\xEB t\xEB duksh\xEBm.", calendarError: "T\xEB dh\xEBnat e kalendarit nuk u verifikuan. Kontrolloni qasjen n\xEB llogarin\xEB tuaj dhe provoni p\xEBrs\xEBri.", removed: "Aktiviteti u hoq nga ky kalendar. Abonimet dhe kopjet e vjetra jan\xEB t\xEB ve\xE7anta.", stopped: "P\xEBrdit\xEBsimet automatike u ndal\xEBn. Aktivitetet ekzistuese mbeten n\xEB kalendar.", details: "Holl\xEBsit\xEB e gabimit" });
     const json = (value) => JSON.stringify(value).replace(/</g, "\\u003c");
-    return `<!DOCTYPE html><html lang="${language}"><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{font:16px system-ui,sans-serif;background:#f0f2f5;color:#242629;margin:0;padding:24px}main{max-width:720px;margin:auto;background:white;padding:28px;border-radius:16px}h1{color:#990000}p{line-height:1.6}button{font:inherit;border:1px solid #bbb;border-radius:8px;background:white;padding:10px 16px;cursor:pointer;margin:6px 8px 6px 0}#add{background:#990000;color:white;border:0}li{margin:16px 0;overflow-wrap:anywhere}#message{padding:12px;background:#f3f4f6;white-space:pre-line}button:disabled{opacity:.5;cursor:wait}</style></head><body><main><h1>${labels.title}</h1><p>${labels.intro}</p><p>${labels.permission}</p><p>${labels.migration}</p><button id="add" hidden>${labels.add}</button><button id="refresh">${labels.refresh}</button><button id="stop">${labels.stop}</button><p id="message" role="status" aria-live="polite"></p><p id="status"></p><h2>${labels.heading}</h2><ul id="items"></ul><a href="https://calendar.google.com/" target="_blank" rel="noopener">Google Calendar \u2197</a></main><script>
+    return `<!DOCTYPE html><html lang="${language}"><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{font:16px system-ui,sans-serif;background:#f0f2f5;color:#242629;margin:0;padding:24px}main{max-width:720px;margin:auto;background:white;padding:28px;border-radius:16px}h1{color:#990000}p{line-height:1.6}button{font:inherit;border:1px solid #bbb;border-radius:8px;background:white;padding:10px 16px;cursor:pointer;margin:6px 8px 6px 0}#add{background:#990000;color:white;border:0}li{margin:16px 0;overflow-wrap:anywhere}#message{padding:12px;background:#f3f4f6;white-space:pre-line}button:disabled{opacity:.5;cursor:wait}#destination{border:1px solid #ddd;border-radius:10px;padding:16px;margin:20px 0}code{overflow-wrap:anywhere}#error-details{white-space:pre-wrap;overflow-wrap:anywhere}</style></head><body><main><h1>${labels.title}</h1><p>${labels.intro}</p><p>${labels.permission}</p><p>${labels.migration}</p><section id="destination"><h2>${labels.destination}</h2><p id="calendar-name">${labels.notConnected}</p><p id="calendar-identity" hidden>${labels.calendarId}: <code id="calendar-id"></code></p><a id="calendar-link" hidden target="_blank" rel="noopener">${labels.openCalendar} \u2197</a><p id="calendar-warning" role="status"></p></section><button id="add" hidden>${labels.add}</button><button id="refresh">${labels.refresh}</button><button id="stop">${labels.stop}</button><p id="message" role="status" aria-live="polite"></p><details id="error-box" hidden><summary>${labels.details}</summary><p id="error-details"></p></details><p id="status"></p><h2>${labels.heading}</h2><ul id="items"></ul><a href="https://calendar.google.com/" target="_blank" rel="noopener">Google Calendar \u2197</a></main><script>
  const selected=${json(selected)},L=${json(labels)},lang=${json(language)};
  const $=id=>document.getElementById(id);let busy=false;
  function disable(value){busy=value;document.querySelectorAll('button').forEach(b=>b.disabled=value);}
- function fail(){disable(false);$('message').textContent=L.error;}
- function render(state){disable(false);$('status').textContent=(state.automatic?L.automatic:L.inactive)+(state.lastSync?' '+L.last+': '+new Intl.DateTimeFormat(lang==='en'?'en-GB':'sq-AL',{dateStyle:'medium',timeStyle:'short'}).format(new Date(state.lastSync)):'');$('items').replaceChildren();
+ function fail(error){disable(false);$('message').textContent=L.error;$('error-box').hidden=false;$('error-details').textContent=error?.message||L.error;}
+ function safeGoogleLink(value){try{const url=new URL(value);return url.protocol==='https:'&&['calendar.google.com','www.google.com'].includes(url.hostname)?url.href:null;}catch{return null;}}
+ function render(state){disable(false);$('error-box').hidden=true;const calendar=state.calendar;$('calendar-name').textContent=calendar?.name||L.notConnected;$('calendar-identity').hidden=!calendar;$('calendar-id').textContent=calendar?.id||'';const calendarUrl=safeGoogleLink(calendar?.url);$('calendar-link').hidden=!calendarUrl;if(calendarUrl)$('calendar-link').href=calendarUrl;$('calendar-warning').textContent=calendar?.error?L.calendarError:calendar?.visible===false?L.hidden:'';if(calendar?.error||state.lastFailure){$('error-box').hidden=false;$('error-details').textContent=calendar?.error||state.lastFailure;}$('status').textContent=(state.automatic?L.automatic:L.inactive)+(state.lastSync?' '+L.last+': '+new Intl.DateTimeFormat(lang==='en'?'en-GB':'sq-AL',{dateStyle:'medium',timeStyle:'short'}).format(new Date(state.lastSync)):'');$('items').replaceChildren();
   if(!state.items.length)$('items').textContent=L.empty;
-  for(const item of state.items){const li=document.createElement('li'),text=document.createElement('span'),button=document.createElement('button');text.textContent=item.title||item.id;button.textContent=L.remove;button.onclick=()=>{if(!confirm(L.removeConfirm))return;call('removeFacultyActivity',item);};li.append(text,document.createElement('br'),button);$('items').append(li);}
-  $('message').textContent=state.lastError?L.retry:L.ready;
+  for(const item of state.items){const li=document.createElement('li'),text=document.createElement('span'),button=document.createElement('button');text.textContent=item.title||item.id;button.textContent=L.remove;button.onclick=()=>{if(!confirm(L.removeConfirm))return;call('removeFacultyActivity',item);};li.append(text);const eventUrl=safeGoogleLink(item.eventUrl);if(eventUrl){const link=document.createElement('a');link.href=eventUrl;link.target='_blank';link.rel='noopener';link.textContent=L.openEvent+' \u2197';li.append(document.createElement('br'),link);}li.append(document.createElement('br'),button);$('items').append(li);}
+  $('message').textContent=state.lastError?L.retry:calendar?.error?L.calendarError:state.action==='connected'?L.done:state.action==='removed'?L.removed:state.action==='stopped'?L.stopped:L.ready;
   if(selected){$('add').hidden=false;}
  }
  function call(method,arg){disable(true);$('message').textContent=L.busy;const runner=google.script.run.withSuccessHandler(render).withFailureHandler(fail);if(arg===undefined)runner[method]();else runner[method](arg);}
- $('add').onclick=()=>call('connectFacultyActivity',selected);$('refresh').onclick=()=>call('syncFacultyCalendar');$('stop').onclick=()=>{if(confirm(L.stopConfirm))call('stopFacultyCalendar');};call('facultyCalendarStatus');
+ $('add').onclick=()=>call('connectFacultyActivity',selected);$('refresh').onclick=()=>call('checkFacultyCalendar');$('stop').onclick=()=>{if(confirm(L.stopConfirm))call('stopFacultyCalendar');};call('facultyCalendarStatus');
  <\/script></body></html>`;
   }
 
@@ -215,8 +219,25 @@ var FacultyCalendarSync = (() => {
     if (result.removed) props().deleteProperty(PREFIX + selectionKey(item));
     return result;
   }
+  function calendarDetails() {
+    const id = props().getProperty(CALENDAR);
+    if (!id) return null;
+    const details = { id, name: "Fakulteti Filozofik \xB7 Orari", url: "https://calendar.google.com/calendar/embed?src=" + encodeURIComponent(id) + "&ctz=Europe%2FTirane" };
+    try {
+      const data = api("/calendars/" + encodeURIComponent(id));
+      details.name = data.summary || details.name;
+      const entry = api("/users/me/calendarList/" + encodeURIComponent(id));
+      details.visible = entry.selected === true && entry.hidden !== true;
+    } catch (error) {
+      details.error = error.message;
+    }
+    return details;
+  }
+  function showCalendar(id) {
+    api("/users/me/calendarList/" + encodeURIComponent(id), "PATCH", { selected: true, hidden: false });
+  }
   function status() {
-    return { connected: !!props().getProperty(CALENDAR), items: items().map(({ kind, id, title }) => ({ kind, id, title })), lastSync: props().getProperty("lastSync"), lastError: props().getProperty("lastError"), automatic: ScriptApp.getProjectTriggers().some((t) => t.getHandlerFunction() === HANDLER) };
+    return { connected: !!props().getProperty(CALENDAR), calendar: calendarDetails(), items: items().map(({ kind, id, title, eventUrl }) => ({ kind, id, title, eventUrl })), lastSync: props().getProperty("lastSync"), lastError: props().getProperty("lastError"), lastFailure: props().getProperty("lastFailure"), automatic: ScriptApp.getProjectTriggers().some((t) => t.getHandlerFunction() === HANDLER) };
   }
   function connect(value) {
     return locked(() => {
@@ -225,35 +246,56 @@ var FacultyCalendarSync = (() => {
       const event = eventFor({ [selected.kind]: selected.id });
       if (event.cancelled) throw Error("This activity has been cancelled or removed.");
       let calendarId = props().getProperty(CALENDAR);
+      if (calendarId && !api("/calendars/" + encodeURIComponent(calendarId), "GET", void 0, [404, 410])) {
+        calendarId = null;
+        props().deleteProperty(CALENDAR);
+        for (const item of list) save({ ...item, hash: null, etag: null, eventUrl: null });
+      }
       if (!calendarId) {
         const created = api("/calendars", "POST", { summary: "Fakulteti Filozofik \xB7 Orari", timeZone: "Europe/Tirane", description: "Selected faculty activities. Automatically checked every five minutes." });
         calendarId = created.id;
         props().setProperty(CALENDAR, calendarId);
       }
+      showCalendar(calendarId);
       ensureTrigger();
       save(old || { ...selected, title: event.title });
-      syncItem(old || selected, event);
+      try {
+        syncItem(old || selected, event);
+      } catch (error) {
+        props().setProperty("lastError", "The selected activity could not be synchronized. Please retry.");
+        props().setProperty("lastFailure", error.message);
+        throw error;
+      }
       props().setProperty("lastSync", (/* @__PURE__ */ new Date()).toISOString());
       props().deleteProperty("lastError");
-      return status();
+      props().deleteProperty("lastFailure");
+      return { ...status(), action: "connected" };
     });
   }
-  function sync() {
+  function sync(interactive = false) {
     return locked(() => {
       if (!props().getProperty(CALENDAR)) return status();
+      if (interactive) showCalendar(props().getProperty(CALENDAR));
       const list = items();
       let failures = 0;
       const start = Date.now();
       const cursor = Number(props().getProperty("cursor") || 0) % Math.max(1, list.length);
       let count = 0;
-      for (; count < list.length && Date.now() - start < 24e4; count++) try {
-        syncItem(list[(cursor + count) % list.length]);
-      } catch (error) {
-        failures++;
+      for (; count < list.length && Date.now() - start < 24e4; count++) {
+        try {
+          const item = list[(cursor + count) % list.length];
+          syncItem(item, interactive ? eventFor({ [item.kind]: item.id }) : void 0);
+        } catch (error) {
+          failures++;
+          props().setProperty("lastFailure", error.message || "Calendar synchronization failed.");
+        }
       }
       props().setProperty("cursor", String((cursor + count) % Math.max(1, list.length)));
       if (failures || count < list.length) props().setProperty("lastError", "Some activities could not be refreshed. They will be retried on the next check.");
-      else props().deleteProperty("lastError");
+      else {
+        props().deleteProperty("lastError");
+        props().deleteProperty("lastFailure");
+      }
       props().setProperty("lastSync", (/* @__PURE__ */ new Date()).toISOString());
       if (!items().length) removeTrigger();
       return status();
@@ -266,14 +308,14 @@ var FacultyCalendarSync = (() => {
         syncItem(found, { cancelled: true });
         if (!items().length) removeTrigger();
       }
-      return status();
+      return { ...status(), action: "removed" };
     });
   }
   function stop() {
     return locked(() => {
       removeTrigger();
       for (const item of items()) props().deleteProperty(PREFIX + selectionKey(item));
-      return status();
+      return { ...status(), action: "stopped" };
     });
   }
   function page(request) {
@@ -293,6 +335,7 @@ function doGet(request) { return FacultyCalendarSync.page(request); }
 function connectFacultyActivity(value) { return FacultyCalendarSync.connect(value); }
 function facultyCalendarStatus() { return FacultyCalendarSync.status(); }
 function syncFacultyCalendar() { return FacultyCalendarSync.sync(); }
+function checkFacultyCalendar() { return FacultyCalendarSync.sync(true); }
 function removeFacultyActivity(value) { return FacultyCalendarSync.remove(value); }
 function stopFacultyCalendar() { return FacultyCalendarSync.stop(); }
 
