@@ -528,8 +528,7 @@ function openLinkedSection(){
    $('requests-section').scrollIntoView({block:'start'});
    return;
   }
-  for(const id of ['requests-section','email-delivery-section','reservations-section'])$(id).open=true;
-  readEmailDelivery();
+  for(const id of ['requests-section','email-delivery-section','reservations-section'])$(id).open=false;
   return;
  }
 

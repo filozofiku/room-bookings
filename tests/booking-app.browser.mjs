@@ -453,6 +453,8 @@ await page.waitForSelector('#app:not([hidden])');
 assert.equal(await page.locator('#reservation-entry').isVisible(),false);
 for(const id of ['requests-section','email-delivery-section','reservations-section']){
  assert.equal(await page.locator('#'+id).isVisible(),true);
+ assert.equal(await page.locator('#'+id).getAttribute('open'),null);
+ await page.locator('#'+id+' > summary').click();
  assert.equal(await page.locator('#'+id).getAttribute('open'),'');
 }
 assert.equal(await page.locator('#requests-heading').textContent(),'Kërkesat për miratim');
@@ -528,6 +530,10 @@ assert.equal(await page.locator('#requests-heading').textContent(),'Requests for
 assert.equal(await page.locator('#reservations-heading').textContent(),'All reservations');
 assert.match(await page.locator('#email-delivery-section summary').textContent(),/Email notification status/);
 assert.match(await page.locator('#management-scope').textContent(),/Only your/);
+for(const id of ['requests-section','email-delivery-section','reservations-section']){
+ assert.equal(await page.locator('#'+id).getAttribute('open'),null);
+ await page.locator('#'+id+' > summary').click();
+}
 if(process.env.FET_BOOKING_LANGUAGE_SCREENSHOTS)await page.screenshot({path:'/tmp/fet-management-language-desktop.png'});
 await page.locator('#my-reservations').getByRole('button',{name:'Edit',exact:true}).first().click();
 await page.locator('#title').fill('Tekst i ruajtur gjatë ndërrimit');
@@ -548,6 +554,7 @@ await page.evaluate(async()=>{
  window.testStore.set('users/admin',{active:true,role:'admin',canCancelAll:true});
  await window.testAuth({uid:'admin',displayName:'Administrator',email:'admin@example.test'});
 });
+for(const id of ['requests-section','email-delivery-section'])if(await page.locator('#'+id).getAttribute('open')===null)await page.locator('#'+id+' > summary').click();
 await page.getByRole('button',{name:'Refresh status',exact:true}).click();
 await page.waitForFunction(()=>document.getElementById('email-delivery-list').textContent.includes('Student notification'));
 assert.match(await page.locator('#email-delivery-list').textContent(),/Status: Pending/);
