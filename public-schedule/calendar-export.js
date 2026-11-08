@@ -45,7 +45,7 @@ export function calendarActions(event,t=value=>value){
  const instructions=document.createElement('p');instructions.textContent=t('Duke përgatitur abonimin…');box.append(instructions);
  const address=document.createElement('input');address.type='url';address.readOnly=true;address.hidden=true;address.setAttribute('aria-label',t('Adresa e abonimit në kalendar'));address.style.cssText='width:100%;max-width:100%;box-sizing:border-box';address.onclick=()=>address.select();box.append(address);
  let requested=false;box.addEventListener('toggle',()=>{if(!box.open||requested)return;requested=true;subscription(event).then(feed=>{
-   const url=new URL('https://calendar.google.com/calendar/render');url.searchParams.set('cid',feed);link.href=url.href;link.hidden=false;
+   const url=new URL('https://calendar.google.com/calendar/render');url.searchParams.set('cid',feed.replace(/^https:/,'webcal:'));link.href=url.href;link.hidden=false;
    instructions.textContent=t('Nëse lidhja nuk funksionon, në Google Calendar në kompjuter zgjidhni Kalendare të tjera → Nga URL dhe ngjitni këtë adresë.');address.value=feed;address.hidden=false;
  }).catch(()=>{requested=false;instructions.textContent=t('Abonimi nuk është ende i disponueshëm. Provoni përsëri më vonë.');});});
  const copyNote=document.createElement('p');copyNote.textContent=t('Skedari .ics është kopje lokale dhe nuk përditësohet automatikisht.');box.append(copyNote);

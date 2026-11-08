@@ -28,7 +28,8 @@ try {
   const classFeed=new URL(classUrl.searchParams.get('cid'));
   assert.match(classFeed.searchParams.get('class'),/^class-\d+$/);
   assert.equal(classFeed.searchParams.has('booking'),false);
-  assert.equal(await page.locator('#modalCalendar input').inputValue(),classFeed.href);
+  assert.equal(classFeed.protocol,'webcal:');
+  assert.equal(await page.locator('#modalCalendar input').inputValue(),classFeed.href.replace(/^webcal:/,'https:'));
   const classDownload=page.waitForEvent('download');await page.locator('#modalCalendar button').click();assert.equal((await classDownload).suggestedFilename(),'rezervimi.ics');
   await page.click('#closeDialog');
   assert.equal(await page.locator('#bookingDate').isVisible(),false);

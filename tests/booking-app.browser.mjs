@@ -168,6 +168,7 @@ assert.equal(await page.locator('#booking-receipt .status-confirmed').textConten
 await page.locator('#booking-receipt .calendar-actions summary').click();
 await page.locator('#booking-receipt .calendar-actions a').waitFor({state:'visible'});
 const calendarUrl=new URL(await page.locator('#booking-receipt .calendar-actions a').getAttribute('href'));
+assert.equal(new URL(calendarUrl.searchParams.get('cid')).protocol,'webcal:');
 assert.equal(new URL(calendarUrl.searchParams.get('cid')).searchParams.get('booking'),'new');
 assert.equal(new URL(calendarUrl.searchParams.get('cid')).searchParams.has('class'),false);
 const downloaded=page.waitForEvent('download');await page.locator('#booking-receipt .calendar-actions button').click();assert.equal((await downloaded).suggestedFilename(),'rezervimi.ics');
