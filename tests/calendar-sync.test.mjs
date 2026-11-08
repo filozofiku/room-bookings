@@ -24,12 +24,13 @@ test('same event is patched on changes, unchanged sources make no writes, and ca
  run({cancelled:true});assert.equal(calls.at(-1).method,'DELETE');assert(calls.at(-1).path.startsWith('/calendars/app-created/events/'));assert.equal(stored.size,0);
 });
 function fixture(){
- let user='alice';const users=new Map(),events=new Map(),requests=[],cache=new Map();let next=0,unavailable=false,version=0;const calendars=new Map(),calendarEvents=new Map(),entries=new Map();
+ let user='alice';const users=new Map(),events=new Map(),requests=[],cache=new Map();let next=0,unavailable=false,version=0,googleFailure=null;const invalidated=[];const calendars=new Map(),calendarEvents=new Map(),entries=new Map();
  const state=()=>{if(!users.has(user))users.set(user,{properties:new Map(),triggers:[]});return users.get(user);};
  const encode=v=>typeof v==='string'?{stringValue:v}:Array.isArray(v)?{arrayValue:{values:v.map(encode)}}:{mapValue:{fields:Object.fromEntries(Object.entries(v).map(([k,v])=>[k,encode(v)]))}};
  const response=(status,data)=>({getResponseCode:()=>status,getContentText:()=>data?JSON.stringify(data):''});
  const fetch=(url,options={})=>{if(url.includes('firestore.googleapis.com')){if(unavailable)return response(503,{});const value=events.get(url.split('/documents/')[1]);return value?response(200,{fields:encode(value).mapValue.fields,updateTime:'2026-11-08T10:00:00Z'}):response(404,{});}
   assert(url.startsWith('https://www.googleapis.com/calendar/v3/'));assert.equal(options.headers.Authorization,'Bearer '+user);requests.push({user,url,...options});
+  if(googleFailure&&url.includes(googleFailure.includes))return response(googleFailure.status,{error:{message:googleFailure.status===401?'Invalid Credentials':'Insufficient Permission',errors:[{reason:googleFailure.status===401?'authError':'insufficientPermissions'}]}});
   const body=options.payload?JSON.parse(options.payload):null;
   const path=url.split('/calendar/v3')[1],method=options.method||'GET';
   if(method==='POST'&&path==='/calendars'){const id=user+'-calendar-'+(++next),calendar={id,...body};calendars.set(id,calendar);entries.set(id,{id,selected:false,hidden:true});return response(200,calendar);}
@@ -39,9 +40,9 @@ function fixture(){
   if(method==='DELETE'){calendarEvents.delete(path);return response(204);}
   const key=method==='POST'?path+'/'+body.id:path,result={...body,id:method==='POST'?body.id:path.split('/').at(-1),etag:String(++version),htmlLink:'https://www.google.com/calendar/event?eid=test'};calendarEvents.set(key,result);return response(200,result);
  };
- const ctx=vm.createContext({Intl,Date,console,PropertiesService:{getUserProperties:()=>({getProperties:()=>Object.fromEntries(state().properties),getProperty:k=>state().properties.get(k)||null,setProperty:(k,v)=>state().properties.set(k,v),deleteProperty:k=>state().properties.delete(k)})},LockService:{getUserLock:()=>({tryLock:()=>true,releaseLock:()=>{}})},CacheService:{getScriptCache:()=>({get:k=>cache.get(k),put:(k,v)=>cache.set(k,v)})},ScriptApp:{getOAuthToken:()=>user,getProjectTriggers:()=>state().triggers,newTrigger:handler=>({timeBased:()=>({everyMinutes:n=>({create:()=>{assert.equal(n,5);state().triggers.push({getHandlerFunction:()=>handler});}})})}),deleteTrigger:t=>{state().triggers=state().triggers.filter(v=>v!==t);}},Utilities:{DigestAlgorithm:{SHA_256:'sha256'},Charset:{UTF_8:'utf8'},computeDigest:(_,s)=>[...createHash('sha256').update(s).digest()]},UrlFetchApp:{fetch,fetchAll:rs=>rs.map(r=>fetch(r.url,r))}});
+ const ctx=vm.createContext({Intl,Date,console,PropertiesService:{getUserProperties:()=>({getProperties:()=>Object.fromEntries(state().properties),getProperty:k=>state().properties.get(k)||null,setProperty:(k,v)=>state().properties.set(k,v),deleteProperty:k=>state().properties.delete(k)})},LockService:{getUserLock:()=>({tryLock:()=>true,releaseLock:()=>{}})},CacheService:{getScriptCache:()=>({get:k=>cache.get(k),put:(k,v)=>cache.set(k,v)})},ScriptApp:{invalidateAuth:()=>invalidated.push(user),getOAuthToken:()=>user,getProjectTriggers:()=>state().triggers,newTrigger:handler=>({timeBased:()=>({everyMinutes:n=>({create:()=>{assert.equal(n,5);state().triggers.push({getHandlerFunction:()=>handler});}})})}),deleteTrigger:t=>{state().triggers=state().triggers.filter(v=>v!==t);}},Utilities:{DigestAlgorithm:{SHA_256:'sha256'},Charset:{UTF_8:'utf8'},computeDigest:(_,s)=>[...createHash('sha256').update(s).digest()]},UrlFetchApp:{fetch,fetchAll:rs=>rs.map(r=>fetch(r.url,r))}});
  vm.runInContext(readFileSync(new URL('../calendar-sync/CalendarSync.gs',import.meta.url),'utf8'),ctx);
- return {api:ctx,events,requests,cache,as:value=>{user=value;},fail:value=>{unavailable=value;}};
+ return {api:ctx,events,requests,cache,invalidated,failGoogle:value=>{googleFailure=value;},as:value=>{user=value;},fail:value=>{unavailable=value;}};
 }
 test('standalone app isolates user properties, calendars, tokens and triggers; retries failed sources safely',()=>{
  const f=fixture();f.events.set('publicBookings/one',{title:'Titulli',date:'2026-11-08',periodIds:['p1'],roomId:'r1'});f.events.set('periods/p1',{start:'14:30',end:'16:00'});f.events.set('rooms/r1',{name:'Salla 128'});
@@ -54,4 +55,12 @@ test('standalone app isolates user properties, calendars, tokens and triggers; r
 test('connection requires an explicit user action and both languages preserve safe author text',()=>{
  for(const lang of ['en','sq']){const html=connectionPage({kind:'booking',id:'one'},lang);assert(html.includes('google.script.run'));assert(html.includes("$('add').onclick"));assert(!html.includes("call('connectFacultyActivity');"));assert(html.includes('every five minutes')||html.includes('çdo pesë minuta'));}
  const manifest=JSON.parse(readFileSync(new URL('../calendar-sync/appsscript.json',import.meta.url)));assert.equal(manifest.webapp.executeAs,'USER_ACCESSING');assert(manifest.oauthScopes.includes('https://www.googleapis.com/auth/calendar.app.created'));assert(!manifest.oauthScopes.includes('https://www.googleapis.com/auth/calendar'));
+});
+
+test('calendar-list permission errors do not block writes; 401 errors explain reauthorization and preserve user selections',()=>{
+ const f=fixture();f.events.set('publicBookings/one',{title:'Titulli',date:'2026-11-08',periodIds:['p1'],roomId:'r1'});f.events.set('periods/p1',{start:'14:30',end:'16:00'});f.events.set('rooms/r1',{name:'Salla 128'});
+ f.failGoogle({includes:'/users/me/calendarList/',status:403});const connected=f.api.connectFacultyActivity({kind:'booking',id:'one'});assert.equal(connected.action,'connected');assert(connected.items[0].eventUrl);assert.match(connected.calendar.visibilityWarning,/calendar visibility failed \(403\)/);assert.equal(connected.calendar.error,undefined);
+ f.failGoogle({includes:'/calendar/v3/',status:401});const status=f.api.facultyCalendarStatus();assert.equal(status.calendar.errorStatus,401);assert.match(status.calendar.error,/authError: Invalid Credentials/);assert.throws(()=>f.api.connectFacultyActivity({kind:'booking',id:'one'}),/\(401\)/);
+ const reset=f.api.reauthorizeFacultyCalendar();assert.equal(reset.authorizationReset,true);assert.equal(f.invalidated.length,1);assert.equal(f.api.facultyCalendarStatus().items.length,1);assert.equal(f.api.facultyCalendarStatus().automatic,false);
+ f.failGoogle(null);const again=f.api.connectFacultyActivity({kind:'booking',id:'one'});assert.equal(again.calendar.id,connected.calendar.id);assert.equal(again.automatic,true);assert.equal(again.items.length,1);
 });

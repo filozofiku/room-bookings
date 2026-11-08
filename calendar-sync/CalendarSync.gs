@@ -23,6 +23,7 @@ var FacultyCalendarSync = (() => {
   __export(worker_exports, {
     connect: () => connect,
     page: () => page,
+    reauthorize: () => reauthorize,
     remove: () => remove,
     status: () => status,
     stop: () => stop,
@@ -160,20 +161,22 @@ var FacultyCalendarSync = (() => {
       done: "Activity connected. It will now be checked every five minutes."
     } : { title: "Lidh Google Calendar", intro: "Shtoni aktivitetet e zgjedhura n\xEB nj\xEB kalendar t\xEB ve\xE7ant\xEB t\xEB fakultetit n\xEB llogarin\xEB tuaj Google. Ndryshimet kontrollohen \xE7do pes\xEB minuta, edhe kur kjo faqe \xEBsht\xEB e mbyllur. Koha mund t\xEB ndryshoj\xEB n\xEBse Google vonon kontrollin ose arrihet kuota e llogaris\xEB.", permission: "Kjo lidhje menaxhon vet\xEBm kalendar\xEBt q\xEB krijon. Nuk lexon kalendarin tuaj kryesor dhe nuk d\xEBrgon email p\xEBr rezervimet.", add: "Lidh k\xEBt\xEB aktivitet", refresh: "Kontrollo ndryshimet tani", stop: "Ndalo t\xEB gjitha p\xEBrdit\xEBsimet automatike", stopConfirm: "T\xEB ndalohen p\xEBrdit\xEBsimet automatike p\xEBr t\xEB gjitha aktivitetet e lidhura? Aktivitetet ekzistuese do t\xEB mbeten n\xEB kalendar.", remove: "Hiq nga kalendari", removeConfirm: "T\xEB hiqet ky aktivitet nga kalendari dhe t\xEB ndalen p\xEBrdit\xEBsimet e tij?", busy: "Duke punuar\u2026", ready: "Gati", empty: "Nuk ka aktivitete t\xEB lidhura.", last: "Kontrolli i fundit", automatic: "P\xEBrdit\xEBsimet automatike jan\xEB aktive (\xE7do pes\xEB minuta).", inactive: "P\xEBrdit\xEBsimet automatike jan\xEB ndalur.", error: "Veprimi nuk u krye. Kontrolloni autorizimin dhe konfigurimin e sh\xEBrbimit, pastaj provoni p\xEBrs\xEBri.", retry: "Disa aktivitete nuk u rifreskuan; kontrolli i ardhsh\xEBm do t\xEB provoj\xEB p\xEBrs\xEBri.", migration: "Hiqni abonimet e vjetra p\xEBrmes URL-s\xEB p\xEBr t\xEB nj\xEBjtat aktivitete p\xEBr t\xEB shmangur kopjet e dyfishta.", heading: "Aktivitetet e lidhura", done: "Aktiviteti u lidh. Tani do t\xEB kontrollohet \xE7do pes\xEB minuta." };
     Object.assign(labels, en ? { destination: "Destination calendar", calendarId: "Calendar ID", openCalendar: "Open this calendar", openEvent: "Open event", notConnected: "A separate faculty calendar will be created when you connect your first activity.", hidden: "This calendar is hidden in Google Calendar. Connect an activity or check now to make it visible.", calendarError: "Calendar details could not be verified. Check your account access and try again.", removed: "The activity was removed from this calendar. Older URL subscriptions and copies are separate.", stopped: "Automatic updates stopped. Existing calendar events remain.", details: "Error details" } : { destination: "Kalendari ku shtohen aktivitetet", calendarId: "ID-ja e kalendarit", openCalendar: "Hap k\xEBt\xEB kalendar", openEvent: "Hap aktivitetin", notConnected: "Nj\xEB kalendar i ve\xE7ant\xEB i fakultetit do t\xEB krijohet kur t\xEB lidhni aktivitetin e par\xEB.", hidden: "Ky kalendar \xEBsht\xEB i fshehur n\xEB Google Calendar. Lidhni nj\xEB aktivitet ose kontrolloni tani p\xEBr ta b\xEBr\xEB t\xEB duksh\xEBm.", calendarError: "T\xEB dh\xEBnat e kalendarit nuk u verifikuan. Kontrolloni qasjen n\xEB llogarin\xEB tuaj dhe provoni p\xEBrs\xEBri.", removed: "Aktiviteti u hoq nga ky kalendar. Abonimet dhe kopjet e vjetra jan\xEB t\xEB ve\xE7anta.", stopped: "P\xEBrdit\xEBsimet automatike u ndal\xEBn. Aktivitetet ekzistuese mbeten n\xEB kalendar.", details: "Holl\xEBsit\xEB e gabimit" });
+    Object.assign(labels, en ? { authError: "Google rejected the calendar authorization (401). Reauthorize this connection using the same Google account.", reauthorize: "Reauthorize Google Calendar", reauthorizeConfirm: "Reset authorization for this connection? Your calendar and selected activities will be kept. Reopen this page afterwards and grant access again.", authReset: "Authorization reset. Close this page, reopen the activity connection link, sign in with the same Google account, grant the requested permissions, and connect the activity again.", visibilityWarning: "Calendar visibility could not be checked. Open this calendar directly or select it in Google Calendar." } : { authError: "Google refuzoi autorizimin e kalendarit (401). Riautorizoni lidhjen me t\xEB nj\xEBjt\xEBn llogari Google.", reauthorize: "Riautorizo Google Calendar", reauthorizeConfirm: "T\xEB rivendoset autorizimi i k\xEBsaj lidhjeje? Kalendari dhe aktivitetet e zgjedhura do t\xEB ruhen. Hapeni p\xEBrs\xEBri faqen dhe jepni lejen s\xEBrish.", authReset: "Autorizimi u rivendos. Mbylleni faqen, hapeni p\xEBrs\xEBri lidhjen e aktivitetit, hyni me t\xEB nj\xEBjt\xEBn llogari Google, jepni lejet e k\xEBrkuara dhe lidhni aktivitetin s\xEBrish.", visibilityWarning: "Dukshm\xEBria e kalendarit nuk u verifikua. Hapeni drejtp\xEBrdrejt ose zgjidheni n\xEB Google Calendar." });
     const json = (value) => JSON.stringify(value).replace(/</g, "\\u003c");
-    return `<!DOCTYPE html><html lang="${language}"><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{font:16px system-ui,sans-serif;background:#f0f2f5;color:#242629;margin:0;padding:24px}main{max-width:720px;margin:auto;background:white;padding:28px;border-radius:16px}h1{color:#990000}p{line-height:1.6}button{font:inherit;border:1px solid #bbb;border-radius:8px;background:white;padding:10px 16px;cursor:pointer;margin:6px 8px 6px 0}#add{background:#990000;color:white;border:0}li{margin:16px 0;overflow-wrap:anywhere}#message{padding:12px;background:#f3f4f6;white-space:pre-line}button:disabled{opacity:.5;cursor:wait}#destination{border:1px solid #ddd;border-radius:10px;padding:16px;margin:20px 0}code{overflow-wrap:anywhere}#error-details{white-space:pre-wrap;overflow-wrap:anywhere}</style></head><body><main><h1>${labels.title}</h1><p>${labels.intro}</p><p>${labels.permission}</p><p>${labels.migration}</p><section id="destination"><h2>${labels.destination}</h2><p id="calendar-name">${labels.notConnected}</p><p id="calendar-identity" hidden>${labels.calendarId}: <code id="calendar-id"></code></p><a id="calendar-link" hidden target="_blank" rel="noopener">${labels.openCalendar} \u2197</a><p id="calendar-warning" role="status"></p></section><button id="add" hidden>${labels.add}</button><button id="refresh">${labels.refresh}</button><button id="stop">${labels.stop}</button><p id="message" role="status" aria-live="polite"></p><details id="error-box" hidden><summary>${labels.details}</summary><p id="error-details"></p></details><p id="status"></p><h2>${labels.heading}</h2><ul id="items"></ul><a href="https://calendar.google.com/" target="_blank" rel="noopener">Google Calendar \u2197</a></main><script>
+    return `<!DOCTYPE html><html lang="${language}"><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{font:16px system-ui,sans-serif;background:#f0f2f5;color:#242629;margin:0;padding:24px}main{max-width:720px;margin:auto;background:white;padding:28px;border-radius:16px}h1{color:#990000}p{line-height:1.6}button{font:inherit;border:1px solid #bbb;border-radius:8px;background:white;padding:10px 16px;cursor:pointer;margin:6px 8px 6px 0}#add{background:#990000;color:white;border:0}li{margin:16px 0;overflow-wrap:anywhere}#message{padding:12px;background:#f3f4f6;white-space:pre-line}button:disabled{opacity:.5;cursor:wait}#destination{border:1px solid #ddd;border-radius:10px;padding:16px;margin:20px 0}code{overflow-wrap:anywhere}#error-details{white-space:pre-wrap;overflow-wrap:anywhere}</style></head><body><main><h1>${labels.title}</h1><p>${labels.intro}</p><p>${labels.permission}</p><p>${labels.migration}</p><section id="destination"><h2>${labels.destination}</h2><p id="calendar-name">${labels.notConnected}</p><p id="calendar-identity" hidden>${labels.calendarId}: <code id="calendar-id"></code></p><a id="calendar-link" hidden target="_blank" rel="noopener">${labels.openCalendar} \u2197</a><p id="calendar-warning" role="status"></p></section><button id="add" hidden>${labels.add}</button><button id="refresh">${labels.refresh}</button><button id="stop">${labels.stop}</button><button id="reauthorize" hidden>${labels.reauthorize}</button><p id="message" role="status" aria-live="polite"></p><details id="error-box" hidden><summary>${labels.details}</summary><p id="error-details"></p></details><p id="status"></p><h2>${labels.heading}</h2><ul id="items"></ul><a href="https://calendar.google.com/" target="_blank" rel="noopener">Google Calendar \u2197</a></main><script>
  const selected=${json(selected)},L=${json(labels)},lang=${json(language)};
  const $=id=>document.getElementById(id);let busy=false;
  function disable(value){busy=value;document.querySelectorAll('button').forEach(b=>b.disabled=value);}
- function fail(error){disable(false);$('message').textContent=L.error;$('error-box').hidden=false;$('error-details').textContent=error?.message||L.error;}
+ function fail(error){disable(false);const unauthorized=/(401)/.test(error?.message||'');$('reauthorize').hidden=!unauthorized;$('message').textContent=unauthorized?L.authError:L.error;$('error-box').hidden=false;$('error-box').open=true;$('error-details').textContent=error?.message||L.error;}
  function safeGoogleLink(value){try{const url=new URL(value);return url.protocol==='https:'&&['calendar.google.com','www.google.com'].includes(url.hostname)?url.href:null;}catch{return null;}}
- function render(state){disable(false);$('error-box').hidden=true;const calendar=state.calendar;$('calendar-name').textContent=calendar?.name||L.notConnected;$('calendar-identity').hidden=!calendar;$('calendar-id').textContent=calendar?.id||'';const calendarUrl=safeGoogleLink(calendar?.url);$('calendar-link').hidden=!calendarUrl;if(calendarUrl)$('calendar-link').href=calendarUrl;$('calendar-warning').textContent=calendar?.error?L.calendarError:calendar?.visible===false?L.hidden:'';if(calendar?.error||state.lastFailure){$('error-box').hidden=false;$('error-details').textContent=calendar?.error||state.lastFailure;}$('status').textContent=(state.automatic?L.automatic:L.inactive)+(state.lastSync?' '+L.last+': '+new Intl.DateTimeFormat(lang==='en'?'en-GB':'sq-AL',{dateStyle:'medium',timeStyle:'short'}).format(new Date(state.lastSync)):'');$('items').replaceChildren();
+ function render(state){disable(false);if(state.authorizationReset){$('message').textContent=L.authReset;document.querySelectorAll('button').forEach(b=>b.disabled=true);return;}$('error-box').hidden=true;const calendar=state.calendar,unauthorized=calendar?.errorStatus===401||String(state.lastFailureStatus)==='401';$('reauthorize').hidden=!unauthorized;$('calendar-name').textContent=calendar?.name||L.notConnected;$('calendar-identity').hidden=!calendar;$('calendar-id').textContent=calendar?.id||'';const calendarUrl=safeGoogleLink(calendar?.url);$('calendar-link').hidden=!calendarUrl;if(calendarUrl)$('calendar-link').href=calendarUrl;$('calendar-warning').textContent=unauthorized?L.authError:calendar?.error?L.calendarError:calendar?.visibilityWarning?L.visibilityWarning:calendar?.visible===false?L.hidden:'';if(calendar?.error||calendar?.visibilityWarning||state.lastFailure){$('error-box').hidden=false;$('error-box').open=true;$('error-details').textContent=calendar?.error||state.lastFailure||calendar?.visibilityWarning;}$('status').textContent=(state.automatic?L.automatic:L.inactive)+(state.lastSync?' '+L.last+': '+new Intl.DateTimeFormat(lang==='en'?'en-GB':'sq-AL',{dateStyle:'medium',timeStyle:'short'}).format(new Date(state.lastSync)):'');$('items').replaceChildren();
   if(!state.items.length)$('items').textContent=L.empty;
   for(const item of state.items){const li=document.createElement('li'),text=document.createElement('span'),button=document.createElement('button');text.textContent=item.title||item.id;button.textContent=L.remove;button.onclick=()=>{if(!confirm(L.removeConfirm))return;call('removeFacultyActivity',item);};li.append(text);const eventUrl=safeGoogleLink(item.eventUrl);if(eventUrl){const link=document.createElement('a');link.href=eventUrl;link.target='_blank';link.rel='noopener';link.textContent=L.openEvent+' \u2197';li.append(document.createElement('br'),link);}li.append(document.createElement('br'),button);$('items').append(li);}
-  $('message').textContent=state.lastError?L.retry:calendar?.error?L.calendarError:state.action==='connected'?L.done:state.action==='removed'?L.removed:state.action==='stopped'?L.stopped:L.ready;
+  $('message').textContent=unauthorized?L.authError:state.lastError?L.retry:calendar?.error?L.calendarError:state.action==='connected'?L.done:state.action==='removed'?L.removed:state.action==='stopped'?L.stopped:L.ready;
   if(selected){$('add').hidden=false;}
  }
  function call(method,arg){disable(true);$('message').textContent=L.busy;const runner=google.script.run.withSuccessHandler(render).withFailureHandler(fail);if(arg===undefined)runner[method]();else runner[method](arg);}
+ $('reauthorize').onclick=()=>{if(confirm(L.reauthorizeConfirm))call('reauthorizeFacultyCalendar');};
  $('add').onclick=()=>call('connectFacultyActivity',selected);$('refresh').onclick=()=>call('checkFacultyCalendar');$('stop').onclick=()=>{if(confirm(L.stopConfirm))call('stopFacultyCalendar');};call('facultyCalendarStatus');
  <\/script></body></html>`;
   }
@@ -187,7 +190,16 @@ var FacultyCalendarSync = (() => {
   function api(path, method = "GET", body, allowed = []) {
     const response = UrlFetchApp.fetch("https://www.googleapis.com/calendar/v3" + path, { method, headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() }, contentType: "application/json", ...body ? { payload: JSON.stringify(body) } : {}, muteHttpExceptions: true }), status2 = response.getResponseCode();
     if (allowed.includes(status2)) return null;
-    if (status2 < 200 || status2 >= 300) throw Object.assign(Error(`Google Calendar request failed (${status2}). Check the Calendar API and account authorization, then retry.`), { status: status2 });
+    if (status2 < 200 || status2 >= 300) {
+      let detail = "";
+      try {
+        const error = JSON.parse(response.getContentText()).error;
+        detail = [error?.errors?.[0]?.reason, error?.message].filter(Boolean).join(": ").slice(0, 600);
+      } catch {
+      }
+      const operation = path.startsWith("/users/me/calendarList/") ? "calendar visibility" : path.includes("/events") ? "event synchronization" : "calendar metadata";
+      throw Object.assign(Error(`Google Calendar ${operation} failed (${status2}). ${detail || "Check account authorization and try again."}`), { status: status2 });
+    }
     return response.getContentText() ? JSON.parse(response.getContentText()) : null;
   }
   var items = () => Object.entries(props().getProperties()).filter(([key]) => key.startsWith(PREFIX)).map(([, value]) => JSON.parse(value));
@@ -226,18 +238,27 @@ var FacultyCalendarSync = (() => {
     try {
       const data = api("/calendars/" + encodeURIComponent(id));
       details.name = data.summary || details.name;
+    } catch (error) {
+      details.error = error.message;
+      details.errorStatus = error.status;
+    }
+    if (!details.error) try {
       const entry = api("/users/me/calendarList/" + encodeURIComponent(id));
       details.visible = entry.selected === true && entry.hidden !== true;
     } catch (error) {
-      details.error = error.message;
+      details.visibilityWarning = error.message;
+      details.errorStatus = error.status;
     }
     return details;
   }
   function showCalendar(id) {
-    api("/users/me/calendarList/" + encodeURIComponent(id), "PATCH", { selected: true, hidden: false });
+    try {
+      api("/users/me/calendarList/" + encodeURIComponent(id), "PATCH", { selected: true, hidden: false });
+    } catch {
+    }
   }
   function status() {
-    return { connected: !!props().getProperty(CALENDAR), calendar: calendarDetails(), items: items().map(({ kind, id, title, eventUrl }) => ({ kind, id, title, eventUrl })), lastSync: props().getProperty("lastSync"), lastError: props().getProperty("lastError"), lastFailure: props().getProperty("lastFailure"), automatic: ScriptApp.getProjectTriggers().some((t) => t.getHandlerFunction() === HANDLER) };
+    return { connected: !!props().getProperty(CALENDAR), calendar: calendarDetails(), items: items().map(({ kind, id, title, eventUrl }) => ({ kind, id, title, eventUrl })), lastSync: props().getProperty("lastSync"), lastError: props().getProperty("lastError"), lastFailure: props().getProperty("lastFailure"), lastFailureStatus: props().getProperty("lastFailureStatus"), automatic: ScriptApp.getProjectTriggers().some((t) => t.getHandlerFunction() === HANDLER) };
   }
   function connect(value) {
     return locked(() => {
@@ -264,11 +285,14 @@ var FacultyCalendarSync = (() => {
       } catch (error) {
         props().setProperty("lastError", "The selected activity could not be synchronized. Please retry.");
         props().setProperty("lastFailure", error.message);
+        props().setProperty("lastFailureStatus", String(error.status || ""));
+        if (error.status === 401) removeTrigger();
         throw error;
       }
       props().setProperty("lastSync", (/* @__PURE__ */ new Date()).toISOString());
       props().deleteProperty("lastError");
       props().deleteProperty("lastFailure");
+      props().deleteProperty("lastFailureStatus");
       return { ...status(), action: "connected" };
     });
   }
@@ -288,6 +312,11 @@ var FacultyCalendarSync = (() => {
         } catch (error) {
           failures++;
           props().setProperty("lastFailure", error.message || "Calendar synchronization failed.");
+          props().setProperty("lastFailureStatus", String(error.status || ""));
+          if (error.status === 401) {
+            removeTrigger();
+            break;
+          }
         }
       }
       props().setProperty("cursor", String((cursor + count) % Math.max(1, list.length)));
@@ -295,6 +324,7 @@ var FacultyCalendarSync = (() => {
       else {
         props().deleteProperty("lastError");
         props().deleteProperty("lastFailure");
+        props().deleteProperty("lastFailureStatus");
       }
       props().setProperty("lastSync", (/* @__PURE__ */ new Date()).toISOString());
       if (!items().length) removeTrigger();
@@ -318,6 +348,13 @@ var FacultyCalendarSync = (() => {
       return { ...status(), action: "stopped" };
     });
   }
+  function reauthorize() {
+    return locked(() => {
+      removeTrigger();
+      ScriptApp.invalidateAuth();
+      return { authorizationReset: true };
+    });
+  }
   function page(request) {
     let selected = null;
     try {
@@ -338,4 +375,5 @@ function syncFacultyCalendar() { return FacultyCalendarSync.sync(); }
 function checkFacultyCalendar() { return FacultyCalendarSync.sync(true); }
 function removeFacultyActivity(value) { return FacultyCalendarSync.remove(value); }
 function stopFacultyCalendar() { return FacultyCalendarSync.stop(); }
+function reauthorizeFacultyCalendar() { return FacultyCalendarSync.reauthorize(); }
 
