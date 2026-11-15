@@ -8,6 +8,16 @@ try {
   const page = await browser.newPage();
   const errors = [];
   page.on('pageerror',error => errors.push(error.message));
+  // Use the real staff navigation module with deterministic Firebase responses.
+  await page.route('https://www.gstatic.com/firebasejs/12.0.0/**',route => {
+    const file=new URL(route.request().url()).pathname.split('/').at(-1);
+    const modules={
+      'firebase-app.js':`let app;export const getApps=()=>app?[app]:[];export const getApp=()=>app;export const initializeApp=config=>(app=config);`,
+      'firebase-auth.js':`export const getAuth=()=>({});export const signOut=async()=>window.testStaffAuth(null);export const onAuthStateChanged=(auth,callback)=>{window.testStaffAuth=callback;callback(null);return ()=>{};};`,
+      'firebase-firestore.js':`export const getFirestore=()=>({});export const doc=(db,collection,uid)=>uid;export const getDoc=async uid=>{if(window.testStaffDelay)await window.testStaffDelay;if(window.testStaffFailure)throw Error('offline');return {exists:()=>uid!=='student',data:()=>({active:['staff','nonstaff'].includes(uid),role:uid==='nonstaff'?'student':'teacher'})};};`
+    };
+    return route.fulfill({contentType:'text/javascript',body:modules[file]});
+  });
   await page.route('**/public-bookings.js',route => route.fulfill({contentType:'text/javascript',body:`
     export async function connectBookings(config, onDate, report) {
       window.testReport = report;
@@ -18,6 +28,38 @@ try {
   await page.route('https://filozofiku.github.io/calendar-classes.json',route=>route.fulfill({contentType:'application/json',body:readFileSync('public-schedule/calendar-classes.json','utf8')}));
   await page.goto(process.env.PREVIEW_URL || 'http://127.0.0.1:8765');
   await page.waitForFunction(() => window.testReport && !document.getElementById('mainContent').hidden);
+  await page.waitForFunction(()=>window.testStaffAuth);
+  assert.equal(await page.locator('.rail-links a:visible').count(),4);
+  assert.equal(await page.locator('a[data-staff-entry]').isVisible(),true);
+  assert.equal(await page.locator('[data-my-reservations]').isVisible(),false);
+  await page.evaluate(()=>window.testStaffAuth({uid:'student',email:'student@student.uni-pr.edu'}));
+  assert.equal(await page.locator('[data-my-reservations]').isVisible(),false);
+  await page.evaluate(()=>window.testStaffAuth({uid:'inactive',email:'inactive@uni-pr.edu'}));
+  assert.equal(await page.locator('[data-my-reservations]').isVisible(),false);
+  await page.evaluate(()=>window.testStaffAuth({uid:'nonstaff',email:'nonstaff@uni-pr.edu'}));
+  assert.equal(await page.locator('[data-my-reservations]').isVisible(),false);
+  await page.evaluate(()=>window.testStaffAuth({uid:'staff',email:'teacher@uni-pr.edu'}));
+  assert.equal(await page.locator('[data-my-reservations]').isVisible(),true);
+  assert.equal(await page.locator('a[data-staff-entry]').isVisible(),false);
+  assert.equal(await page.locator('[data-staff-identity]').textContent(),'teacher@uni-pr.edu');
+  await page.selectOption('#languagePicker','en');
+  assert.equal(await page.locator('[data-my-reservations]').textContent(),'My reservations');
+  assert.equal(await page.locator('[data-staff-logout]').textContent(),'Sign out');
+  await page.selectOption('#languagePicker','sq');
+  await page.locator('[data-staff-logout]').click();
+  assert.equal(await page.locator('[data-my-reservations]').isVisible(),false);
+  await page.evaluate(async()=>{window.testStaffFailure=true;await window.testStaffAuth({uid:'staff'});window.testStaffFailure=false;});
+  assert.equal(await page.locator('a[data-staff-entry]').isVisible(),true);
+  assert.equal(await page.locator('#mainContent').isVisible(),true);
+  await page.evaluate(()=>{window.testStaffDelay=new Promise(resolve=>window.releaseStaff=resolve);window.testStaffAuth({uid:'staff'});});
+  await page.evaluate(()=>window.testStaffAuth(null));
+  await page.evaluate(()=>{window.releaseStaff();window.testStaffDelay=null;});
+  assert.equal(await page.locator('[data-my-reservations]').isVisible(),false);
+  await page.setViewportSize({width:390,height:844});
+  assert.equal(await page.locator('a[data-staff-entry]').isVisible(),true);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await page.screenshot({path:'/tmp/fet-public-staff-mobile.png',fullPage:true});
+  await page.setViewportSize({width:1280,height:720});
   await page.locator('#bookingDate').evaluate((el,date)=>{el.value=date},'2026-10-23');
   // Anonymous visitors can export a class occurrence from the displayed week.
   await page.locator('#weekBody .event').first().click();
@@ -199,6 +241,14 @@ try {
   assert.equal(await page.locator('.room-choice').count(),0);
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:'/tmp/fet-public-preview-mobile.png',fullPage:true});
+  // A missing authentication SDK must not prevent anonymous timetable access.
+  await page.route('https://www.gstatic.com/firebasejs/12.0.0/**',route=>route.abort());
+  await page.reload();
+  await page.waitForSelector('#mainContent:not([hidden])');
+  assert.equal(await page.locator('a[data-staff-entry]').isVisible(),true);
+  assert.equal(await page.locator('[data-my-reservations]').isVisible(),false);
+  await page.locator('[data-portal-page="today"]').click();
+  assert.equal(await page.locator('#todayPanel').isVisible(),true);
   assert.deepEqual(errors,[]);
-  console.log('Browser checks passed: timetable loading, weekly/list reservation blocks, details, cancellation, overlap, closed dates, offline, date change, safe titles.');
+  console.log('Browser checks passed: staff access, sign-out, anonymous access without authentication SDK, timetable loading, weekly/list reservation blocks, details, cancellation, overlap, closed dates, offline, date change, safe titles.');
 } finally { await browser.close(); }

@@ -28,6 +28,28 @@ records the email-notification choice, and no email is sent. The event modal sho
 its type, selected resources, physical/online mode and safe HTTP(S) meeting link.
 Legacy room-only bookings continue to render.
 
+## Public and staff navigation
+
+Anonymous visitors see the three public destinations and a separate **Hyni për
+rezervime** entrance labelled for academic staff using `@uni-pr.edu` accounts.
+The booking app explains that account approval is required before sign-in. It
+preserves direct links to reservation management and preselected rooms, dates
+and times. Unapproved accounts can switch accounts or return to the timetable.
+
+`staff-navigation.js` restores the existing Firebase session on the public site
+and checks the signed-in user's own `users/{uid}` document. Only an account with
+`active: true` and role `teacher` or `admin` sees the two reservation links and
+sign-out controls. Both sites use this check, matching the existing Firestore
+rules, which remain authoritative.
+Access detection runs independently of the public timetable and booking feed.
+If it fails, visitors can still use the public pages and the staff entrance.
+
+Publish `staff-navigation.js`, `index.html`, `i18n.js`, `public-bookings.js` and
+`university-shell.css` together at the public site's root, alongside its existing
+assets. Publish the booking build through its existing workflow as well. Both
+sites must use the same Firebase project and origin to restore the same session;
+no new account permissions or security-rule changes are needed.
+
 ## Initial publication (historical setup)
 
 1. Review and deploy the updated `firestore.rules` from the booking repository:

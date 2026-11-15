@@ -2,6 +2,17 @@ import {EN,t,getLanguage,locale,roomLabel,initLanguage} from '../public-schedule
 import {englishTimetableLabel} from '../public-schedule/timetable-en.js';
 export {getLanguage,locale,initLanguage};
 export const BOOKING_EN={
+ "Rezervimi i sallave për stafin akademik":"Room booking for academic staff",
+ "Për të rezervuar salla dhe për të menaxhuar rezervimet tuaja, hyni me llogarinë tuaj institucionale @uni-pr.edu. Qasja kërkon miratimin e llogarisë nga administratori.":"To book rooms and manage your reservations, sign in with your institutional @uni-pr.edu account. Your account must be approved by the administrator.",
+ "Duke kontrolluar qasjen…":"Checking access…",
+ "Hyni me llogarinë tuaj institucionale për të vazhduar.":"Sign in with your institutional account to continue.",
+ "Rezervimet janë të disponueshme vetëm për stafin akademik të autorizuar. Kjo llogari nuk ka qasje. Përdorni llogarinë tuaj @uni-pr.edu; nëse jeni pjesë e stafit dhe qasja mungon, kontaktoni administratorin për miratimin e saj.":"Reservations are available only to authorized academic staff. This account does not have access. Use your @uni-pr.edu account; if you are a staff member and access is missing, contact the administrator for approval.",
+ "Qasja nuk mund të verifikohej. Kontrolloni lidhjen dhe provoni përsëri.":"Access could not be verified. Check your connection and try again.",
+ "Ndërroni llogarinë":"Switch account",
+ "Provoni përsëri":"Try again",
+ "Orari mësimor dhe rezervimet e publikuara mund të shihen pa hyrë në llogari.":"The timetable and published reservations can be viewed without signing in.",
+ "Shikoni orarin mësimor":"View the timetable",
+
 'Statistika dhe raporte':'Statistics and reports',
 'Statistika dhe raporte | Universiteti i Prishtinës':'Statistics and reports | University of Prishtina',
 'Raportet janë të disponueshme vetëm për përdoruesit me autorizim të lartë.':'Reports are available only to elevated users.',

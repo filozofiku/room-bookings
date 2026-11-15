@@ -13,15 +13,17 @@ import { EVENT_TYPES, slotKeys, conflictMessage, wordCount } from './booking-res
 import {updateReservation} from './update-reservation.js';
 import {isSpecialRoom,submitReservationRequest,decideReservationRequest} from './reservation-requests.js';
 import { auth, db } from './firebase.js';
+import {hasStaffAccess,setStaffNavigation} from '../public-schedule/staff-navigation.js';
 
 const $ = (id) => document.getElementById(id);
 const provider = new GoogleAuthProvider();
 auth.languageCode = getLanguage();
-provider.setCustomParameters({hl:getLanguage()});
+provider.setCustomParameters({hl:getLanguage(),prompt:'select_account'});
 let currentUser = null;
 let canCancelAll = false;
 let reportsController=null;
 let authenticationGeneration=0;
+let staffAccessState='checking';
 let rooms = [];
 let periods = [];
 let settings = null;
@@ -33,6 +35,29 @@ const errText = error=>bt(errorText(error));
 function message(text, isError = false) {
   $('message').textContent = bt(text);
   $('message').className = isError ? 'error' : 'ok';
+}
+function setStaffAccess(state) {
+  staffAccessState=state;
+  const authorized=state==='authorized';
+  setStaffNavigation(authorized,currentUser?.email||'');
+  $('staff-access').hidden=authorized;
+  $('booking-help-panel').hidden=!authorized||managementView||reportsView;
+  $('login').hidden=Boolean(currentUser);
+  $('login').disabled=state==='checking';
+  $('switch-account').hidden=!currentUser||authorized;
+  $('retry-access').hidden=state!=='unavailable';
+  $('staff-access-identity').hidden=!currentUser||authorized;
+  $('staff-access-identity').textContent=currentUser?.email||'';
+  const status={
+    checking:'Duke kontrolluar qasjen…',
+    signedout:'Hyni me llogarinë tuaj institucionale për të vazhduar.',
+    denied:'Rezervimet janë të disponueshme vetëm për stafin akademik të autorizuar. Kjo llogari nuk ka qasje. Përdorni llogarinë tuaj @uni-pr.edu; nëse jeni pjesë e stafit dhe qasja mungon, kontaktoni administratorin për miratimin e saj.',
+    unavailable:'Qasja nuk mund të verifikohej. Kontrolloni lidhjen dhe provoni përsëri.'
+  };
+  $('staff-access-status').textContent=bt(status[state]||'');
+  const entry=document.querySelector('a[data-staff-entry]');
+  if(authorized)entry.removeAttribute('aria-current');
+  else entry.setAttribute('aria-current','page');
 }
 function selectedPeriodIds() {
   return selectPeriods(periods, $('from').value, $('through').value);
@@ -565,12 +590,13 @@ async function loadApp() {
   const user=currentUser,generation=authenticationGeneration;
   const userSnap = await getDoc(doc(db,'users',user.uid));
   if(generation!==authenticationGeneration)return;
-  if (!userSnap.exists() || !userSnap.data().active) {
+  if (!userSnap.exists() || !hasStaffAccess(userSnap.data())) {
     $('app').hidden = true;
-  emailViewGeneration++;$('email-delivery-list').replaceChildren();$('email-delivery-feedback').textContent='';$('email-delivery-section').open=false;
-    message(bt("Keni hyrë me llogarinë Google, por ajo ende nuk është miratuar. Dërgojani administratorit këtë identifikues të llogarisë: {v0}",{v0:currentUser.uid}),true);
+    emailViewGeneration++;$('email-delivery-list').replaceChildren();$('email-delivery-feedback').textContent='';$('email-delivery-section').open=false;
+    setStaffAccess('denied');
     return;
   }
+  setStaffAccess('authorized');
   canCancelAll = userSnap.data().canCancelAll === true;
   $('reports-link').hidden=!canCancelAll;
   if(reportsView){
@@ -641,8 +667,15 @@ for (const kind of ['groups','teachers']) {
   $(`${kind}-search`).addEventListener('input',()=>filterChoices(kind));
   $(kind).addEventListener('change',()=>filterChoices(kind));
 }
-$('login').onclick = async () => { try { await signInWithPopup(auth, provider); } catch(e) {message(errText(e),true);} };
+$('login').onclick = async () => { $('login').disabled=true;try { await signInWithPopup(auth, provider); } catch(e) {message(errText(e),true);} finally {$('login').disabled=staffAccessState==='checking';} };
 $('logout').onclick = async () => { try { await signOut(auth); } catch(e) {message(errText(e),true);} };
+$('switch-account').onclick=$('logout').onclick;
+$('retry-access').onclick=async()=>{
+  const generation=authenticationGeneration;
+  setStaffAccess('checking');message('');
+  try { await loadApp(); }
+  catch(e){if(generation===authenticationGeneration){if(staffAccessState!=='authorized')setStaffAccess(e.code==='permission-denied'?'denied':'unavailable');message(errText(e),true);}}
+};
 $('date').onchange = () => readAvailability().catch(e => message(errText(e),true));
 $('room').onchange = () => { updateLocationField();readAvailability().catch(e => message(errText(e),true)); };
 $('booking-form').onsubmit = createReservation;
@@ -699,7 +732,8 @@ if(reportsView){
  $('reports-link').setAttribute('aria-current','page');
 }
 function refreshLanguage(){
- auth.languageCode=getLanguage();provider.setCustomParameters({hl:getLanguage()});
+ auth.languageCode=getLanguage();provider.setCustomParameters({hl:getLanguage(),prompt:'select_account'});
+ setStaffAccess(staffAccessState);
  for(const id of ['room','event-type'])for(const option of $(id).options)option.textContent=displayRoom(bt(option.dataset.sourceLabel||option.textContent));
  for(const kind of ['groups','teachers']){
   for(const label of $(kind).querySelectorAll('label'))if(label.dataset.sourceName)label.lastChild.textContent=kind==='groups'?displayGroup(label.dataset.sourceName):label.dataset.sourceName;
@@ -734,7 +768,9 @@ onAuthStateChanged(auth,async user => {
   $('logout').hidden = !user;
   $('identity').textContent = user?.email || '';
   $('app').hidden = true;
+  message('');
+  setStaffAccess(user?'checking':'signedout');
   emailViewGeneration++;$('email-delivery-list').replaceChildren();$('email-delivery-feedback').textContent='';$('email-delivery-section').open=false;
-  if (user) try { await loadApp(); } catch(e){message(errText(e),true);}
-  else message(reportsView?bt('Hyni me llogarinë tuaj Google për të parë raportet.'):managementView?bt('Hyni me llogarinë tuaj Google për të parë kërkesat, njoftimet me email dhe rezervimet tuaja.'):bt('Hyni me llogarinë tuaj Google për të parë disponueshmërinë dhe për të rezervuar salla.'));
+  const generation=authenticationGeneration;
+  if (user) try { await loadApp(); } catch(e){if(generation===authenticationGeneration){if(staffAccessState!=='authorized')setStaffAccess(e.code==='permission-denied'?'denied':'unavailable');message(errText(e),true);}}
 });

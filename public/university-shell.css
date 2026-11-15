@@ -111,3 +111,21 @@ legend{font-size:13px;font-weight:600;color:var(--ink-soft);padding:0 7px}
 @media print{#weekNavigation{display:none!important}}
 
 #management-heading{font-size:24px;color:var(--ink-soft);margin:0 0 8px}#management-scope{color:var(--muted);font-size:14px;margin:0 0 24px}.booking-portal #email-delivery-section{border:1px solid var(--line);padding:20px;border-radius:12px;margin:20px 0}.booking-portal #email-delivery-section>summary{font-size:17px;font-weight:600;color:var(--ink-soft)}
+
+/* Public navigation stays separate from staff tools at every screen size. */
+.rail-links [hidden],.booking-portal [hidden]{display:none!important}
+.university-rail{overflow-y:auto}
+.rail-staff-heading{border-top:1px solid var(--line);margin-top:14px;padding:20px 13px 3px;font-size:10px;font-weight:700;letter-spacing:.07em;color:var(--muted)}
+.rail-staff-note{margin:0 13px 8px;font-size:11px;color:var(--muted)}
+.rail-account{padding:12px 13px;border-top:1px solid var(--line);margin-top:8px;min-width:0}
+.rail-account [data-staff-identity]{display:block;font-size:11px;overflow-wrap:anywhere;margin:0 0 8px}
+.rail-account button{font:inherit;font-size:12px;padding:7px 12px;cursor:pointer;border:1px solid var(--line);border-radius:7px;background:white;color:var(--ink-soft)}
+.staff-eyebrow{font-size:11px;letter-spacing:.08em;font-weight:700;color:var(--accent);margin:0 0 12px}
+#staff-access h2{font-size:24px;line-height:1.3;margin:0 0 16px}
+#staff-access p{max-width:680px}
+#staff-access-status{color:var(--ink-soft)}
+#staff-access-identity{font-size:13px;overflow-wrap:anywhere}
+.staff-access-actions{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0}
+.staff-public-note{padding-top:20px;border-top:1px solid var(--line);color:var(--ink-soft)}
+@media(min-width:801px){.sidebar-collapsed .rail-staff-heading,.sidebar-collapsed .rail-staff-note,.sidebar-collapsed .rail-account{display:none}.sidebar-collapsed [data-staff-entry],.sidebar-collapsed [data-staff-only]:first-of-type{border-top-color:var(--line)}}
+@media(max-width:800px){a[data-staff-entry]{grid-column:1/-1}.rail-staff-heading,.rail-staff-note,.rail-account{grid-column:1/-1}.rail-staff-heading{margin-top:4px;padding-top:12px}.rail-account{display:flex;align-items:center;justify-content:space-between;gap:12px}.rail-account [data-staff-identity]{margin:0}.rail-staff-note{margin-bottom:4px}#staff-access h2{font-size:21px}}

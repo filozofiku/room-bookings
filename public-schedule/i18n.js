@@ -1,5 +1,13 @@
 // Public-site translations only. No booking data or email templates are changed.
 export const EN={
+ "PËR STAFIN AKADEMIK":"FOR ACADEMIC STAFF",
+ "Hyni për rezervime":"Sign in to book",
+ "Me llogarinë @uni-pr.edu":"With your @uni-pr.edu account",
+ "Dilni":"Sign out",
+ "Rezervoni sallë (për stafin) ↗":"Book a room (staff) ↗",
+ "Rezervimet bëhen vetëm nga stafi akademik i autorizuar me llogari @uni-pr.edu. Orari dhe sallat e lira shihen pa hyrë në llogari.":"Only authorized academic staff with an @uni-pr.edu account can book rooms. Timetables and available rooms can be viewed without signing in.",
+ "Disponueshmëria për datën e zgjedhur përfshin orarin zyrtar dhe rezervimet në aplikacion. Rezervimet bëhen vetëm nga stafi akademik i autorizuar me llogari @uni-pr.edu. Kliko një sallë për të hapur aplikacionin e rezervimeve me datën dhe orët e përzgjedhura; nëse nuk ke hyrë, do të shfaqet faqja e hyrjes për stafin.":"Availability for the selected date includes the official timetable and reservations in the app. Only authorized academic staff with an @uni-pr.edu account can book rooms. Select a room to open the booking app with your selected date and times; if you are signed out, the staff sign-in page will appear.",
+
  'Orari mësimor i Fakultetit Filozofik, Universiteti i Prishtinës. Kërko sipas grupit të studentëve, mësimdhënësit ose sallës dhe gjej sallat e lira.':'Faculty of Philosophy timetable, University of Prishtina. Search by student group, teacher or room and find available rooms.',
  'Orari mësimor | Universiteti i Prishtinës':'Timetable | University of Prishtina',
  'Logoja e Universitetit të Prishtinës':'University of Prishtina logo',

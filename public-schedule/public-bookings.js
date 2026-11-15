@@ -2,11 +2,11 @@ import { bookingRows, weekDates } from './booking-model.js';
 
 // Dynamic imports keep the official HTML timetable usable if Firebase cannot load.
 export async function connectBookings(config, onDate, report) {
-  const [{initializeApp}, {getFirestore, collection, doc, query, where, onSnapshot}] = await Promise.all([
+  const [{initializeApp, getApps, getApp}, {getFirestore, collection, doc, query, where, onSnapshot}] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js')
   ]);
-  const db = getFirestore(initializeApp(config));
+  const db = getFirestore(getApps().length ? getApp() : initializeApp(config));
   let generation = 0;
   let unsubscribe = [];
   const selectDate = date => {
