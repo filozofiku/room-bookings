@@ -56,20 +56,17 @@ export function bookingTimestamp(value, locale = 'sq-AL') {
   }).format(date) : 'Koha nuk është e disponueshme';
 }
 
-// Partition each connected overlap cluster into reusable, non-overlapping lanes.
+// Reuse non-overlapping lanes and keep card widths consistent throughout a day.
 export function eventLanes(events) {
   const result = new Map();
-  let cluster = [], ends = [], boundary = -1;
-  const finish = () => { for (const item of cluster) result.set(item.event,{lane:item.lane,count:ends.length}); };
+  const ends = [];
   for (const event of [...events].sort((a,b)=>a.s-b.s || b.e-a.e)) {
-    if (event.s >= boundary) { finish(); cluster=[]; ends=[]; }
     let lane=ends.findIndex(end=>end<=event.s);
     if(lane<0)lane=ends.length;
     ends[lane]=event.e;
-    cluster.push({event,lane});
-    boundary=Math.max(...ends);
+    result.set(event,{lane,count:0});
   }
-  finish();
+  for (const layout of result.values()) layout.count=ends.length;
   return result;
 }
 

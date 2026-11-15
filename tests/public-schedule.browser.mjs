@@ -212,6 +212,25 @@ try {
   boxes.sort((a,b)=>a.left-b.left);
   assert.ok(boxes.every((b,i)=>i===0 || b.left>=boxes[i-1].right));
   for(const button of await page.locator('#weekBody .reservation-event').all()){await button.click();assert.equal(await page.locator('#modalDetails').isVisible(),true);await page.click('#closeDialog');}
+  // An earlier standalone reservation uses the same width as the later pair.
+  const alignedRows=[
+    {...roomless,title:'Standalone activity',slots:[{start:'11:30',end:'12:00'}]},
+    {...booking,title:'Parallel activity A'},
+    {...booking,title:'Parallel activity B'}
+  ];
+  await page.evaluate(value=>window.testReport(value),{...result,rows:alignedRows});
+  for(const viewport of [{width:1280,height:720},{width:390,height:844}]){
+    await page.setViewportSize(viewport);
+    const aligned=await page.locator('#weekBody .reservation-event').evaluateAll(nodes=>nodes.map(node=>{
+      const box=node.getBoundingClientRect();return {left:box.left,right:box.right,width:box.width};
+    }));
+    assert.equal(aligned.length,3);
+    assert.ok(aligned.every(box=>Math.abs(box.width-aligned[0].width)<1));
+    assert.ok(Math.abs(aligned[0].left-Math.min(aligned[1].left,aligned[2].left))<1);
+    assert.ok(aligned[1].right<=aligned[2].left||aligned[2].right<=aligned[1].left);
+  }
+  await page.setViewportSize({width:1280,height:720});
+  await page.evaluate(value=>window.testReport(value),{...result,rows:[booking,roomless,roomlessGroup]});
   const otherHash=new URL(page.url()).hash;
   assert.equal(otherHash,'#orari/reservations/te-gjitha');
   await page.selectOption('#category','rooms');

@@ -53,12 +53,25 @@ test('all reservations include rooms and roomless events without changing resour
  assert.equal(reservationEvents(rows,'',...args,'reservations').length,2);
  for(const [kind,name] of [['rooms','Salla 1'],['subgroups','G'],['teachers','T']])assert.equal(reservationEvents(rows,name,...args,kind).length,1);
 });
-test('overlap lanes handle nested events, adjacent boundaries and separate clusters',async()=>{
+test('overlap lanes retain a consistent width across a day and reuse freed lanes',async()=>{
  const {eventLanes}=await import('../public-schedule/booking-model.js');
  const events=[{s:0,e:8},{s:1,e:3},{s:3,e:5},{s:4,e:6},{s:8,e:9}];
  const lanes=eventLanes(events);
  assert.equal(lanes.get(events[0]).count,3);
  assert.equal(lanes.get(events[1]).lane,lanes.get(events[2]).lane);
- assert.equal(lanes.get(events[4]).count,1);
+ for(const event of events)assert.equal(lanes.get(event).count,3);
+ assert.equal(lanes.get(events[4]).lane,0);
  for(const a of events)for(const b of events)if(a!==b && a.s<b.e && b.s<a.e)assert.notEqual(lanes.get(a).lane,lanes.get(b).lane);
+});
+test('a standalone activity beside a later parallel pair uses one aligned column',async()=>{
+ const {eventLanes}=await import('../public-schedule/booking-model.js');
+ const events=[{s:4,e:8},{s:8,e:12},{s:8,e:12}];
+ const lanes=eventLanes([events[2],events[0],events[1]]);
+ assert.deepEqual(lanes.get(events[0]),{lane:0,count:2});
+ assert.equal(lanes.get(events[1]).count,2);
+ assert.equal(lanes.get(events[2]).count,2);
+ assert.notEqual(lanes.get(events[1]).lane,lanes.get(events[2]).lane);
+ const sequential=[{s:0,e:1},{s:1,e:2}];
+ assert.deepEqual([...eventLanes(sequential).values()],[{lane:0,count:1},{lane:0,count:1}]);
+ assert.equal(eventLanes([]).size,0);
 });
