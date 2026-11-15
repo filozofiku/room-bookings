@@ -55,7 +55,7 @@ export async function deliverPublicEvent(bookingId,recipient,{db,periods,rooms,c
   if(['sent','failed'].includes(data.status))return null;
   if(data.status==='sending' && data.leaseUntil.toMillis()>now())return null;
   const attempts=(data.attempts||0)+1;
-  const patch={bookingId,recipient,status:'sending',attempts,leaseToken:token,leaseUntil:timestamp(now()+300000)};
+  const patch={bookingId,recipient,status:'sending',attempts,leaseToken:token,leaseUntil:timestamp(now()+300000),...(!data.createdAt?{createdAt:timestamp(now())}:{})};
   tx.update(ref,patch);return patch;
  });
  if(!work)return 'skipped';

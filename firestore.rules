@@ -25,6 +25,14 @@ service cloud.firestore {
       return booking.ownerUid == request.auth.uid || get(userPath()).data.get('canCancelAll', false) == true;
     }
     function elevated() { return get(userPath()).data.get('canCancelAll',false) == true; }
+    function reportingWorker() {
+      return request.auth != null && request.auth.uid == 'reporting-worker' && request.auth.token.get('reportingWorker',false) == true;
+    }
+    function activityRecorded(id,suffix) {
+      let path=/databases/$(database)/documents/activityEvents/$(id + suffix);
+      return controls().get('auditLoggingRequired',false) != true ||
+        (existsAfter(path) && getAfter(path).data.occurredAt == request.time);
+    }
     function adminEmailRetry() {
       return approved() && elevated() && resource.data.status == 'failed' &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','attempts','retryRequestedAt','retryRequestedBy']) &&
@@ -193,10 +201,12 @@ service cloud.firestore {
       allow read: if approved();
       allow create: if canBook(request.resource.data.date) && valid(request.resource.data) &&
         mayCreate(reservationId,request.resource.data) &&
+        activityRecorded(reservationId,'__created') &&
         request.resource.data.createdAt == request.time && !request.resource.data.keys().hasAny(['revision','updatedAt']) &&
         (resources(request.resource.data).size() == 0 || occupancyWritten(reservationId, request.resource.data)) &&
         publicMatches(reservationId, request.resource.data);
       allow update: if canBook(request.resource.data.date) && mayCancel(resource.data) && valid(request.resource.data) &&
+        activityRecorded(reservationId,'__edit__' + string(request.resource.data.revision)) &&
         (!specialRoom(request.resource.data.roomId) || elevated() || sameSlots(resource.data,request.resource.data)) &&
         request.resource.data.ownerUid == resource.data.ownerUid && request.resource.data.creatorName == resource.data.creatorName &&
         request.resource.data.createdAt == resource.data.createdAt && request.resource.data.updatedAt == request.time &&
@@ -204,6 +214,7 @@ service cloud.firestore {
         editOccupancy(reservationId,resource.data,request.resource.data) &&
         studentChangeRecorded(reservationId,'__edit__' + string(request.resource.data.revision)) && modificationRecorded(reservationId,resource.data,request.resource.data) && publicMatches(reservationId,request.resource.data);
       allow delete: if approved() && controls().bookingOpen == true &&
+        activityRecorded(reservationId,'__cancelled') &&
         mayCancel(resource.data) && studentChangeRecorded(reservationId,'__cancel') && cancellationRecorded(reservationId, resource.data) &&
         controls().slotStorage == 'resources-v2' &&
         (resources(resource.data).size() == 0 || occupancyWritten(reservationId, resource.data)) &&
@@ -212,13 +223,15 @@ service cloud.firestore {
     match /reservationRequests/{id} {
       allow read: if approved() && (elevated() || resource.data.ownerUid == request.auth.uid);
       allow create: if canBook(request.resource.data.date) && !elevated() && valid(request.resource.data) &&
+        activityRecorded(id,'__requested') &&
         specialRoom(request.resource.data.roomId) && request.resource.data.ownerUid == request.auth.uid &&
         request.resource.data.creatorName == request.auth.token.get('name','Mësimdhënës') &&
         request.resource.data.createdAt == request.time && !request.resource.data.keys().hasAny(['revision','updatedAt']) &&
         !exists(/databases/$(database)/documents/requestNotifications/$(id)) &&
         existsAfter(/databases/$(database)/documents/requestNotifications/$(id));
       allow update: if false;
-      allow delete: if approved() && elevated() && existsAfter(/databases/$(database)/documents/requestDecisions/$(id));
+      allow delete: if approved() && elevated() && existsAfter(/databases/$(database)/documents/requestDecisions/$(id)) &&
+        activityRecorded(id,getAfter(/databases/$(database)/documents/requestDecisions/$(id)).data.outcome == 'approved' ? '__approved' : '__declined');
     }
     match /requestNotifications/{id} {
       allow create: if approved() &&
@@ -294,7 +307,7 @@ service cloud.firestore {
       allow read: if mailWorker() || (approved() && (resource.data.booking.ownerUid == request.auth.uid || elevated()));
       allow update: if adminEmailRetry();
       allow update: if mailWorker() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-        'status','attempts','leaseToken','leaseUntil','sentAt','sentRecipients','lastErrorCode','lastAttemptAt'
+        'status','attempts','leaseToken','leaseUntil','sentAt','sentRecipients','recipientSentAt','lastErrorCode','lastAttemptAt'
       ]) && request.resource.data.status in ['sending','sent','retrying','failed','skipped'];
       allow delete: if false;
     }
@@ -319,7 +332,7 @@ service cloud.firestore {
         request.resource.data.status == (getAfter(/databases/$(database)/documents/requestDecisions/$(id)).data.outcome == 'approved' ? 'pending' : 'cancelled');
       allow update: if adminEmailRetry();
       allow update: if mailWorker() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-        'status','attempts','leaseToken','leaseUntil','sentAt','sentRecipients','lastErrorCode','lastAttemptAt'
+        'status','attempts','leaseToken','leaseUntil','sentAt','sentRecipients','recipientSentAt','lastErrorCode','lastAttemptAt'
       ]) && request.resource.data.status in ['sending','sent','retrying','failed','skipped'];
       allow delete: if false;
     }
@@ -334,7 +347,7 @@ service cloud.firestore {
         get(/databases/$(database)/documents/publicBookings/$(request.resource.data.bookingId)).data.isPublic == true &&
         request.resource.data.recipient in get(/databases/$(database)/documents/mailSettings/publicEvents).data.recipients;
       allow update: if mailWorker() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-        'status','attempts','leaseToken','leaseUntil','sentAt','lastErrorCode','lastAttemptAt'
+        'status','attempts','leaseToken','leaseUntil','sentAt','createdAt','lastErrorCode','lastAttemptAt'
       ]);
       allow delete: if false;
     }
@@ -402,6 +415,77 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /roomDays/{key} { allow read: if approved(); allow write: if false; }
+    // Immutable action records. Neither ordinary users nor managers can rewrite history.
+    match /activityEvents/{id} {
+      function matches(d,booking) {
+        return d.ownerUid == booking.ownerUid && d.title == booking.title && d.activityDate == booking.date && d.revision == booking.get('revision',0);
+      }
+      function created(d) {
+        let path=/databases/$(database)/documents/reservations/$(d.entityId);
+        let booking=getAfter(path).data;
+        let decision=/databases/$(database)/documents/requestDecisions/$(d.entityId);
+        return id == d.entityId + '__created' && !exists(path) && matches(d,booking) && d.requestedAt == null &&
+          (d.method == 'direct' ? (booking.ownerUid == request.auth.uid && !exists(/databases/$(database)/documents/reservationRequests/$(d.entityId))) :
+            (d.method == 'approved' && elevated() && getAfter(decision).data.outcome == 'approved' &&
+              getAfter(decision).data.decidedBy == request.auth.uid && getAfter(decision).data.createdAt == request.time));
+      }
+      function edited(d) {
+        let path=/databases/$(database)/documents/reservations/$(d.entityId);
+        let before=get(path).data;
+        let after=getAfter(path).data;
+        return id == d.entityId + '__edit__' + string(d.revision) && mayCancel(before) && matches(d,after) &&
+          after.revision == before.get('revision',0)+1 && d.method == '' && d.requestedAt == null;
+      }
+      function cancelled(d) {
+        let path=/databases/$(database)/documents/reservations/$(d.entityId);
+        return id == d.entityId + '__cancelled' && matches(d,get(path).data) && mayCancel(get(path).data) &&
+          !existsAfter(path) && d.method == '' && d.requestedAt == null;
+      }
+      function requested(d) {
+        let path=/databases/$(database)/documents/reservationRequests/$(d.entityId);
+        return id == d.entityId + '__requested' && !exists(path) && matches(d,getAfter(path).data) &&
+          d.ownerUid == request.auth.uid && d.method == '' && d.requestedAt == null;
+      }
+      function decided(d) {
+        let path=/databases/$(database)/documents/reservationRequests/$(d.entityId);
+        let decision=getAfter(/databases/$(database)/documents/requestDecisions/$(d.entityId)).data;
+        return elevated() && id == d.entityId + (d.kind == 'approved' ? '__approved' : '__declined') &&
+          matches(d,get(path).data) && !existsAfter(path) && d.requestedAt == get(path).data.createdAt && d.method == '' &&
+          decision.decidedBy == request.auth.uid && decision.createdAt == request.time &&
+          decision.outcome == (d.kind == 'approved' ? 'approved' : 'rejected');
+      }
+      allow read: if approved() && elevated();
+      allow create: if approved() && request.resource.data.keys().hasOnly(['kind','entityId','ownerUid','actorUid','occurredAt','activityDate','title','revision','method','requestedAt','source']) &&
+        request.resource.data.actorUid == request.auth.uid && request.resource.data.source == 'app' &&
+        request.resource.data.occurredAt == request.time && request.resource.data.entityId is string &&
+        request.resource.data.revision is int && request.resource.data.revision >= 0 &&
+        (request.resource.data.kind == 'created' ? created(request.resource.data) :
+         request.resource.data.kind == 'edited' ? edited(request.resource.data) :
+         request.resource.data.kind == 'cancelled' ? cancelled(request.resource.data) :
+         request.resource.data.kind == 'requested' ? requested(request.resource.data) :
+         request.resource.data.kind in ['approved','declined'] && decided(request.resource.data));
+      allow update, delete: if false;
+    }
+    match /timetableImports/{id} { allow read: if approved() && elevated(); allow write: if false; }
+    match /trafficDaily/{date} {
+      allow read: if approved() && elevated();
+      allow create, update: if reportingWorker() && date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+        request.resource.data.keys().hasOnly(['visits','pageViews','paths','complete','source','updatedAt','timezone','sampled']) &&
+        request.resource.data.visits is number && request.resource.data.visits >= 0 &&
+        request.resource.data.pageViews is number && request.resource.data.pageViews >= 0 &&
+        request.resource.data.paths is list && request.resource.data.paths.size() <= 500 &&
+        request.resource.data.complete is bool && request.resource.data.source == 'cloudflare' &&
+        request.resource.data.timezone == 'Europe/Tirane' && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+    match /reportSettings/{id} {
+      allow read: if approved() && elevated();
+      allow create, update: if reportingWorker() && id == 'traffic' &&
+        request.resource.data.keys().hasOnly(['status','updatedAt','lastSuccessAt','lastCompleteDate','errorCode','hostname']) &&
+        request.resource.data.status in ['ready','error'] && request.resource.data.hostname == 'filozofiku.github.io' &&
+        request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
     // Historical per-period locks are retained for reference; daily locks are authoritative.
     match /roomSlots/{slotId} {
       allow read: if approved();

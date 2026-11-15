@@ -1,6 +1,7 @@
 import {collection,doc,runTransaction,serverTimestamp} from 'firebase/firestore';
 import {slotKeys,conflictMessage} from './booking-resources.js';
 import {BookingError} from './booking-ui.js';
+import {recordActivity} from './activity-events.js';
 export const SPECIAL_ROOMS=['r_9c3ca97a27ce','r_a8ae63f60a13'];
 export const isSpecialRoom=id=>SPECIAL_ROOMS.includes(id);
 export async function submitReservationRequest(db,data,user,studentEmails=[]){
@@ -16,6 +17,7 @@ export async function submitReservationRequest(db,data,user,studentEmails=[]){
   if(conflict)throw new BookingError(conflict);
   const booking={...data,ownerUid:user.uid,creatorName:user.displayName||'Mësimdhënës',createdAt:serverTimestamp()};
   tx.set(ref,booking);
+  recordActivity(tx,db,'requested',ref.id,booking,user);
   if(studentEmails.length)tx.set(doc(db,'studentNotifications',ref.id),{booking,recipients:studentEmails,kind:'students',status:'awaiting-approval',createdAt:serverTimestamp()});
   tx.set(doc(db,'requestNotifications',ref.id),{booking,kind:'request-submitted',status:'pending',createdAt:serverTimestamp()});
  });
@@ -45,10 +47,12 @@ export async function decideReservationRequest(db,id,outcome,reason,user){
    if(conflict)throw new BookingError(conflict);
    const booking={...data,createdAt:serverTimestamp()}, {ownerUid,...published}=booking;
    tx.set(doc(db,'reservations',id),booking);tx.set(doc(db,'publicBookings',id),published);
+   recordActivity(tx,db,'created',id,booking,user,{method:'approved'});
    slotKeys(data).forEach(key=>locks[key]=id);
    tx.set(occupancyRef,{bookings:locks,changedReservationId:id});
   }
   tx.set(doc(db,'requestDecisions',id),{booking:data,outcome,reason,status:'pending',decidedBy:user.uid,deciderName:user.displayName||'Mësimdhënës',createdAt:serverTimestamp()});
+  recordActivity(tx,db,outcome==='approved'?'approved':'declined',id,data,user,{requestedAt:data.createdAt});
   if(students.exists())tx.update(doc(db,'studentNotifications',id),{status:outcome==='approved'?'pending':'cancelled'});
   tx.delete(ref);
  });

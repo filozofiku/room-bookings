@@ -2,6 +2,10 @@ import {EN,t,getLanguage,locale,roomLabel,initLanguage} from '../public-schedule
 import {englishTimetableLabel} from '../public-schedule/timetable-en.js';
 export {getLanguage,locale,initLanguage};
 export const BOOKING_EN={
+'Statistika dhe raporte':'Statistics and reports',
+'Statistika dhe raporte | Universiteti i Prishtinës':'Statistics and reports | University of Prishtina',
+'Raportet janë të disponueshme vetëm për përdoruesit me autorizim të lartë.':'Reports are available only to elevated users.',
+'Hyni me llogarinë tuaj Google për të parë raportet.':'Sign in with your Google account to view reports.',
 'Rezervimi i sallave të fakultetit':'Faculty room booking','Rezervimet e mia | Universiteti i Prishtinës':'My reservations | University of Prishtina','Hyni me Google':'Sign in with Google','Dilni':'Sign out',
 'Ndihmë: si të bëni një rezervim':'Help: how to make a reservation',
 'Hyni me llogarinë tuaj të miratuar të universitetit. Zgjidhni datën, sallën (ose “Pa sallë”), orët dhe të dhënat e aktivitetit.':'Sign in with your approved university account. Select the date, room (or “No room”), times and event details.',

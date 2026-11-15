@@ -1,6 +1,8 @@
 import {bt,getLanguage,locale,initLanguage,displayRoom,displayGroup} from './booking-i18n.js';
 const requestedSection=new URLSearchParams(location.search).get('section');
 const managementView=['my-reservations','requests'].includes(requestedSection);
+const reportsView=requestedSection==='reports';
+import {recordActivity} from './activity-events.js';
 import {parseStudentEmails} from './student-emails.js';
 import {loadEmailDeliveries,deliveryLabel,retryEmail} from './email-delivery.js';
 import {calendarActions,calendarInstant} from './calendar-export.js';
@@ -18,6 +20,8 @@ auth.languageCode = getLanguage();
 provider.setCustomParameters({hl:getLanguage()});
 let currentUser = null;
 let canCancelAll = false;
+let reportsController=null;
+let authenticationGeneration=0;
 let rooms = [];
 let periods = [];
 let settings = null;
@@ -479,6 +483,7 @@ async function createReservation(event) {
       const conflict = conflictMessage(data, locks, weeklySnap?.exists() ? weeklySnap.data().busyKeys : []);
       if (conflict) throw new BookingError(conflict);
       tx.set(reservationRef, {...data, ownerUid, createdAt:serverTimestamp()});
+      recordActivity(tx,db,'created',reservationRef.id,{...data,ownerUid},currentUser,{method:'direct'});
       tx.set(publicRef, {...data, createdAt:serverTimestamp()});
       if(studentEmails.length)tx.set(doc(db,'studentNotifications',reservationRef.id),{booking:{...data,ownerUid,createdAt:serverTimestamp()},recipients:studentEmails,kind:'students',status:'pending',createdAt:serverTimestamp()});
       const keys = slotKeys(data);
@@ -518,6 +523,7 @@ async function cancelReservation(id, reason = '') {
     if(students.exists())tx.set(doc(db,'studentChangeNotifications',`${id}__cancel`),{reservationId:id,booking,recipients:students.data().recipients,kind:'students',eventAction:'cancelled',reason:reason.trim(),status:'pending',createdAt:serverTimestamp()});
     tx.delete(reservationRef);
     tx.delete(doc(db,'publicBookings',id));
+    recordActivity(tx,db,'cancelled',id,booking,currentUser);
   });
 }
 function openLinkedSection(){
@@ -556,7 +562,9 @@ function applyBookingLink() {
   try{selectedPeriodIds();}catch(e){bookingMessage(errText(e),true);}
 }
 async function loadApp() {
-  const userSnap = await getDoc(doc(db,'users',currentUser.uid));
+  const user=currentUser,generation=authenticationGeneration;
+  const userSnap = await getDoc(doc(db,'users',user.uid));
+  if(generation!==authenticationGeneration)return;
   if (!userSnap.exists() || !userSnap.data().active) {
     $('app').hidden = true;
   emailViewGeneration++;$('email-delivery-list').replaceChildren();$('email-delivery-feedback').textContent='';$('email-delivery-section').open=false;
@@ -564,6 +572,18 @@ async function loadApp() {
     return;
   }
   canCancelAll = userSnap.data().canCancelAll === true;
+  $('reports-link').hidden=!canCancelAll;
+  if(reportsView){
+    $('booking-help').closest('section').hidden=true;
+    if(!canCancelAll){message(bt('Raportet janë të disponueshme vetëm për përdoruesit me autorizim të lartë.'),true);return;}
+    message('');
+    const {createReportsDashboard}=await import('./reports-dashboard.js');
+    if(generation!==authenticationGeneration)return;
+    $('reports').hidden=false;
+    reportsController=createReportsDashboard(db,user);
+    await reportsController.load();
+    return;
+  }
   const [settingsSnap,roomSnap,periodSnap,catalogSnap] = await Promise.all([
     getDoc(doc(db,'settings','control')),
     getDocs(collection(db,'rooms')),
@@ -572,6 +592,7 @@ async function loadApp() {
   ]);
   if (!settingsSnap.exists()) throw new BookingError(bt('Administratori duhet të importojë fillimisht orarin.'));
   settings = settingsSnap.data();
+  if(generation!==authenticationGeneration)return;
   if (settings.slotStorage !== 'resources-v2') throw new BookingError(bt('Rezervimet po përditësohen. Provoni përsëri së shpejti.'));
   rooms = roomSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.name.localeCompare(b.name));
   periods = periodSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.id.localeCompare(b.id));
@@ -670,6 +691,13 @@ if(managementView){
  for(const link of document.querySelectorAll('.rail-links a'))link.removeAttribute('aria-current');
  document.querySelector('[data-my-reservations]').setAttribute('aria-current','page');
 }
+if(reportsView){
+ $('booking-help').closest('section').hidden=true;
+ document.querySelector('header h1').textContent='Statistika dhe raporte';
+ document.title='Statistika dhe raporte | Universiteti i Prishtinës';
+ for(const link of document.querySelectorAll('.rail-links a'))link.removeAttribute('aria-current');
+ $('reports-link').setAttribute('aria-current','page');
+}
 function refreshLanguage(){
  auth.languageCode=getLanguage();provider.setCustomParameters({hl:getLanguage()});
  for(const id of ['room','event-type'])for(const option of $(id).options)option.textContent=displayRoom(bt(option.dataset.sourceLabel||option.textContent));
@@ -678,6 +706,7 @@ function refreshLanguage(){
   filterChoices(kind);
  }
  for(const id of ['message','booking-message','selection-hint','cancel-question','cancel-error','request-decision-heading','request-decision-error','email-delivery-feedback','edit-notice'])$(id).textContent=bt($(id).textContent);
+ if(reportsView){reportsController?.render();return;}
  if(currentUser&&settings){
   $('booking-heading').textContent=bt(editing?'Redaktoni rezervimin':'Rezervoni një aktivitet');
   $('management-scope').textContent=bt(canCancelAll?'Shfaqen kërkesat dhe rezervimet e të gjithë përdoruesve.':'Shfaqen vetëm kërkesat, njoftimet dhe rezervimet tuaja.');
@@ -691,6 +720,10 @@ function refreshLanguage(){
 }
 initLanguage(refreshLanguage);
 onAuthStateChanged(auth,async user => {
+  authenticationGeneration++;
+  reportsController?.dispose();reportsController=null;
+  $('reports').hidden=true;$('reports-content').replaceChildren();$('reports-link').hidden=true;
+  $('reports-feedback').textContent='';
   stopEditing();
   if($('reservation-dialog').open)$('reservation-dialog').close('back');
   if($('request-decision-dialog').open)$('request-decision-dialog').close('back');
@@ -703,5 +736,5 @@ onAuthStateChanged(auth,async user => {
   $('app').hidden = true;
   emailViewGeneration++;$('email-delivery-list').replaceChildren();$('email-delivery-feedback').textContent='';$('email-delivery-section').open=false;
   if (user) try { await loadApp(); } catch(e){message(errText(e),true);}
-  else message(managementView?bt('Hyni me llogarinë tuaj Google për të parë kërkesat, njoftimet me email dhe rezervimet tuaja.'):bt('Hyni me llogarinë tuaj Google për të parë disponueshmërinë dhe për të rezervuar salla.'));
+  else message(reportsView?bt('Hyni me llogarinë tuaj Google për të parë raportet.'):managementView?bt('Hyni me llogarinë tuaj Google për të parë kërkesat, njoftimet me email dhe rezervimet tuaja.'):bt('Hyni me llogarinë tuaj Google për të parë disponueshmërinë dhe për të rezervuar salla.'));
 });

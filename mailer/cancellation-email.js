@@ -75,12 +75,14 @@ export async function deliverCancellation(ref, {db, auth, send, now, timestamp, 
         content.subject='Njoftim për ndryshimin e aktivitetit';
       }
       const delivered=[...(work.sentRecipients||[])];
+      const recipientSentAt={...(work.recipientSentAt||{})};
       for(const recipient of recipients){
         if(delivered.includes(recipient))continue;
         if(!await currentStudentEvent()){await finish({status:'skipped'});return;}
         await send({to:recipient,...content,messageId:`<student-${createHash('sha256').update(ref.id+':'+recipient).digest('hex')}@filozofiku.github.io>`});
         delivered.push(recipient);
-        await finish({sentRecipients:[...delivered],leaseUntil:timestamp(now()+300000)});
+        recipientSentAt[recipient]=timestamp(now());
+        await finish({sentRecipients:[...delivered],recipientSentAt:{...recipientSentAt},leaseUntil:timestamp(now()+300000)});
       }
       await finish({status:'sent',sentAt:timestamp(now())});
       return;

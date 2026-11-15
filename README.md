@@ -1,3 +1,10 @@
+## Statistics and management reports
+
+Elevated users (`canCancelAll: true`) can open `?section=reports` for reservation,
+request, response-time, student-notification and Cloudflare traffic reports, with
+date filters, CSV export and printing. See [reporting setup and metric definitions](docs/reporting.md)
+for immutable audit logging, private traffic synchronization and historical coverage.
+
 ## Rezervime me grupe dhe mësimdhënës (resources-v2)
 
 Formulari mbështet katër llojet e aktivitetit, asnjë ose disa grupe/mësimdhënës,

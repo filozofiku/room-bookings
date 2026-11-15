@@ -1,0 +1,27 @@
+.rail-links #reports-link[hidden]{display:none}
+.booking-portal>#reports{max-width:1340px;background:transparent;border:0;box-shadow:none;padding:0}
+#reports h2{font-size:28px;margin:0 0 6px;color:var(--ink)}
+#reports-description{margin:0 0 22px;color:var(--muted)}
+.report-toolbar{display:flex;gap:14px;flex-wrap:wrap;align-items:end;background:white;padding:20px;border:1px solid var(--line);border-radius:12px}
+.report-toolbar label{margin:0 0 5px}.report-toolbar input,.report-toolbar select{min-height:42px}
+.report-actions{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
+#reports-feedback{color:var(--ink-soft);min-height:24px}
+.report-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px;margin:16px 0 24px}
+.report-metric{background:white;border:1px solid var(--line);border-radius:12px;padding:20px;min-width:0}
+.report-metric h3{font-size:13px;font-weight:600;color:var(--ink-soft);margin:0 0 10px}
+.report-metric strong{font-size:34px;line-height:1.1;color:var(--accent);font-variant-numeric:tabular-nums}
+.report-metric p{font-size:12px;color:var(--muted);margin:10px 0 0}
+.report-panel{background:white;border:1px solid var(--line);border-radius:12px;padding:22px;margin:18px 0;break-inside:avoid}
+.report-panel>h3{font-size:18px;margin:0 0 14px;color:var(--ink)}
+.report-note{font-size:13px;color:var(--muted)}
+.report-table-wrap{overflow-x:auto;width:100%}
+#reports table{width:100%;border-collapse:collapse;font-size:14px}
+#reports th,#reports td{text-align:left;padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}
+#reports th{font-size:12px;color:var(--ink-soft);background:#fafafd}
+#reports td:last-child{font-variant-numeric:tabular-nums}
+#reports caption{text-align:left;margin:8px 0;font-weight:600}
+#reports .report-panel:last-child table{min-width:650px}
+#reports svg{display:block;width:100%;height:auto;margin:12px 0}
+#reports details{margin-top:12px}#reports summary{font-weight:600;color:var(--ink-soft)}
+@media(max-width:600px){.report-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.report-metric{padding:15px}.report-metric strong{font-size:28px}.report-panel{padding:15px}.report-toolbar>div{flex:1 1 145px}.report-toolbar input,.report-toolbar select{width:100%}}
+@media print{body{margin:0!important;background:white!important}.university-rail,header,.report-toolbar,.report-actions,#message,#reports-feedback{display:none!important}.booking-portal>#reports{margin:0;max-width:none}#reports details>*{display:block!important}.report-panel{box-shadow:none;border-color:#bbb}#reports table{font-size:10px}.report-metric strong{font-size:25px}#reports a{display:none}}

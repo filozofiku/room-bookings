@@ -1,6 +1,7 @@
 import {doc,runTransaction,serverTimestamp} from 'firebase/firestore';
 import {slotKeys,conflictMessage} from './booking-resources.js';
 import {BookingError} from './booking-ui.js';
+import {recordActivity} from './activity-events.js';
 export async function updateReservation(db,id,expectedRevision,data,user){
  return runTransaction(db,async tx=>{
   const ref=doc(db,'reservations',id),snapshot=await tx.get(ref);
@@ -29,6 +30,7 @@ export async function updateReservation(db,id,expectedRevision,data,user){
   const {ownerUid,...published}=booking;
   if(students.exists())tx.set(doc(db,'studentChangeNotifications',`${id}__edit__${booking.revision}`),{reservationId:id,booking,before,recipients:students.data().recipients,kind:'students',eventAction:'modified',status:'pending',createdAt:serverTimestamp()});
   tx.set(ref,booking);tx.set(doc(db,'publicBookings',id),published);
+  recordActivity(tx,db,'edited',id,booking,user);
   const newKeys=slotKeys(booking);newKeys.forEach(key=>newLocks[key]=id);
   if(before.date!==data.date && oldKeys.length)tx.set(oldRef,{bookings:oldLocks,changedReservationId:id});
   if(newKeys.length || (before.date===data.date && oldKeys.length))tx.set(newRef,{bookings:newLocks,changedReservationId:id});

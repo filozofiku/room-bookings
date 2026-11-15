@@ -57,3 +57,15 @@ test('administrator requeue allows a failed notification to be delivered once',a
  f.set({status:'pending',attempts:0,retryRequestedBy:'manager'});
  await f.run();await f.run();assert.equal(sent.length,1);assert.equal(f.data().status,'sent');assert.equal(f.data().attempts,1);
 });
+test('student receipts retain each successful send time across partial retries',async()=>{
+ const sent=[],f=fixture(async mail=>{if(mail.to.startsWith('b@')&&sent.length===1)throw Error('temporary');sent.push(mail.to);});
+ const originalDoc=f.deps.db.doc;
+ f.deps.db.doc=path=>path.startsWith('publicBookings/')?{get:async()=>({data:()=>booking})}:originalDoc(path);
+ f.set({kind:'students',recipients:['a@student.uni-pr.edu','b@student.uni-pr.edu'],reason:undefined});
+ await assert.rejects(f.run(),/retry/);
+ assert.deepEqual(f.data().sentRecipients,['a@student.uni-pr.edu']);assert.equal(f.data().recipientSentAt['a@student.uni-pr.edu'].toMillis(),1000);
+ f.advance();f.deps.send=async mail=>sent.push(mail.to);await f.run();
+ assert.equal(f.data().status,'sent');assert.equal(sent.length,2);
+ assert.equal(f.data().recipientSentAt['a@student.uni-pr.edu'].toMillis(),1000);
+ assert.equal(f.data().recipientSentAt['b@student.uni-pr.edu'].toMillis(),301001);
+});
