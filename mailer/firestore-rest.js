@@ -62,6 +62,10 @@ export function firestoreRest(project, token, request = fetch, origin = 'https:/
       const rows=await call(':runQuery','POST',{structuredQuery:{from:[{collectionId:'publicBookings'}],where:{fieldFilter:{field:{fieldPath:'date'},op:'GREATER_THAN_OR_EQUAL',value:encode(date)}}}});
       return rows.filter(r=>r.document).map(r=>snapshot(r.document));
     },
+    publicReceipts:async weekStart=>{
+      const rows=await call(':runQuery','POST',{structuredQuery:{from:[{collectionId:'publicEventDeliveries'}],where:{fieldFilter:{field:{fieldPath:'weekStart'},op:'EQUAL',value:encode(weekStart)}}}});
+      return rows.filter(r=>r.document).map(r=>snapshot(r.document).data());
+    },
     pending:async(collection='cancellationNotifications')=>{
       const rows=await call(':runQuery','POST',{structuredQuery:{from:[{collectionId:collection}],where:{fieldFilter:{field:{fieldPath:'status'},op:'IN',value:encode(['pending','retrying','sending'])}},limit:25}});
       return rows.filter(r=>r.document).map(r=>db.doc(collection+'/'+r.document.name.split('/').at(-1)));

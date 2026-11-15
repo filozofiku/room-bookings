@@ -340,14 +340,35 @@ service cloud.firestore {
       allow get: if (mailWorker() || (approved() && elevated())) && id == 'publicEvents';
       allow list, write: if false;
     }
+    match /publicEventRecipients/{id} {
+      allow read: if mailWorker() || (approved() && elevated());
+      allow create: if mailWorker() &&
+        request.resource.data.keys().hasOnly(['recipient','unsubscribeToken','unsubscribed']) &&
+        request.resource.data.recipient in get(/databases/$(database)/documents/mailSettings/publicEvents).data.recipients &&
+        request.resource.data.unsubscribeToken is string && request.resource.data.unsubscribeToken.size() >= 32 &&
+        request.resource.data.unsubscribed == false;
+      // A bearer token authorizes only opting out. No public reads, address
+      // changes, token changes, resubscriptions or arbitrary writes are allowed.
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unsubscribed','unsubscribedAt','confirmationToken']) &&
+        request.resource.data.confirmationToken == resource.data.unsubscribeToken &&
+        request.resource.data.unsubscribed == true && request.resource.data.unsubscribedAt == request.time;
+      allow delete: if false;
+    }
+    match /publicEventWeeks/{week} {
+      allow read: if mailWorker() || (approved() && elevated());
+      allow create: if mailWorker() && request.resource.data.keys().hasOnly(['weekStart','bookingIds','createdAt']) &&
+        request.resource.data.weekStart == week && request.resource.data.bookingIds is list;
+      allow update, delete: if false;
+    }
     match /publicEventDeliveries/{id} {
       allow read: if mailWorker() || (approved() && elevated());
-      allow update: if adminEmailRetry() && get(/databases/$(database)/documents/publicBookings/$(resource.data.bookingId)).data.isPublic == true;
+      allow update: if adminEmailRetry() && ('weekStart' in resource.data || get(/databases/$(database)/documents/publicBookings/$(resource.data.bookingId)).data.isPublic == true);
       allow create: if mailWorker() &&
-        get(/databases/$(database)/documents/publicBookings/$(request.resource.data.bookingId)).data.isPublic == true &&
+        request.resource.data.weekStart is string && request.resource.data.bookingIds is list &&
+        exists(/databases/$(database)/documents/publicEventWeeks/$(request.resource.data.weekStart)) &&
         request.resource.data.recipient in get(/databases/$(database)/documents/mailSettings/publicEvents).data.recipients;
       allow update: if mailWorker() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-        'status','attempts','leaseToken','leaseUntil','sentAt','createdAt','lastErrorCode','lastAttemptAt'
+        'status','attempts','leaseToken','leaseUntil','sentAt','createdAt','lastErrorCode','lastAttemptAt','bookingIds'
       ]);
       allow delete: if false;
     }

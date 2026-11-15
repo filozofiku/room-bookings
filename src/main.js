@@ -92,7 +92,7 @@ function renderConfirmation(data) {
     [bt('Salla'),displayRoom(rooms.find(room=>room.id===data.roomId)?.name || bt('Pa sallë'))],
     [bt('Grupet e studentëve'),data.groupIds.map(id=>displayGroup(catalog.groups[id] || id)).join(', ') || bt('Pa grup të studentëve')],
     [bt('Mësimdhënësit'),data.teacherIds.map(id=>catalog.teachers[id] || id).join(', ') || bt('Pa mësimdhënës')],
-    [bt('Njoftimi për aktivitetin'),data.isPublic ? bt('Publik — email 48 orë para fillimit, ose në ekzekutimin e parë nëse mbeten më pak se 48 orë') : bt('Jo publik')],
+    [bt('Njoftimi për aktivitetin'),data.isPublic ? bt('Publik — përmbledhje javore çdo të hënë në 08:00') : bt('Jo publik')],
     [bt('Mënyra e zhvillimit'),data.mode==='online' ? bt('Online') : bt('Fizik')],
     [bt('Rezervuar nga'),data.creatorName]
   ];
@@ -400,14 +400,11 @@ async function readEmailDelivery(){
    if(elevated&&notice.status==='failed')retryButton(card,[notice.path]);list.append(card);
   }
   for(const event of publicEvents.sort((a,b)=>b.booking.date.localeCompare(a.booking.date))){
-   const card=document.createElement('article');card.className='decision-card';const heading=document.createElement('h3');heading.textContent=bt("Njoftim publik · {v0}",{v0:event.booking.title});
+   const card=document.createElement('article');card.className='decision-card';const heading=document.createElement('h3');heading.textContent=bt("Përmbledhje javore · {v0}",{v0:event.week.start});
    const counts={sent:0,failed:0,waiting:0,skipped:0};for(const d of event.deliveries){if(d.status==='sent')counts.sent++;else if(d.status==='failed')counts.failed++;else if(d.status==='skipped')counts.skipped++;else counts.waiting++;}
    counts.waiting+=Math.max(0,event.expected-event.deliveries.length);
-   const first=periods.filter(p=>event.booking.periodIds?.includes(p.id)).sort((a,b)=>a.start.localeCompare(b.start))[0];
-   const instant=first?calendarInstant(event.booking.date,first.start):null;
-   const start=instant?Date.parse(instant.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/,'$1-$2-$3T$4:$5:$6Z')):NaN;
-   const ended=!Number.isFinite(start)||start<=Date.now();
-   const text=document.createElement('p');text.textContent=bt("{v0} · Dërguar: {v1} · Dështuar: {v2} · {v3}: {v4} · Të anashkaluara: {v5}. ",{v0:event.booking.date,v1:counts.sent,v2:counts.failed,v3:ended?bt('Pa dërguar'):bt('Në pritje'),v4:counts.waiting,v5:counts.skipped})+(!event.enabled?bt('Njoftimet publike janë të çaktivizuara. '):event.expected===0?bt('Lista e marrësve nuk është konfiguruar. '):'')+bt('Afati: 48 orë para fillimit; shërbimi nuk dërgon pas fillimit të aktivitetit.');card.append(heading,text);
+   const ended=event.week.end<=todayDate();
+   const text=document.createElement('p');text.textContent=bt("{v0} · Dërguar: {v1} · Dështuar: {v2} · {v3}: {v4} · Të anashkaluara: {v5}. ",{v0:event.booking.date,v1:counts.sent,v2:counts.failed,v3:ended?bt('Pa dërguar'):bt('Në pritje'),v4:counts.waiting,v5:counts.skipped})+(!event.enabled?bt('Njoftimet publike janë të çaktivizuara. '):event.expected===0?bt('Lista e marrësve nuk është konfiguruar. '):'')+bt('Përmbledhje javore: çdo të hënë në 08:00, për javën e hënë–e diel. Statusi i dërgimit i përket emailit javor.');card.append(heading,text);
    if(!ended&&counts.failed)retryButton(card,event.deliveries.filter(d=>d.status==='failed').map(d=>d.path));list.append(card);
   }
   feedback.textContent=list.children.length?bt('Statusi u rifreskua.'):bt('Nuk ka njoftime për të shfaqur.');

@@ -66,22 +66,41 @@ workflow-t kontrollon konfigurimin dhe numëron ngjarjet për njoftim pa dërgua
 Dërgimi publik është i ndarë nga ai i anulimeve: kërkon repository variable
 `PUBLIC_EVENT_EMAIL_ENABLED=true`. Kufizimi i planifikimit është pranuar dhe shfaqet në formularin e rezervimit.
 
-Afati llogaritet si 48 orë reale para fillimit sipas `Europe/Tirane`, përfshirë
-ndryshimet sezonale të orës. Rezervimet e krijuara më vonë janë menjëherë të
-pranueshme për përpunim, por ekzekutimi GitHub mund të vonohet: kjo zgjidhje
-nuk garanton email të menjëhershëm ose saktësisht në afat. Edhe rezervimet publike
-që ekzistonin para aktivizimit përpunohen nëse afati ka ardhur dhe ende nuk kanë
-filluar. Ngjarjet e filluara, private ose të anuluara nuk njoftohen.
+Përmbledhja javore përgatitet çdo të hënë në 08:00 sipas `Europe/Tirane`,
+për aktivitetet publike të javës e hënë–e diel (përfshirë të hënën në mëngjes).
+Nuk ka më njoftime individuale 48 orë para aktivitetit. Ndryshimet sezonale të
+orës respektohen. Worker-i i minutës fillon dërgimin në ekzekutimin e parë pas
+08:00; Google/GitHub dhe kuotat mund ta vonojnë. Nëse e hëna humbet plotësisht,
+nuk krijohet përmbledhje e re në mes të javës. Një javë pa aktivitete merr email
+që e thotë qartë këtë.
 
-Emaili i dërgohet veçmas secilës adresë, me hollësitë, përshkrimin dhe linkun
-online kur ekziston. `publicEventDeliveries` ruan rezultat për çdo çift
-rezervim–marrës. Dështimet riprovohen deri në pesë herë; marrësit me status `sent`
-nuk ridërgohen. Pas korrigjimit të një dështimi, një administrator mund ta kthejë
-vetëm atë dokument në `retrying`, me `attempts: 0`. Kufizimi SMTP për kopje të
-mundshme pas një ndërprerjeje mes pranimit dhe regjistrimit të statusit vlen edhe
-këtu. Anulimi kontrollohet menjëherë para SMTP; emaili i pranuar nga SMTP nuk
-mund të tërhiqet. Ky shërbim nuk njofton listën për anulime: emaili i anulimit
-vazhdon të shkojë vetëm te krijuesi sipas rregullave ekzistuese.
+`publicEventWeeks/{YYYY-MM-DD}` ruan listën e aktiviteteve një herë. Aktivitetet e
+shtuara pas përgatitjes nuk krijojnë email shtesë. Para çdo dërgimi lexohen sërish
+hollësitë: aktivitetet e anuluara, të bëra jo publike ose të zhvendosura jashtë
+javës përjashtohen. `publicEventDeliveries` ruan një rezultat për çdo çift
+javë–marrës, me `weekStart` dhe `bookingIds`. Marrësit `sent` nuk ridërgohen;
+dështimet riprovohen deri në pesë herë dhe vetëm deri në fund të javës.
+Marrësit marrin email veçmas. SMTP/MailApp nuk garantojnë saktësisht një dërgim
+nëse procesi ndalet mes pranimit të emailit dhe ruajtjes së statusit.
+
+Çdo aktivitet përmban lidhjen ekzistuese të Google Calendar Sync dhe URL-në e
+abonimit live për Apple Calendar / Outlook. Lidhjet përdorin ID-në e rezervimit;
+ndryshimet dhe anulimet pasqyrohen nga shërbimet ekzistuese të kalendarit.
+
+Çdo email përmban një lidhje personale te `unsubscribe.html`, me token të
+rastësishëm në fragmentin e URL-së. Hapja nuk ndryshon asgjë; marrësi klikon
+“Çregjistrohu” pa hyrë në llogari. Faqja nuk përmban analitikë dhe nuk shfaq
+adresën e emailit. Rregullat lejojnë vetëm çregjistrimin me tokenin e saktë;
+lista, adresat dhe tokenët nuk mund të lexohen publikisht.
+`publicEventRecipients` ruan preferencën private; rifutja e listës së marrësve
+nuk e rivendos abonimin. Preferenca kontrollohet përsëri menjëherë para dërgimit.
+Çregjistrimi ndal vetëm emailat javore publike, jo njoftimet personale për rezervime.
+Emaili që është pranuar tashmë për dërgim nuk mund të tërhiqet.
+
+Aktivizimi kërkon publikimin e faqes së re, rregullave dhe kodit të rindërtuar të
+Apps Script: shihni [hapat e përditësimit](../apps-script/README.md#weekly-public-event-digests).
+Mos aktivizoni të dy planifikuesit njëkohësisht. Historia e vjetër për aktivitetet
+individuale ruhet; worker-i i ri nuk e ripërpunon.
 
 ## Njoftimet për ndryshimin e rezervimeve
 
@@ -105,5 +124,5 @@ vendos `pending`, rivendos numrin e përpjekjeve dhe regjistron
 `retryRequestedBy` / `retryRequestedAt`. Përmbajtja dhe marrësit nuk ndryshohen.
 Njoftimet e dërguara ose në proces nuk mund të rivendosen. Worker-i ekzistues
 përpunon riprovimet në ekzekutimin vijues; butoni nuk garanton dërgim të menjëhershëm.
-Dërgimet publike mbeten të kufizuara në intervalin 48-orësh para fillimit dhe
-ndalojnë nëse aktiviteti anulohet ose nuk është më publik.
+Dërgimet publike shfaqen sipas javës dhe riprovimet ndalojnë në fund të javës.
+Marrësit e çregjistruar përjashtohen nga numërimet dhe dërgimet e reja.

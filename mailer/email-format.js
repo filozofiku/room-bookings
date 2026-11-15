@@ -11,8 +11,10 @@ export function emailHtml(text,descriptionSections=[]){
  const lineHtml=line=>escape(line).replace(/https?:\/\/[^\s<]+/g,url=>`<a href="${url}" style="color:#a51f25;overflow-wrap:anywhere">${url}</a>`);
  const paragraphs=value=>value.replace(/\r\n?/g,'\n').split(/\n\s*\n/).filter(Boolean).map(p=>`<p style="margin:0 0 16px;overflow-wrap:anywhere">${p.split('\n').map(lineHtml).join('<br>')}</p>`).join('');
  text=String(text);
+ let descriptionCursor=0;
  const ranges=descriptionSections.filter(s=>s.text).map(section=>{
-  const marker=section.label+'\n'+section.text,index=text.indexOf(marker);
+  const marker=section.label+'\n'+section.text,index=text.indexOf(marker,descriptionCursor);
+  if(index>=0)descriptionCursor=index+marker.length;
   return {start:index+section.label.length+1,end:index+marker.length,found:index>=0};
  }).filter(r=>r.found).sort((a,b)=>a.start-b.start);
  let body='',cursor=0;
