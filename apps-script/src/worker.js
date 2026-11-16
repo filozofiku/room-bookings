@@ -24,6 +24,13 @@ async function database(){
  const db=firestoreRest(config.projectId,token,http);
  return db;
 }
+// Cache only public reference data, never recipient lists or OAuth tokens.
+async function references(db,collection){
+ const cache=CacheService.getScriptCache(),key='mailer-reference-v1-'+collection,cached=cache.get(key);
+ if(cached){try{return JSON.parse(cached);}catch{}}
+ const data=(await db.collection(collection).get()).docs.map(d=>({id:d.id,...d.data()}));
+ cache.put(key,JSON.stringify(data),3600);return data;
+}
 export async function run(checkOnly=false){
  account();const props=PropertiesService.getScriptProperties();
  if(!checkOnly&&props.getProperty('EMAIL_ENABLED')!=='true'){console.log('Email worker paused.');return {paused:true};}
@@ -35,8 +42,10 @@ export async function run(checkOnly=false){
   // Reviewer requests are first, followed by decisions, cancellations and changes.
   const queues=['studentChangeNotifications','studentNotifications','requestNotifications','requestDecisions','cancellationNotifications','modificationNotifications'];
   const queue=[];for(const name of queues)queue.push(...await db.pending(name));report.pending=queue.length;
-  const settings=(await db.doc('mailSettings/publicEvents').get()).data();
-  const periods=(await db.collection('periods').get()).docs.map(d=>({id:d.id,...d.data()}));
+  const window=publicEventWeek(Date.now());
+  const checkPublic=checkOnly || (Date.now()>=window.dueAt && Date.now()>=Number(props.getProperty('PUBLIC_SCAN_AFTER')||0));
+  const settings=checkPublic?(await db.doc('mailSettings/publicEvents').get()).data():null;
+  const periods=checkPublic?await references(db,'periods'):[];
   const week=settings?.enabled?await preparePublicWeek(db,Date.now(),periods,{create:!checkOnly}):null;
   if(checkOnly){
    await db.collection('publicEventRecipients').get();
@@ -60,7 +69,7 @@ export async function run(checkOnly=false){
    }catch{report.errors++;}
   }
   if(week&&!exhausted()){
-   const rooms=(await db.collection('rooms').get()).docs.map(d=>({id:d.id,...d.data()}));
+   const rooms=await references(db,'rooms');
    const catalog=(await db.doc('resourceCatalog/current').get()).data()||{};
    const finished=new Set((await db.publicReceipts(week.start)).filter(r=>['sent','failed','skipped'].includes(r.status)).map(r=>r.recipient));
    for(const recipient of settings.recipients||[]){
@@ -69,10 +78,13 @@ export async function run(checkOnly=false){
     try{await deliverPublicWeek(week,recipient,{db,periods,rooms,catalog,send,now:Date.now,token:Utilities.getUuid()});}catch{report.errors++;}
    }
   }else if(week)report.deferred=true;
+  // Once the weekly run is finished, scan hourly for explicit retries instead
+  // of rereading every recipient receipt every minute for the rest of the week.
+  if(checkPublic)props.setProperty('PUBLIC_SCAN_AFTER',String(Date.now()+(report.deferred||report.errors?60000:3600000)));
   report.quotaRemaining=remaining;
   if(report.errors)throw Error('Some notifications failed; inspect Statusi i njoftimeve me email.');
   return report;
- }catch(error){report.failure=true;throw error;}
+ }catch(error){report.failure=true;report.failureCode=['RESOURCE_EXHAUSTED','PERMISSION_DENIED','UNAUTHENTICATED','UNAVAILABLE'].includes(error.code)?error.code:'WORKER_ERROR';throw error;}
  finally{
   report.durationMs=Date.now()-started;
   props.setProperty('LAST_RUN',JSON.stringify(report));console.log(JSON.stringify(report));lock.releaseLock();

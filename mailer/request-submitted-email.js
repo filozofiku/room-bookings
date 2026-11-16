@@ -1,5 +1,5 @@
 import {emailDate} from './email-format.js';
-export const REQUEST_REVIEWER_EMAIL='bardhok.bashota@uni-pr.edu';
+export const REQUEST_REVIEWER_EMAIL='arsim.sinani@uni-pr.edu';
 export function requestSubmittedEmail(booking,periods,roomName){
  const selected=booking.periodIds.map(id=>periods.find(p=>p.id===id));
  if(!selected.length||selected.some(p=>!p))throw Error('missing-periods');

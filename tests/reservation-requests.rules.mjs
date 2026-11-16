@@ -122,7 +122,7 @@ test('special rooms require private requests and atomic elevated decisions',asyn
   for(const id of rooms){await deliverCancellation(rest.doc('requestNotifications/'+id),reviewerDeps);await deliverCancellation(rest.doc('requestNotifications/'+id),reviewerDeps);}
   await assertFails(setDoc(doc(owner,'reservationRequests',rooms[0]),base));
   assert.equal(requestMails.length,2);
-  for(const mail of requestMails){assert.equal(mail.to,'bardhok.bashota@uni-pr.edu');assert.doesNotMatch(mail.text,/Kërkuesi: Owner/);assert.match(mail.text,/Kërkesat për miratim/);assert.match(mail.messageId,/^<request-submitted-/);}
+  for(const mail of requestMails){assert.equal(mail.to,'arsim.sinani@uni-pr.edu');assert.doesNotMatch(mail.text,/Kërkuesi: Owner/);assert.match(mail.text,/Kërkesat për miratim/);assert.match(mail.messageId,/^<request-submitted-/);}
 
 
  }finally{await env.cleanup();}

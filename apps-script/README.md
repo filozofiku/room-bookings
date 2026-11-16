@@ -4,10 +4,11 @@ This is the existing Firebase email worker adapted to Google Apps Script. It sen
 `zzha.filozofik@uni-pr.edu`, using MailApp authorization rather than an app password.
 It needs no Firebase Blaze plan, web-app deployment, public endpoint, or spreadsheet.
 
-The worker checks each minute. Weekly public-event digests start on Monday at
+The worker checks reservation notification queues each minute. Public reference data
+is cached for an hour, and a completed weekly batch is checked hourly for explicit retries. Weekly public-event digests start on Monday at
 08:00 Europe/Tirane; urgent reservation notices keep their existing checks.
 
-It covers reviewer requests (Bardhok, rooms 102/127), approval/refusal decisions,
+It covers reviewer requests (Arsim Sinani, rooms 102/127), approval/refusal decisions,
 cancellations, modifications, and one weekly public-event digest per recipient.
 It preserves the dashboard, delivery receipts, atomic leases and administrator retries.
 
@@ -131,3 +132,20 @@ node --test tests/public-event-email.test.mjs tests/apps-script.test.mjs tests/e
 FIRESTORE_EMULATOR_HOST=127.0.0.1:8086 TEST_MODULES_DIR=/tmp/fet-weekly-validation node --test tests/public-event-subscriptions.rules.mjs tests/public-bookings.rules.mjs tests/email-delivery.rules.mjs
 TEST_MODULES_DIR=/tmp/fet-weekly-validation node tests/unsubscribe.browser.mjs
 ```
+
+
+## Request recipient: Arsim Sinani
+
+Requests for rooms 102/127 now notify `arsim.sinani@uni-pr.edu`. To activate this
+change in the existing Apps Script project, replace its entire `Code.gs` with the
+rebuilt file and save. Keep the current properties and minute trigger. Run
+`checkConnection`; do not reinstall the trigger or reset delivery records.
+
+The sender remains `zzha.filozofik@uni-pr.edu`. Previously sent reviewer notices are
+not automatically resent. One-time handoff emails must be selected from requests
+that are still pending, and recorded separately from the original delivery history.
+
+If `checkConnection` reports `RESOURCE_EXHAUSTED`, Firestore is refusing reads due
+to quota. Changing the recipient does not clear that quota. The new worker avoids
+minute-by-minute reads of public reference collections and completed weekly receipts.
+When access returns, queued notifications can resume using the new recipient.

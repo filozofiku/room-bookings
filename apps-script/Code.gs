@@ -166,7 +166,7 @@ var UniversityMailer = (() => {
   }
 
   // mailer/request-submitted-email.js
-  var REQUEST_REVIEWER_EMAIL = "bardhok.bashota@uni-pr.edu";
+  var REQUEST_REVIEWER_EMAIL = "arsim.sinani@uni-pr.edu";
   function requestSubmittedEmail(booking, periods, roomName) {
     const selected = booking.periodIds.map((id) => periods.find((p) => p.id === id));
     if (!selected.length || selected.some((p) => !p)) throw Error("missing-periods");
@@ -590,6 +590,18 @@ ${recipient}`).digest("hex");
     const db = firestoreRest(firebase_config_default.projectId, token, http);
     return db;
   }
+  async function references(db, collection) {
+    const cache = CacheService.getScriptCache(), key = "mailer-reference-v1-" + collection, cached = cache.get(key);
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch {
+      }
+    }
+    const data = (await db.collection(collection).get()).docs.map((d) => ({ id: d.id, ...d.data() }));
+    cache.put(key, JSON.stringify(data), 3600);
+    return data;
+  }
   async function run(checkOnly = false) {
     account();
     const props = PropertiesService.getScriptProperties();
@@ -607,8 +619,10 @@ ${recipient}`).digest("hex");
       const queue = [];
       for (const name of queues) queue.push(...await db.pending(name));
       report.pending = queue.length;
-      const settings = (await db.doc("mailSettings/publicEvents").get()).data();
-      const periods = (await db.collection("periods").get()).docs.map((d) => ({ id: d.id, ...d.data() }));
+      const window = publicEventWeek(Date.now());
+      const checkPublic = checkOnly || Date.now() >= window.dueAt && Date.now() >= Number(props.getProperty("PUBLIC_SCAN_AFTER") || 0);
+      const settings = checkPublic ? (await db.doc("mailSettings/publicEvents").get()).data() : null;
+      const periods = checkPublic ? await references(db, "periods") : [];
       const week = settings?.enabled ? await preparePublicWeek(db, Date.now(), periods, { create: !checkOnly }) : null;
       if (checkOnly) {
         await db.collection("publicEventRecipients").get();
@@ -641,7 +655,7 @@ ${recipient}`).digest("hex");
         }
       }
       if (week && !exhausted()) {
-        const rooms = (await db.collection("rooms").get()).docs.map((d) => ({ id: d.id, ...d.data() }));
+        const rooms = await references(db, "rooms");
         const catalog = (await db.doc("resourceCatalog/current").get()).data() || {};
         const finished = new Set((await db.publicReceipts(week.start)).filter((r) => ["sent", "failed", "skipped"].includes(r.status)).map((r) => r.recipient));
         for (const recipient of settings.recipients || []) {
@@ -657,11 +671,13 @@ ${recipient}`).digest("hex");
           }
         }
       } else if (week) report.deferred = true;
+      if (checkPublic) props.setProperty("PUBLIC_SCAN_AFTER", String(Date.now() + (report.deferred || report.errors ? 6e4 : 36e5)));
       report.quotaRemaining = remaining;
       if (report.errors) throw Error("Some notifications failed; inspect Statusi i njoftimeve me email.");
       return report;
     } catch (error) {
       report.failure = true;
+      report.failureCode = ["RESOURCE_EXHAUSTED", "PERMISSION_DENIED", "UNAUTHENTICATED", "UNAVAILABLE"].includes(error.code) ? error.code : "WORKER_ERROR";
       throw error;
     } finally {
       report.durationMs = Date.now() - started;

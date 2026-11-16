@@ -17,6 +17,6 @@ test('reviewer notification retries, uses a fixed recipient, and suppresses succ
  const deps={db:{runTransaction:async cb=>cb({get:async()=>({exists:true,data:()=>data}),update:(_,patch)=>{data={...data,...patch}}}),collection:()=>({get:async()=>({docs:periods.map(p=>({id:p.id,data:()=>p}))})}),doc:()=>({get:async()=>({data:()=>({name:'Salla 127'})})})},auth:{getUser:async()=>{throw Error('Wrong recipient lookup')}},send:async mail=>{if(++attempts===1)throw Error('temporary');sent.push(mail)},now:()=>1000,timestamp:ms=>({toMillis:()=>ms}),token:'lease'};
  await assert.rejects(deliverCancellation(ref,deps));assert.equal(data.status,'retrying');
  await deliverCancellation(ref,deps);await deliverCancellation(ref,deps);
- assert.equal(sent.length,1);assert.equal(sent[0].to,REQUEST_REVIEWER_EMAIL);assert.equal(sent[0].to,'bardhok.bashota@uni-pr.edu');assert.equal(data.status,'sent');
+ assert.equal(sent.length,1);assert.equal(sent[0].to,REQUEST_REVIEWER_EMAIL);assert.equal(sent[0].to,'arsim.sinani@uni-pr.edu');assert.equal(data.status,'sent');
  assert.match(sent[0].messageId,/^<request-submitted-/);
 });
