@@ -1,6 +1,7 @@
 import {doc,runTransaction,serverTimestamp} from 'firebase/firestore';
-import {slotKeys,conflictMessage} from './booking-resources.js';
+import {slotKeys,conflictMessage,needsReapproval} from './booking-resources.js';
 import {BookingError} from './booking-ui.js';
+import {parseStudentEmails} from './student-emails.js';
 import {recordActivity} from './activity-events.js';
 export async function updateReservation(db,id,expectedRevision,data,user){
  return runTransaction(db,async tx=>{
@@ -9,9 +10,16 @@ export async function updateReservation(db,id,expectedRevision,data,user){
   const before=snapshot.data();
   const students=await tx.get(doc(db,'studentNotifications',id));
   if((before.revision||0)!==expectedRevision)throw new BookingError('Rezervimi është ndryshuar ndërkohë. Hapeni përsëri për redaktim.');
+  return applyReservationEdit(tx,db,id,before,data,user,students);
+ });
+}
+export async function applyReservationEdit(tx,db,id,before,data,user,students){
+ const expectedRevision=before.revision||0;
+ const recipients=parseStudentEmails((data.studentEmails??before.studentEmails??students.data()?.recipients??[]).join(';'));
   const controls=await tx.get(doc(db,'settings','control'));
   const profile=await tx.get(doc(db,'users',user.uid));
   if(!profile.data()?.active || (before.ownerUid!==user.uid && !profile.data()?.canCancelAll))throw new BookingError('Nuk keni leje për ta ndryshuar këtë rezervim.');
+  if(!profile.data()?.canCancelAll && needsReapproval(before,data))throw new BookingError('Ndryshimi i sallës, datës ose orës kërkon miratim.');
   if(!controls.data()?.bookingOpen)throw new BookingError('Rezervimet janë pezulluar.');
   const calendar=await tx.get(doc(db,'calendarDays',data.date));
   if(!calendar.data()?.bookingAllowed)throw new BookingError('Rezervimet janë të mbyllura për këtë datë.');
@@ -26,10 +34,10 @@ export async function updateReservation(db,id,expectedRevision,data,user){
   const newLocks=before.date===data.date?oldLocks:{...(newSnap.data()?.bookings||{})};
   const conflict=conflictMessage(data,newLocks,weekly?.data()?.busyKeys||[]);
   if(conflict)throw new BookingError(conflict);
-  const booking={...data,ownerUid:before.ownerUid,creatorName:before.creatorName,createdAt:before.createdAt,revision:expectedRevision+1,updatedAt:serverTimestamp()};
-  const {ownerUid,...published}=booking;
-  if(students.exists())tx.set(doc(db,'studentChangeNotifications',`${id}__edit__${booking.revision}`),{reservationId:id,booking,before,recipients:students.data().recipients,kind:'students',eventAction:'modified',status:'pending',createdAt:serverTimestamp()});
-  tx.set(ref,booking);tx.set(doc(db,'publicBookings',id),published);
+  const booking={...data,studentEmails:recipients,ownerUid:before.ownerUid,creatorName:before.creatorName,createdAt:before.createdAt,revision:expectedRevision+1,updatedAt:serverTimestamp()};
+  const {ownerUid,studentEmails,...published}=booking;
+  if(recipients.length || (before.studentEmails??students.data()?.recipients??[]).length)tx.set(doc(db,'studentChangeNotifications',`${id}__edit__${booking.revision}`),{reservationId:id,booking,before,recipients,kind:'students',eventAction:'modified',status:recipients.length?'pending':'skipped',createdAt:serverTimestamp()});
+  tx.set(doc(db,'reservations',id),booking);tx.set(doc(db,'publicBookings',id),published);
   recordActivity(tx,db,'edited',id,booking,user);
   const newKeys=slotKeys(booking);newKeys.forEach(key=>newLocks[key]=id);
   if(before.date!==data.date && oldKeys.length)tx.set(oldRef,{bookings:oldLocks,changedReservationId:id});
@@ -37,5 +45,5 @@ export async function updateReservation(db,id,expectedRevision,data,user){
   tx.set(doc(db,'modificationNotifications',`${id}__${booking.revision}`),{
    reservationId:id,before,booking,previousKeys:oldKeys,modifiedBy:user.uid,modifierName:user.displayName||'Mësimdhënës',createdAt:serverTimestamp(),status:before.ownerUid===user.uid?'recorded':'pending'
   });
- });
+ return booking;
 }

@@ -19,3 +19,16 @@ export function validPeriodRanges(periods) {
 }
 
 export function wordCount(text) { return text.trim().split(/\s+/u).filter(Boolean).length; }
+
+export function publicDescriptionError(title, description) {
+  const normalize = text => text.trim().replace(/\s+/gu, ' ').toLowerCase();
+  if (normalize(description) === normalize(title)) return 'Përshkrimi i aktivitetit publik nuk mund të jetë vetëm kopje e titullit.';
+  if (wordCount(description) < 100) return 'Përshkrimi i aktivitetit publik duhet të ketë të paktën 100 fjalë.';
+  if (wordCount(description) > 500) return 'Përshkrimi i aktivitetit nuk mund të ketë më shumë se 500 fjalë.';
+  return '';
+}
+
+export const SPECIAL_ROOMS=['r_9c3ca97a27ce','r_a8ae63f60a13'];
+export const isSpecialRoom=id=>SPECIAL_ROOMS.includes(id);
+export const scheduleChanged=(before,after)=>before.date!==after.date || before.roomId!==after.roomId || JSON.stringify(before.periodIds)!==JSON.stringify(after.periodIds);
+export const needsReapproval=(before,after)=> (isSpecialRoom(before.roomId)||isSpecialRoom(after.roomId)) && scheduleChanged(before,after);

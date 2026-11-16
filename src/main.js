@@ -9,9 +9,9 @@ import {calendarActions,calendarInstant} from './calendar-export.js';
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, query, where, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { BookingError, selectPeriods, reservationTime, errorText, MAX_PERIODS } from './booking-ui.js';
-import { EVENT_TYPES, slotKeys, conflictMessage, wordCount } from './booking-resources.js';
+import { EVENT_TYPES, slotKeys, conflictMessage, wordCount, publicDescriptionError } from './booking-resources.js';
 import {updateReservation} from './update-reservation.js';
-import {isSpecialRoom,submitReservationRequest,decideReservationRequest} from './reservation-requests.js';
+import {isSpecialRoom,submitReservationRequest,decideReservationRequest,submitReservationEditRequest,decideReservationEditRequest,needsReapproval} from './reservation-requests.js';
 import { auth, db } from './firebase.js';
 import {hasStaffAccess,setStaffNavigation} from '../public-schedule/staff-navigation.js';
 
@@ -81,7 +81,7 @@ function prepareReservation(period) {
 }
 function renderConfirmation(data) {
   const dialog = $('reservation-dialog');
-  const requestOnly=!editing&&!canCancelAll&&isSpecialRoom(data.roomId);
+  const requestOnly=!canCancelAll&&(editing?needsReapproval(editing.data,data):isSpecialRoom(data.roomId));
   $('reservation-heading').textContent=editing?bt('Konfirmoni ndryshimet'):requestOnly?bt('Konfirmoni kërkesën për rezervim'):bt('Konfirmoni rezervimin');
   dialog.querySelector('[value=confirm]').textContent=editing?bt('Konfirmo ndryshimet'):requestOnly?bt('Dërgo kërkesën'):bt('Konfirmo rezervimin');
   const summary = $('reservation-summary');
@@ -96,7 +96,7 @@ function renderConfirmation(data) {
     [bt('Mënyra e zhvillimit'),data.mode==='online' ? bt('Online') : bt('Fizik')],
     [bt('Rezervuar nga'),data.creatorName]
   ];
-  if(requestOnly)fields.push([bt('Miratimi'),bt('Kërkesa nuk rezervon sallën. Rezervimi dhe njoftimet publike bëhen vetëm pas miratimit.')]);
+  if(requestOnly)fields.push([bt('Miratimi'),bt(editing?'Kërkesa për ndryshim u dërgua për miratim. Rezervimi ekzistues mbetet në fuqi.':'Kërkesa nuk rezervon sallën. Rezervimi dhe njoftimet publike bëhen vetëm pas miratimit.')]);
   if(data.location)fields.push([bt('Lokacioni'),data.location]);
   if(data.onlineUrl)fields.push([bt('Linku i ngjarjes online'),data.onlineUrl]);
   if(data.studentEmails?.length)fields.push([bt('Studentë për njoftim'),data.studentEmails.join('; ')]);
@@ -190,6 +190,7 @@ function stopEditing() {
   $('reservation-entry').hidden=managementView;
   editing=null;
   $('student-emails-field').hidden=false;
+  $('student-emails').value='';
   $('edit-banner').hidden=true;
   $('booking-heading').textContent=bt('Rezervoni një aktivitet');
   $('booking-form').querySelector('button').textContent=bt('Bëni rezervimin');
@@ -197,12 +198,20 @@ function stopEditing() {
   $('booking-message').textContent='';
   updateRequestHint();
 }
-function startEditing(id,data) {
+async function startEditing(id,data) {
+  const user=currentUser;
+  let studentEmails=data.studentEmails;
+  try{
+   if(!studentEmails)studentEmails=(await getDoc(doc(db,'studentNotifications',id))).data()?.recipients||[];
+  }catch(e){message(errText(e),true);return;}
+  if(currentUser?.uid!==user?.uid)return;
+  data={...data,studentEmails};
   $('reservation-entry').hidden=false;
   $('booking-section').open=true;
   $('booking-receipt').hidden=true;
   editing={id,data,revision:data.revision||0};
-  $('student-emails-field').hidden=true;
+  $('student-emails-field').hidden=false;
+  $('student-emails').value=studentEmails.join('\n');
   $('date').value=data.date;$('room').value=data.roomId;
   $('title').value=data.title;$('event-type').value=data.eventType||EVENT_TYPES[0];
   $('from').value=data.periodIds[0];$('through').value=data.periodIds.at(-1);
@@ -224,10 +233,10 @@ function startEditing(id,data) {
   $('booking-heading').scrollIntoView({behavior:'smooth'});
 }
 function updateRequestHint() {
-  const special=!canCancelAll&&isSpecialRoom($('room').value);
+  const special=!canCancelAll&&(isSpecialRoom($('room').value)||isSpecialRoom(editing?.data.roomId));
   $('request-hint').hidden=!special;
   $('request-hint').textContent=editing
-    ? bt('Për ndryshimin e sallës, datës, orës ose pjesëmarrësve të një rezervimi në sallë të posaçme nevojitet një kërkesë e re. Rezervimi ekzistues mbetet në fuqi.')
+    ? bt('Vetëm ndryshimi i sallës, datës ose orës kërkon miratim. Të dhënat e tjera mund të ruhen menjëherë. Deri në miratim, rezervimi ekzistues mbetet në fuqi.')
     : bt('Kjo sallë kërkon miratim. Kërkesa nuk e zë sallën dhe nuk shfaqet në orarin publik deri në miratim.');
   $('booking-form').querySelector('button').textContent=editing?bt('Ruani ndryshimet'):special?bt('Dërgoni kërkesën për rezervim'):bt('Bëni rezervimin');
 }
@@ -245,6 +254,7 @@ function requestDetails(data) {
     bt("Grupet: {v0}",{v0:data.groupIds.map(id=>displayGroup(catalog.groups[id]||id)).join(', ')||bt('Pa grup')}),
     bt("Mësimdhënësit: {v0}",{v0:data.teacherIds.map(id=>catalog.teachers[id]||id).join(', ')||bt('Pa mësimdhënës')}),
     bt("Njoftimi: {v0} · {v1}",{v0:data.isPublic?bt('Publik'):bt('Jo publik'),v1:data.mode==='online'?bt('Online'):bt('Fizik')})];
+  if(data.studentEmails?.length)lines.push(bt('Studentë për njoftim')+': '+data.studentEmails.join('; '));
   if(data.location)lines.push(bt("Lokacioni: {v0}",{v0:data.location}));
   if(data.onlineUrl)lines.push(data.onlineUrl);
   if(data.description)lines.push(data.description);
@@ -268,7 +278,7 @@ function decisionTimestamp(value) {
 function decisionCard(decision) {
   const data=decision.booking,card=document.createElement('article');card.className='decision-card';
   const heading=document.createElement('h3');
-  heading.textContent=`${decision.outcome==='approved'?bt('Miratuar'):bt('Refuzuar')} · ${data.title}`;
+  heading.textContent=`${decision.reservationId?bt('Ndryshim rezervimi')+' · ':''}${decision.outcome==='approved'?bt('Miratuar'):bt('Refuzuar')} · ${data.title}`;
   const details=document.createElement('dl');details.className='decision-details';
   const fields=[
     [bt('Kërkuesi'),data.creatorName||bt('Emri nuk është i disponueshëm')],
@@ -282,6 +292,7 @@ function decisionCard(decision) {
     ...(data.location?[[bt('Lokacioni'),data.location]]:[]),
     ...(data.onlineUrl?[[bt('Linku i ngjarjes online'),data.onlineUrl]]:[]),
     ...(data.description?[[bt('Përshkrimi i aktivitetit'),data.description]]:[]),
+    ...(data.studentEmails?.length?[[bt('Studentë për njoftim'),data.studentEmails.join('; ')]]:[]),
     [bt('Kërkesa u dërgua më'),decisionTimestamp(data.createdAt)],
     [bt('Vendimi nga'),decision.deciderName||bt('Emri nuk është i disponueshëm')],
     [bt('Vendimi u mor më'),decisionTimestamp(decision.createdAt)],
@@ -299,13 +310,14 @@ function decisionCard(decision) {
 async function readRequests() {
   if(!currentUser)return;
   const own=path=>canCancelAll?collection(db,path):query(collection(db,path),where(path==='requestDecisions'?'booking.ownerUid':'ownerUid','==',currentUser.uid));
-  const [pending,decisions]=await Promise.all([getDocs(own('reservationRequests')),getDocs(own('requestDecisions'))]);
+  const [pending,editPending,decisions]=await Promise.all([getDocs(own('reservationRequests')),getDocs(own('reservationEditRequests')),getDocs(own('requestDecisions'))]);
+  const requests=[...pending.docs,...editPending.docs.map(d=>({id:d.id,edit:true,data:()=>({...d.data().booking,createdAt:d.data().createdAt})}))];
   $('requests-heading').textContent=managementView||canCancelAll?bt('Kërkesat për miratim'):bt('Kërkesat e mia');
   const wrapper=$('reservation-requests');wrapper.replaceChildren();
-  if(!pending.docs.length)wrapper.textContent=bt('Nuk ka kërkesa në pritje.');
-  for(const item of pending.docs.sort((a,b)=>a.data().date.localeCompare(b.data().date))){
+  if(!requests.length)wrapper.textContent=bt('Nuk ka kërkesa në pritje.');
+  for(const item of requests.sort((a,b)=>a.data().date.localeCompare(b.data().date))){
     const data=item.data(),card=document.createElement('div');card.className='request-card';card.append(statusBadge('pending'));
-    const details=document.createElement('p');details.style.whiteSpace='pre-wrap';details.textContent=requestDetails(data)+bt('\nNë pritje të miratimit');card.append(details);
+    const details=document.createElement('p');details.style.whiteSpace='pre-wrap';details.textContent=(item.edit?bt('Kërkesë për ndryshimin e rezervimit. Rezervimi ekzistues mbetet në fuqi.')+'\n':'')+requestDetails(data)+bt('\nNë pritje të miratimit');card.append(details);
     const feedback=document.createElement('p');feedback.setAttribute('role','status');feedback.style.whiteSpace='pre-wrap';
     if(canCancelAll)for(const [outcome,label] of [['approved',bt('Miratoni')],['rejected',bt('Refuzoni')]]){
       const button=document.createElement('button');button.type='button';button.textContent=label;button.className=outcome==='rejected'?'danger':'';
@@ -313,7 +325,7 @@ async function readRequests() {
         const reason=await confirmRequestDecision(data,outcome);if(reason===null)return;
         card.querySelectorAll('button').forEach(b=>b.disabled=true);
         try{
-          await decideReservationRequest(db,item.id,outcome,reason,currentUser);
+          await (item.edit?decideReservationEditRequest:decideReservationRequest)(db,item.id,outcome,reason,currentUser);
           await Promise.all([readRequests(),readMyBookings(),readAvailability()]);
           message(outcome==='approved'?bt('Kërkesa u miratua dhe rezervimi u publikua. Njoftimi me email është në pritje të dërgimit.'):bt('Kërkesa u refuzua dhe u fshi. Njoftimi me email është në pritje të dërgimit.'));
         }catch(e){feedback.textContent=errText(e);feedback.className='error';card.querySelectorAll('button').forEach(b=>b.disabled=false);}
@@ -439,7 +451,7 @@ function renderReceipt(){
  if(!lastReceipt)return;
  const {id,data,requestOnly}=lastReceipt,receipt=$('booking-receipt');receipt.replaceChildren(statusBadge(requestOnly?'pending':'confirmed'));
  const summary=document.createElement('p');summary.style.whiteSpace='pre-wrap';summary.textContent=requestDetails(data);receipt.append(summary);
- const next=document.createElement('p');next.textContent=bt(requestOnly?'Kërkesa do të shqyrtohet nga një përdorues me autorizim. Salla ende nuk është rezervuar. Për vendimin do të njoftoheni me email; dërgimi mund të vonohet.':'Rezervimi shfaqet në orarin zyrtar. Mund ta redaktoni ose anuloni te “Rezervimet e mia”.');receipt.append(next);
+ const next=document.createElement('p');next.textContent=bt(requestOnly&&lastReceipt.editRequest?'Kërkesa për ndryshim u dërgua për miratim. Rezervimi ekzistues mbetet në fuqi.':requestOnly?'Kërkesa do të shqyrtohet nga një përdorues me autorizim. Salla ende nuk është rezervuar. Për vendimin do të njoftoheni me email; dërgimi mund të vonohet.':'Rezervimi shfaqet në orarin zyrtar. Mund ta redaktoni ose anuloni te “Rezervimet e mia”.');receipt.append(next);
  if(!requestOnly)receipt.append(bookingCalendar(id,data));receipt.hidden=false;
 }
 async function createReservation(event) {
@@ -449,7 +461,7 @@ async function createReservation(event) {
   if (!currentUser || $('reservation-dialog').open || $('booking-form').querySelector('button').disabled) return;
   const edit=editing;
   let studentEmails;
-  try { studentEmails=edit?[]:parseStudentEmails($('student-emails').value); } catch(e) { return bookingMessage(e.message,true); }
+  try { studentEmails=parseStudentEmails($('student-emails').value); } catch(e) { return bookingMessage(e.message,true); }
   const date = $('date').value;
   const roomId = $('room').value;
   const title = $('title').value.trim();
@@ -466,16 +478,16 @@ async function createReservation(event) {
   const location=roomId==='' && $('mode').value==='physical' ? $('location').value.trim() : '';
   if(location.length>300)return bookingMessage(bt('Lokacioni mund të ketë deri në 300 karaktere.'),true);
   const description = $('visibility').value === 'public' ? $('description').value.trim() : '';
-  if (wordCount(description) > 500) return bookingMessage(bt('Përshkrimi i aktivitetit nuk mund të ketë më shumë se 500 fjalë.'), true);
+  const descriptionError = $('visibility').value === 'public' ? publicDescriptionError(title, description) : '';
+  if (descriptionError) return bookingMessage(bt(descriptionError), true);
   const checked = id => [...$(id).querySelectorAll('input:checked')].map(input => input.value);
-  const data = {title, date, roomId, periodIds, description, location, groupIds:checked('groups'), teacherIds:checked('teachers'),
+  const data = {title, date, roomId, periodIds, description, location, studentEmails, groupIds:checked('groups'), teacherIds:checked('teachers'),
     eventType:$('event-type').value, isPublic:$('visibility').value === 'public', mode:$('mode').value, onlineUrl,
     creatorName:edit?.data.creatorName || currentUser.displayName || 'Mësimdhënës'};
   if(edit && Object.entries(data).every(([key,value])=>JSON.stringify(value)===JSON.stringify(edit.data[key] ?? (Array.isArray(value)?[]:typeof value==='boolean'?false:'')))) {
     return bookingMessage(bt('Nuk keni bërë ndryshime.'));
   }
-  const requestOnly=!edit&&!canCancelAll&&isSpecialRoom(roomId);
-  if(edit&&!canCancelAll&&isSpecialRoom(roomId)&&['date','roomId','periodIds','groupIds','teacherIds'].some(key=>JSON.stringify(data[key])!==JSON.stringify(edit.data[key]||[])))return bookingMessage(bt('Ky ndryshim kërkon miratim. Hiqni dorë nga redaktimi dhe dërgoni një kërkesë të re; rezervimi ekzistues mbetet në fuqi.'),true);
+  const requestOnly=!canCancelAll&&(edit?needsReapproval(edit.data,data):isSpecialRoom(roomId));
   const ownerUid=currentUser.uid;
   const reservationRef = doc(collection(db,'reservations'));
   const publicRef = doc(db,'publicBookings',reservationRef.id);
@@ -484,7 +496,9 @@ async function createReservation(event) {
     $('booking-form').querySelector('button').disabled = true;
     if(!await confirmReservation({...data,studentEmails}))return;
     if(currentUser?.uid!==ownerUid)throw new BookingError(bt('Llogaria ndryshoi. Provoni përsëri.'));
-    if(edit) {
+    if(edit&&requestOnly){
+      await submitReservationEditRequest(db,edit.id,edit.revision,data,currentUser);
+    }else if(edit) {
       await updateReservation(db,edit.id,edit.revision,data,currentUser);
     } else if(requestOnly) {
       await submitReservationRequest(db,data,currentUser,studentEmails);
@@ -506,7 +520,8 @@ async function createReservation(event) {
       if (conflict) throw new BookingError(conflict);
       tx.set(reservationRef, {...data, ownerUid, createdAt:serverTimestamp()});
       recordActivity(tx,db,'created',reservationRef.id,{...data,ownerUid},currentUser,{method:'direct'});
-      tx.set(publicRef, {...data, createdAt:serverTimestamp()});
+      const {studentEmails:privateEmails,...publicData}=data;
+      tx.set(publicRef, {...publicData, createdAt:serverTimestamp()});
       if(studentEmails.length)tx.set(doc(db,'studentNotifications',reservationRef.id),{booking:{...data,ownerUid,createdAt:serverTimestamp()},recipients:studentEmails,kind:'students',status:'pending',createdAt:serverTimestamp()});
       const keys = slotKeys(data);
       for (const key of keys) locks[key] = reservationRef.id;
@@ -516,10 +531,10 @@ async function createReservation(event) {
     $('title').value = '';
     $('location').value = '';
     $('description').value = '';
-    $('description-count').textContent = bt('0 / 500 fjalë');
+    $('description').oninput();
     if(edit)stopEditing();
-    bookingMessage(edit ? (edit.data.ownerUid===ownerUid?bt('Rezervimi u ndryshua me sukses.'):bt('Rezervimi u ndryshua. Njoftimi me email është në pritje të dërgimit.')) : requestOnly?bt('Kërkesa u dërgua për miratim. Salla ende nuk është rezervuar.'):bt('Rezervimi u krijua me sukses.'));
-    lastReceipt={id:edit?.id||reservationRef.id,data:{...data,creatorName:currentUser.displayName||''},requestOnly};
+    bookingMessage(edit&&requestOnly?bt('Kërkesa për ndryshim u dërgua për miratim. Rezervimi ekzistues mbetet në fuqi.'):edit ? (edit.data.ownerUid===ownerUid?bt('Rezervimi u ndryshua me sukses.'):bt('Rezervimi u ndryshua. Njoftimi me email është në pritje të dërgimit.')) : requestOnly?bt('Kërkesa u dërgua për miratim. Salla ende nuk është rezervuar.'):bt('Rezervimi u krijua me sukses.'));
+    lastReceipt={id:edit?.id||reservationRef.id,data:{...data,creatorName:currentUser.displayName||''},requestOnly,editRequest:Boolean(edit&&requestOnly)};
     renderReceipt();$('booking-receipt').focus();
     await Promise.all([readAvailability(),readMyBookings(),readRequests()]);
   } catch (e) { bookingMessage(errText(e),true); }
@@ -542,7 +557,8 @@ async function cancelReservation(id, reason = '') {
     slotKeys(booking).forEach(p => delete locks[p]);
     if (slotKeys(booking).length) tx.set(occupancyRef, {bookings:locks, changedReservationId:id});
     if (otherOwner) tx.set(doc(db,'cancellationNotifications',id), {booking,reason:reason.trim(),cancelledBy:currentUser.uid,createdAt:serverTimestamp(),status:'pending'});
-    if(students.exists())tx.set(doc(db,'studentChangeNotifications',`${id}__cancel`),{reservationId:id,booking,recipients:students.data().recipients,kind:'students',eventAction:'cancelled',reason:reason.trim(),status:'pending',createdAt:serverTimestamp()});
+    const recipients=booking.studentEmails??students.data()?.recipients??[];
+    if(recipients.length)tx.set(doc(db,'studentChangeNotifications',`${id}__cancel`),{reservationId:id,booking,recipients,kind:'students',eventAction:'cancelled',reason:reason.trim(),status:'pending',createdAt:serverTimestamp()});
     tx.delete(reservationRef);
     tx.delete(doc(db,'publicBookings',id));
     recordActivity(tx,db,'cancelled',id,booking,currentUser);
@@ -701,11 +717,13 @@ $('cancel-form').onsubmit = event => {
 };
 $('visibility').onchange = () => {
   $('email-notice').hidden = $('description-field').hidden = $('visibility').value !== 'public';
+  $('description').required = $('visibility').value === 'public';
 };
 $('description').oninput = () => {
   const count = wordCount($('description').value);
-  $('description-count').textContent = bt("{v0} / 500 fjalë",{v0:count});
-  $('description-count').className = count > 500 ? 'error' : '';
+
+  $('description-count').textContent = bt('{v0} / 100–500 fjalë',{v0:count});
+  $('description-count').className = count < 100 || count > 500 ? 'error' : '';
 };
 function updateLocationField(){ $('location-field').hidden=$('mode').value!=='physical'||$('room').value!==''; }
 $('mode').onchange = () => { $('online-field').hidden = $('mode').value !== 'online';updateLocationField(); };

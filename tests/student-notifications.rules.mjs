@@ -6,6 +6,7 @@ const {initializeTestEnvironment,assertSucceeds,assertFails}=require('@firebase/
 const {doc,setDoc,writeBatch,serverTimestamp,getDoc}=require('firebase/firestore');
 test('student recipients: atomic creation, domain/count validation and privacy',async()=>{
  const env=await initializeTestEnvironment({projectId:'demo-fet-students',firestore:{rules:readFileSync('firestore.rules','utf8')}});
+ await env.clearFirestore();
  const db=env.authenticatedContext('owner',{name:'Owner'}).firestore();
  const seed=(path,data)=>env.withSecurityRulesDisabled(ctx=>setDoc(doc(ctx.firestore(),path),data));
  try{
@@ -20,6 +21,15 @@ test('student recipients: atomic creation, domain/count validation and privacy',
  batch.set(doc(db,'studentNotifications',id),{booking,kind:'students',recipients,status:'pending',createdAt:serverTimestamp(),...extra});return batch.commit();
  };
  await assertSucceeds(create('valid',['ana@student.uni-pr.edu']));
+ const privateBooking={...booking,studentEmails:['private@student.uni-pr.edu']};
+ const withPrivate=writeBatch(db),{ownerUid:privateOwner,studentEmails:privateList,...privatePublished}=privateBooking;
+ withPrivate.set(doc(db,'reservations/private-list'),privateBooking);
+ withPrivate.set(doc(db,'publicBookings/private-list'),privatePublished);
+ withPrivate.set(doc(db,'studentNotifications/private-list'),{booking:privateBooking,recipients:privateList,kind:'students',status:'pending',createdAt:serverTimestamp()});
+ await assertSucceeds(withPrivate.commit());
+ const exposed=writeBatch(db);exposed.set(doc(db,'reservations/exposed'),privateBooking);exposed.set(doc(db,'publicBookings/exposed'),{...privatePublished,studentEmails:privateList});
+ await assertFails(exposed.commit());
+
  await assertSucceeds(create('hundred',Array.from({length:100},(_,i)=>`s${i}@student.uni-pr.edu`)));
  for(const [id,recipients] of [['domain',['a@uni-pr.edu']],['suffix',['a@student.uni-pr.edu.evil']],['bad',['a..b@student.uni-pr.edu']],['empty',[]],['many',Array.from({length:101},(_,i)=>`s${i}@student.uni-pr.edu`)],['duplicate',['a@student.uni-pr.edu','a@student.uni-pr.edu']]])await assertFails(create(id,recipients));
  await assertFails(create('fake',['a@student.uni-pr.edu'],{booking:{...booking,title:'Forged'}}));

@@ -39,6 +39,15 @@ service cloud.firestore {
         request.resource.data.status == 'pending' && request.resource.data.attempts == 0 &&
         request.resource.data.retryRequestedAt == request.time && request.resource.data.retryRequestedBy == request.auth.uid;
     }
+    function validStudentEmails(list) {
+      return list is list && list.size() <= 100 && list.toSet().size() == list.size() &&
+        (list.size() == 0 || list.join(';').matches("^[a-z0-9!#$%&'*+/=?^_`{|}~-]+([.][a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@student[.]uni-pr[.]edu(;[a-z0-9!#$%&'*+/=?^_`{|}~-]+([.][a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@student[.]uni-pr[.]edu)*$"));
+    }
+    function studentList(booking,id) {
+      let path=/databases/$(database)/documents/studentNotifications/$(id);
+      return 'studentEmails' in booking ? booking.studentEmails : (exists(path) ? get(path).data.recipients : []);
+    }
+    function sameSchedule(a,b) { return a.date == b.date && a.roomId == b.roomId && a.periodIds == b.periodIds; }
     function specialRoom(id) { return id in ['r_9c3ca97a27ce','r_a8ae63f60a13']; }
     function approvedRequest(id, booking) {
       let path = /databases/$(database)/documents/reservationRequests/$(id);
@@ -96,7 +105,8 @@ service cloud.firestore {
       return !day.fetActive || !get(/databases/$(database)/documents/weeklyResources/$(day.weekday)).data.busyKeys.hasAny(expected);
     }
     function valid(d) {
-      return d.keys().hasOnly(['title','date','roomId','periodIds','ownerUid','creatorName','createdAt','groupIds','teacherIds','eventType','isPublic','mode','onlineUrl','location','description','revision','updatedAt']) &&
+      return d.keys().hasOnly(['title','date','roomId','periodIds','ownerUid','creatorName','createdAt','groupIds','teacherIds','eventType','isPublic','mode','onlineUrl','location','description','revision','updatedAt','studentEmails']) &&
+        validStudentEmails(d.get('studentEmails',[])) &&
         d.title is string && d.title.size() > 0 && d.title.size() <= 120 &&
         d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
         d.roomId is string && (d.roomId == '' || d.roomId in catalog().rooms) &&
@@ -109,6 +119,8 @@ service cloud.firestore {
         (d.get('location','') == '' || (d.roomId == '' && d.mode == 'physical')) &&
         d.get('description','') is string &&
         d.get('description','').split('\\s+').removeAll(['']).size() <= 500 &&
+        (!d.isPublic || (d.get('description','').split('\\s+').removeAll(['']).size() >= 100 &&
+          d.description.trim().replace('\\s+', ' ').lower() != d.title.trim().replace('\\s+', ' ').lower())) &&
         (d.isPublic || d.get('description','') == '') &&
         d.isPublic is bool && d.mode in ['physical','online'] && d.onlineUrl is string &&
         (d.mode == 'physical' ? d.onlineUrl == '' : (d.onlineUrl.size() <= 2000 && d.onlineUrl.matches('^https?://[^ /]+.*$')));
@@ -138,7 +150,10 @@ service cloud.firestore {
         a.get('groupIds',[]).toSet() == b.groupIds.toSet() && a.get('teacherIds',[]).toSet() == b.teacherIds.toSet();
     }
     function studentChangeRecorded(id, suffix) {
-      return !exists(/databases/$(database)/documents/studentNotifications/$(id)) ||
+      let path=/databases/$(database)/documents/reservations/$(id);
+      let before=get(path).data;
+      let after=existsAfter(path) ? getAfter(path).data : before;
+      return (studentList(before,id).size() == 0 && studentList(after,id).size() == 0) ||
         (!exists(/databases/$(database)/documents/studentChangeNotifications/$(id + suffix)) &&
          existsAfter(/databases/$(database)/documents/studentChangeNotifications/$(id + suffix)));
     }
@@ -168,7 +183,7 @@ service cloud.firestore {
     }
     function publicMatches(id, d) {
       let p = getAfter(/databases/$(database)/documents/publicBookings/$(id)).data;
-      return !p.keys().hasAny(['ownerUid']) && d.diff(p).affectedKeys() == ['ownerUid'].toSet();
+      return !p.keys().hasAny(['ownerUid','studentEmails']) && d.diff(p).affectedKeys() == (d.keys().hasAny(['studentEmails']) ? ['ownerUid','studentEmails'].toSet() : ['ownerUid'].toSet());
     }
     match /resourceCatalog/{id} { allow read: if true; allow write: if false; }
     match /weeklyResources/{id} { allow read: if approved(); allow write: if false; }
@@ -198,7 +213,8 @@ service cloud.firestore {
       allow write: if false;
     }
     match /reservations/{reservationId} {
-      allow read: if approved();
+      allow get: if approved() && !exists(/databases/$(database)/documents/reservations/$(reservationId));
+      allow read: if approved() && (resource.data.ownerUid == request.auth.uid || elevated());
       allow create: if canBook(request.resource.data.date) && valid(request.resource.data) &&
         mayCreate(reservationId,request.resource.data) &&
         activityRecorded(reservationId,'__created') &&
@@ -207,9 +223,10 @@ service cloud.firestore {
         publicMatches(reservationId, request.resource.data);
       allow update: if canBook(request.resource.data.date) && mayCancel(resource.data) && valid(request.resource.data) &&
         activityRecorded(reservationId,'__edit__' + string(request.resource.data.revision)) &&
-        (!specialRoom(request.resource.data.roomId) || elevated() || sameSlots(resource.data,request.resource.data)) &&
+        (elevated() || (!(specialRoom(resource.data.roomId) || specialRoom(request.resource.data.roomId))) || sameSchedule(resource.data,request.resource.data)) &&
         request.resource.data.ownerUid == resource.data.ownerUid && request.resource.data.creatorName == resource.data.creatorName &&
         request.resource.data.createdAt == resource.data.createdAt && request.resource.data.updatedAt == request.time &&
+        (!('studentEmails' in resource.data) || 'studentEmails' in request.resource.data) &&
         request.resource.data.revision is int && request.resource.data.revision == resource.data.get('revision',0)+1 &&
         editOccupancy(reservationId,resource.data,request.resource.data) &&
         studentChangeRecorded(reservationId,'__edit__' + string(request.resource.data.revision)) && modificationRecorded(reservationId,resource.data,request.resource.data) && publicMatches(reservationId,request.resource.data);
@@ -233,13 +250,32 @@ service cloud.firestore {
       allow delete: if approved() && elevated() && existsAfter(/databases/$(database)/documents/requestDecisions/$(id)) &&
         activityRecorded(id,getAfter(/databases/$(database)/documents/requestDecisions/$(id)).data.outcome == 'approved' ? '__approved' : '__declined');
     }
+    match /reservationEditRequests/{id} {
+      allow read: if approved() && (elevated() || resource.data.ownerUid == request.auth.uid);
+      function validEditRequest() {
+        let d=request.resource.data;
+        let before=get(/databases/$(database)/documents/reservations/$(d.reservationId)).data;
+        return d.keys().hasOnly(['reservationId','expectedRevision','booking','ownerUid','createdAt']) &&
+          d.ownerUid == request.auth.uid && before.ownerUid == request.auth.uid &&
+          d.expectedRevision == before.get('revision',0) && d.createdAt == request.time &&
+          valid(d.booking) && d.booking.ownerUid == before.ownerUid && d.booking.creatorName == before.creatorName && d.booking.createdAt == before.createdAt &&
+          (specialRoom(before.roomId) || specialRoom(d.booking.roomId)) && !sameSchedule(before,d.booking) &&
+          !exists(/databases/$(database)/documents/requestDecisions/$(id)) &&
+          getAfter(/databases/$(database)/documents/requestNotifications/$(id)).data.booking == d.booking;
+      }
+      allow create: if approved() && !elevated() && canBook(request.resource.data.booking.date) && validEditRequest() && activityRecorded(id,'__requested');
+      allow update: if false;
+      allow delete: if approved() && elevated() && getAfter(/databases/$(database)/documents/requestDecisions/$(id)).data.reservationId == resource.data.reservationId &&
+        activityRecorded(id,getAfter(/databases/$(database)/documents/requestDecisions/$(id)).data.outcome == 'approved' ? '__approved' : '__declined');
+    }
     match /requestNotifications/{id} {
       allow create: if approved() &&
         request.resource.data.keys().hasOnly(['booking','kind','status','createdAt']) &&
         request.resource.data.kind == 'request-submitted' && request.resource.data.status == 'pending' &&
         request.resource.data.createdAt == request.time &&
-        !exists(/databases/$(database)/documents/reservationRequests/$(id)) &&
-        request.resource.data.booking == getAfter(/databases/$(database)/documents/reservationRequests/$(id)).data &&
+        !exists(/databases/$(database)/documents/requestDecisions/$(id)) &&
+        ((!exists(/databases/$(database)/documents/reservationRequests/$(id)) && request.resource.data.booking == getAfter(/databases/$(database)/documents/reservationRequests/$(id)).data) ||
+         (!exists(/databases/$(database)/documents/reservationEditRequests/$(id)) && request.resource.data.booking == getAfter(/databases/$(database)/documents/reservationEditRequests/$(id)).data.booking)) &&
         request.resource.data.booking.ownerUid == request.auth.uid;
       allow read: if mailWorker() || (approved() && (elevated() || resource.data.booking.ownerUid == request.auth.uid));
       allow update: if adminEmailRetry();
@@ -251,14 +287,19 @@ service cloud.firestore {
     match /requestDecisions/{id} {
       function validDecision() {
         let d = request.resource.data;
-        let path = /databases/$(database)/documents/reservationRequests/$(id);
-        let reservation = /databases/$(database)/documents/reservations/$(id);
-        return d.keys().hasOnly(['booking','outcome','reason','decidedBy','deciderName','createdAt','status']) &&
-          d.booking == get(path).data && !existsAfter(path) && d.status == 'pending' &&
+        let editing='reservationId' in d;
+        let path = editing ? /databases/$(database)/documents/reservationEditRequests/$(id) : /databases/$(database)/documents/reservationRequests/$(id);
+        let reservation = editing ? /databases/$(database)/documents/reservations/$(d.reservationId) : /databases/$(database)/documents/reservations/$(id);
+        return d.keys().hasOnly(['booking','outcome','reason','decidedBy','deciderName','createdAt','status','reservationId']) &&
+          d.booking == (editing ? get(path).data.booking : get(path).data) && !existsAfter(path) && d.status == 'pending' &&
           d.decidedBy == request.auth.uid && d.deciderName == request.auth.token.get('name','Mësimdhënës') && d.createdAt == request.time &&
           d.reason is string && d.reason.size() <= 2000 && d.reason.matches('(?s).*\\S.*') &&
-          (d.outcome == 'approved' ? (!exists(reservation) && getAfter(reservation).data.diff(d.booking).affectedKeys().hasOnly(['createdAt'])) :
-           (d.outcome == 'rejected' && !existsAfter(reservation)));
+          (editing ?
+            (d.reservationId == get(path).data.reservationId &&
+             (d.outcome == 'approved' ? (get(reservation).data.get('revision',0) == get(path).data.expectedRevision && getAfter(reservation).data.revision == get(path).data.expectedRevision+1 && getAfter(reservation).data.diff(d.booking).affectedKeys().hasOnly(['revision','updatedAt'])) :
+              (d.outcome == 'rejected' && (exists(reservation) ? getAfter(reservation).data == get(reservation).data : !existsAfter(reservation))))) :
+            (d.outcome == 'approved' ? (!exists(reservation) && getAfter(reservation).data.diff(d.booking).affectedKeys().hasOnly(['createdAt'])) :
+             (d.outcome == 'rejected' && !existsAfter(reservation))));
       }
       allow read: if mailWorker() || (approved() && (resource.data.booking.ownerUid == request.auth.uid || elevated()));
       allow create: if approved() && elevated() && validDecision();
@@ -297,8 +338,8 @@ service cloud.firestore {
         let before=get(path).data;
         return d.keys().hasOnly(['reservationId','booking','before','recipients','kind','eventAction','reason','status','createdAt']) &&
           controls().bookingOpen && mayCancel(before) && d.kind == 'students' &&
-          d.status == 'pending' && d.createdAt == request.time &&
-          d.recipients == get(/databases/$(database)/documents/studentNotifications/$(d.reservationId)).data.recipients &&
+          d.status == (d.recipients.size() > 0 ? 'pending' : 'skipped') && d.createdAt == request.time &&
+          d.recipients == studentList(d.eventAction == 'modified' ? getAfter(path).data : before,d.reservationId) &&
           (d.eventAction == 'modified' ?
             (d.before == before && d.booking == getAfter(path).data && d.booking.revision == before.get('revision',0)+1 && id == d.reservationId + '__edit__' + string(d.booking.revision)) :
             (d.eventAction == 'cancelled' && d.booking == before && !existsAfter(path) && id == d.reservationId + '__cancel' && d.reason is string && d.reason.size() <= 2000));
@@ -312,7 +353,7 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /studentNotifications/{id} {
-      allow get: if approved() && elevated();
+      allow get: if approved() && (elevated() || mayCancel(get(/databases/$(database)/documents/reservations/$(id)).data));
       allow get: if approved() && !exists(/databases/$(database)/documents/studentNotifications/$(id)) &&
         mayCancel(get(/databases/$(database)/documents/reservations/$(id)).data);
       function validStudents() {
@@ -321,6 +362,7 @@ service cloud.firestore {
         return d.keys().hasOnly(['booking','recipients','kind','status','createdAt']) &&
           d.kind == 'students' && d.status in ['pending','awaiting-approval'] &&
           d.createdAt == request.time && !exists(source) && d.booking == getAfter(source).data &&
+          (!('studentEmails' in d.booking) || d.recipients == d.booking.studentEmails) &&
           d.recipients is list && d.recipients.size() > 0 && d.recipients.size() <= 100 &&
           d.recipients.toSet().size() == d.recipients.size() &&
           d.recipients.join(';').matches("^[a-z0-9!#$%&'*+/=?^_`{|}~-]+([.][a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@student[.]uni-pr[.]edu(;[a-z0-9!#$%&'*+/=?^_`{|}~-]+([.][a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@student[.]uni-pr[.]edu)*$");
@@ -464,14 +506,16 @@ service cloud.firestore {
       }
       function requested(d) {
         let path=/databases/$(database)/documents/reservationRequests/$(d.entityId);
-        return id == d.entityId + '__requested' && !exists(path) && matches(d,getAfter(path).data) &&
+        let edit=/databases/$(database)/documents/reservationEditRequests/$(d.entityId);
+        return id == d.entityId + '__requested' && !exists(path) && !exists(edit) && (existsAfter(edit) ? matches(d,getAfter(edit).data.booking) : matches(d,getAfter(path).data)) &&
           d.ownerUid == request.auth.uid && d.method == '' && d.requestedAt == null;
       }
       function decided(d) {
-        let path=/databases/$(database)/documents/reservationRequests/$(d.entityId);
         let decision=getAfter(/databases/$(database)/documents/requestDecisions/$(d.entityId)).data;
+        let editing='reservationId' in decision;
+        let path=editing ? /databases/$(database)/documents/reservationEditRequests/$(d.entityId) : /databases/$(database)/documents/reservationRequests/$(d.entityId);
         return elevated() && id == d.entityId + (d.kind == 'approved' ? '__approved' : '__declined') &&
-          matches(d,get(path).data) && !existsAfter(path) && d.requestedAt == get(path).data.createdAt && d.method == '' &&
+          matches(d,editing ? get(path).data.booking : get(path).data) && !existsAfter(path) && d.requestedAt == get(path).data.createdAt && d.method == '' &&
           decision.decidedBy == request.auth.uid && decision.createdAt == request.time &&
           decision.outcome == (d.kind == 'approved' ? 'approved' : 'rejected');
       }

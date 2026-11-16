@@ -331,3 +331,21 @@ The Google Calendar action uses a live, read-only calendar subscription rather t
 Official classes use stable FET activity IDs and recur weekly through 31 December 2026 in Europe/Tirane time. Reservations are single events fetched directly from public Firestore documents; deleting a reservation empties its subscribed feed. The public-site deployment rebuilds the class catalog from the official HTML exports. When changing the CSV, also run `node scripts/build-calendar-classes.mjs /path/to/public-site data/timetable.csv` to retain activity IDs through metadata changes. The `.ics` download is explicitly labelled as a local snapshot.
 
 For checks every five minutes instead of Google’s URL-subscription refresh interval, deploy the separate [per-user Calendar API connection](calendar-sync/README.md) as **User accessing the web app**. Configure its URL as `syncEndpoint` alongside the existing feed `endpoint`. Each visitor explicitly connects selected activities and authorizes access only to calendars created by that connection; one user-owned trigger continues the checks while the site is closed. This option is inactive until its separate deployment is configured.
+
+
+## Redaktimi i rezervimeve në sallat 102 dhe 127
+
+Stafi mund të ndryshojë titullin, përshkrimin, grupet, mësimdhënësit, emailat e
+studentëve, mënyrën e zhvillimit dhe hollësitë e tjera pa rimiratim. Ndryshimi i
+sallës (edhe largimi nga 102/127), datës ose intervalit kërkon miratim. Formulari
+dërgon një propozim privat te `reservationEditRequests`; rezervimi i konfirmuar,
+ID-ja e tij dhe zënia aktuale mbeten në fuqi. Pas miratimit, ndryshimi zbatohet në
+një transaksion me kontroll të konflikteve dhe versionit. Refuzimi nuk e ndryshon
+rezervimin. Kërkesat e vjetruara nuk mbishkruajnë redaktime më të reja.
+
+`studentEmails` ruhet vetëm në rezervimin/kërkesën private, hiqet nga
+`publicBookings` dhe përdoret për njoftimet e ardhshme. Rezervimet e vjetra lexojnë
+listën fillestare nga `studentNotifications` deri në redaktimin e parë. Heqja e të
+gjitha adresave ndalon njoftimet e ardhshme për atë listë; historia e dërgimit ruhet.
+
+Aktivitetet publike kërkojnë përshkrim prej **100–500 fjalësh**, si gjatë krijimit, ashtu edhe gjatë redaktimit. Kufiri zbatohet në formular dhe në rregullat e Firestore.

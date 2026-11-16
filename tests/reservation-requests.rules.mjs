@@ -10,6 +10,7 @@ const {initializeTestEnvironment,assertSucceeds,assertFails}=require('@firebase/
 const {doc,getDoc,setDoc,deleteDoc,writeBatch,serverTimestamp,collection,getDocs,query,where}=require('firebase/firestore');
 test('special rooms require private requests and atomic elevated decisions',async()=>{
  const env=await initializeTestEnvironment({projectId:'demo-fet-requests',firestore:{rules:readFileSync('firestore.rules','utf8')}});
+ await env.clearFirestore();
  const owner=env.authenticatedContext('owner',{name:'Owner'}).firestore(),manager=env.authenticatedContext('manager',{name:'Manager'}).firestore(),other=env.authenticatedContext('other',{name:'Other'}).firestore();
  const seed=async(path,data)=>env.withSecurityRulesDisabled(ctx=>setDoc(doc(ctx.firestore(),path),data));
  const rooms=['r_9c3ca97a27ce','r_a8ae63f60a13'],date='2026-10-28';

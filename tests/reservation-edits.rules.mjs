@@ -10,6 +10,7 @@ const {initializeTestEnvironment,assertSucceeds,assertFails}=require('@firebase/
 const {doc,getDoc,setDoc,runTransaction,serverTimestamp}=require('firebase/firestore');
 test('reservation edits are atomic, conflict-safe and require owner notifications for delegated edits',async()=>{
  const env=await initializeTestEnvironment({projectId:'demo-fet-edits',firestore:{rules:readFileSync('firestore.rules','utf8')}});
+ await env.clearFirestore();
  const owner=env.authenticatedContext('owner',{name:'Owner'}).firestore(),manager=env.authenticatedContext('manager',{name:'Manager'}).firestore(),other=env.authenticatedContext('other',{name:'Other'}).firestore();
  const seed=async(path,data)=>env.withSecurityRulesDisabled(ctx=>setDoc(doc(ctx.firestore(),path),data));
  const date='2026-10-28',next='2026-10-29',roomId='r_123456abcdef';
@@ -96,7 +97,7 @@ test('reservation edits are atomic, conflict-safe and require owner notification
   await assertSucceeds(edit(owner,{title:'Metadata only'}));
   await assertFails(edit(owner,{periodIds:['p02']}));
   await assertFails(edit(owner,{date:next}));
-  await assertFails(edit(owner,{groupIds:[Object.keys(groups)[0]]}));
+  await assertSucceeds(edit(owner,{groupIds:[Object.keys(groups)[0]]}));
   await assertSucceeds(edit(manager,{periodIds:['p02']}));
   await seed('users/manager',{active:true,role:'admin',canCancelAll:false});await assertFails(edit(manager,{title:'Not delegated'}));
   await seed('settings/control',{bookingOpen:false,slotStorage:'resources-v2'});await assertFails(edit(owner,{title:'Paused'}));

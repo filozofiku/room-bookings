@@ -3,7 +3,7 @@ import {createRequire} from 'node:module';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {firestoreRest,timestamp} from '../mailer/firestore-rest.js';
-import {deliverPublicEvent} from '../mailer/public-event-email.js';
+import {deliverPublicWeek,preparePublicWeek} from '../mailer/public-event-email.js';
 import {deliverCancellation} from '../mailer/cancellation-email.js';
 import {slotKeys,validPeriodRanges} from '../src/booking-resources.js';
 const require = createRequire(process.env.TEST_MODULES_DIR ? `${process.env.TEST_MODULES_DIR}/package.json` : import.meta.url);
@@ -11,6 +11,7 @@ const {initializeTestEnvironment, assertSucceeds, assertFails} = require('@fireb
 const {doc,getDoc,getDocs,collection,deleteDoc,setDoc,serverTimestamp,runTransaction} = require('firebase/firestore');
 test('resource reservations: atomic publication, optional resources, conflicts, authorization, and races',async()=>{
  const env=await initializeTestEnvironment({projectId:'demo-fet-public',firestore:{rules:readFileSync('firestore.rules','utf8')}});
+ await env.clearFirestore();
  const date='2026-10-23', roomId='r_123456abcdef';
  const periods=Array.from({length:18},(_,i)=>({id:`p${String(i+1).padStart(2,'0')}`}));
  const groups=Object.fromEntries(Array.from({length:57},(_,i)=>[`g_${String(i).padStart(12,'0')}`,`Group ${i}`]));
@@ -45,6 +46,8 @@ test('resource reservations: atomic publication, optional resources, conflicts, 
   await seed('resourceCatalog/current',{rooms:{[roomId]:'Salla 014'},groups,teachers});
   await seed(`calendarDays/${date}`,{weekday:'5',bookingAllowed:true,fetActive:true});
   await seed('weeklyResources/5',{busyKeys:[]});
+  await assertSucceeds(create('makeup',{eventType:'Zëvendësim i mësimit',groupIds:base.groupIds.slice(0,1),teacherIds:base.teacherIds.slice(0,1)}));
+  await assertSucceeds(cancel('makeup'));
   for(let n=1;n<=16;n++){
    await assertSucceeds(create('valid',{periodIds:periods.slice(0,n).map(p=>p.id)}));
    await assertSucceeds(cancel('valid'));
@@ -102,11 +105,12 @@ test('resource reservations: atomic publication, optional resources, conflicts, 
   const publicEvent={...base,isPublic:true,roomId:'',periodIds:['p01'],date:'2026-10-26'};
   await seed('publicBookings/public-event',publicEvent);
   let publicEmails=0;
-  const publicDeps={db:rest,periods:[{id:'p01',start:'08:00',end:'08:15'}],rooms:[],catalog:{},now:()=>Date.parse('2026-10-25T12:00:00Z'),token:'public-test',send:async()=>{publicEmails++;}};
-  await deliverPublicEvent('public-event','recipient@example.test',publicDeps);
-  await deliverPublicEvent('public-event','recipient@example.test',publicDeps);
+  const publicDeps={db:rest,periods:[{id:'p01',start:'08:00',end:'08:15'}],rooms:[],catalog:{},now:()=>Date.parse('2026-10-26T07:00:00Z'),token:'12345678-1234-1234-1234-123456789012',send:async()=>{publicEmails++;}};
+  const week=await preparePublicWeek(rest,publicDeps.now(),publicDeps.periods);
+  await deliverPublicWeek(week,'recipient@example.test',publicDeps);
+  await deliverPublicWeek(week,'recipient@example.test',publicDeps);
   assert.equal(publicEmails,1);
-  await assert.rejects(deliverPublicEvent('public-event','attacker@example.test',publicDeps));
+  await assert.rejects(deliverPublicWeek(week,'attacker@example.test',publicDeps));
   await assertFails(getDocs(collection(db,'publicEventDeliveries')));
   const receipts=await getDocs(collection(worker,'publicEventDeliveries'));
   assert.equal(receipts.size,1);
@@ -135,6 +139,15 @@ test('resource reservations: atomic publication, optional resources, conflicts, 
     await assertSucceeds(create('new-type',{eventType}));
     await assertSucceeds(cancel('new-type'));
   }
+  for(const description of [undefined,'',Array(99).fill('word').join(' '),' '.repeat(100),'a'.repeat(99),' '+ 'a'.repeat(99)+' ']) {
+    await assertFails(create('description',{isPublic:true,...(description===undefined?{}:{description})}));
+  }
+  const longTitle=Array(20).fill('Panel').join(' ');
+  for(const description of [longTitle,' '+longTitle.toUpperCase().replaceAll(' ','\n\t')+' ']) {
+    await assertFails(create('description',{isPublic:true,title:longTitle,description}));
+  }
+  await assertSucceeds(create('description',{isPublic:true,description:Array(100).fill('fjalë').join(' ')}));
+  await assertSucceeds(cancel('description'));
   await assertSucceeds(create('description',{isPublic:true,description:Array(500).fill('fjalë').join(' ')}));
   await assertSucceeds(cancel('description'));
   await assertFails(create('description',{isPublic:true,description:Array(501).fill('fjalë').join(' ')}));
