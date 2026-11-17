@@ -140,8 +140,10 @@ export async function deliverPublicWeek(week,recipient,{db,periods,rooms,catalog
   await send({to:recipient,...publicWeekEmail(events,week,periods,rooms,catalog,unsubscribeUrl),messageId:`<public-week-${id}@filozofiku.github.io>`});
   await finish({status:'sent',sentAt:timestamp(now()),bookingIds:events.map(e=>e.id)});return 'sent';
  }catch(error){
-  const failed=work.attempts>=5;
-  await finish({status:failed?'failed':'retrying',lastErrorCode:'delivery-error',lastAttemptAt:timestamp(now())});
+  if(error.code==='RESOURCE_EXHAUSTED')throw error;
+  const deferred=error.code==='worker-budget',failed=!deferred&&work.attempts>=5;
+  await finish({status:failed?'failed':'retrying',...(deferred?{attempts:Math.max(0,work.attempts-1)}:{}),lastErrorCode:deferred?'worker-budget':'delivery-error',lastAttemptAt:timestamp(now())});
+  if(deferred)throw error;
   throw Error(failed?'public-week-delivery-failed':'public-week-delivery-retry');
  }
 }

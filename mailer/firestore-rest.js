@@ -24,7 +24,8 @@ export function firestoreRest(project, token, request = fetch, origin = 'https:/
   const call=async(suffix,method='GET',body)=>{
     const response=await request(base+suffix,{method,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(30000)});
     const data=await response.json();
-    if(!response.ok) throw Object.assign(Error('firestore-request-failed'),{code:data.error?.status || 'HTTP_ERROR'});
+    const error=data.error||(Array.isArray(data)?data.find(row=>row.error)?.error:null);
+    if(!response.ok||error)throw Object.assign(Error('firestore-request-failed'),{code:error?.status || 'HTTP_ERROR'});
     return data;
   };
   const snapshot=raw=>({exists:!!raw,id:raw?.name?.split('/').at(-1),updateTime:raw?.updateTime,data:()=>raw?decode({mapValue:{fields:raw.fields}}):undefined});
@@ -59,7 +60,8 @@ export function firestoreRest(project, token, request = fetch, origin = 'https:/
       }
     },
     upcoming:async date=>{
-      const rows=await call(':runQuery','POST',{structuredQuery:{from:[{collectionId:'publicBookings'}],where:{fieldFilter:{field:{fieldPath:'date'},op:'GREATER_THAN_OR_EQUAL',value:encode(date)}}}});
+      const rows=await call(':runQuery','POST',{structuredQuery:{from:[{collectionId:'publicBookings'}],where:{fieldFilter:{field:{fieldPath:'date'},op:'GREATER_THAN_OR_EQUAL',value:encode(date)}},limit:500}});
+      if(rows.filter(r=>r.document).length>=500)throw Error('public-booking-export-limit');
       return rows.filter(r=>r.document).map(r=>snapshot(r.document));
     },
     publicReceipts:async weekStart=>{

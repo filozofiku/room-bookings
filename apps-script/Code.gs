@@ -28,6 +28,66 @@ var UniversityMailer = (() => {
     status: () => status
   });
 
+  // mailer/read-budget.js
+  var WORKER_READ_LIMIT = 6e3;
+  var WORKER_WRITE_LIMIT = 1500;
+  var BUDGET_KEY = "FIRESTORE_BUDGET_V1";
+  function quotaDay(now) {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(now));
+  }
+  var blocked = () => Object.assign(Error("Mail worker daily database budget reached; work deferred."), { code: "worker-budget" });
+  function requestBudget(request, properties, { now = Date.now, readLimit = WORKER_READ_LIMIT, writeLimit = WORKER_WRITE_LIMIT } = {}) {
+    const get = () => {
+      let data;
+      try {
+        data = JSON.parse(properties.getProperty(BUDGET_KEY) || "null");
+      } catch {
+      }
+      return data?.day === quotaDay(now()) ? data : { day: quotaDay(now()), reads: 0, writes: 0 };
+    };
+    const put = (data) => properties.setProperty(BUDGET_KEY, JSON.stringify(data));
+    const ensure = (reads = 0, writes = 0) => {
+      const data = get();
+      if (data.reads + reads > readLimit || data.writes + writes > writeLimit) throw blocked();
+      return data;
+    };
+    const wrapped = async (url, options = {}) => {
+      if (!url.startsWith("https://firestore.googleapis.com/")) return request(url, options);
+      const body = options.body ? JSON.parse(options.body) : null;
+      let reads = 1, writes = 0, kind = "document";
+      if (url.endsWith(":runQuery")) {
+        reads = body?.structuredQuery?.limit;
+        if (!Number.isInteger(reads) || reads < 1 || reads > 500) throw Object.assign(Error("Unbounded worker query refused"), { code: "worker-budget" });
+        kind = "query";
+      } else if (url.endsWith(":commit")) {
+        writes = body?.writes?.length || 0;
+        reads = writes * 3;
+        kind = "commit";
+      } else if (url.includes("?pageSize=")) {
+        reads = Number(url.match(/[?&]pageSize=(\d+)/)?.[1]);
+        if (!Number.isInteger(reads) || reads < 1 || reads > 100) throw blocked();
+        kind = "list";
+      }
+      const data = ensure(reads, writes);
+      data.reads += reads;
+      data.writes += writes;
+      put(data);
+      const response = await request(url, options);
+      const value = await response.json();
+      if (response.ok && !value.error && !(Array.isArray(value) && value.some((row) => row.error)) && kind !== "commit") {
+        const actual = kind === "query" ? Math.max(1, value.filter((row) => row.document).length) : kind === "list" ? Math.max(1, (value.documents || []).length) : 1;
+        if (actual > reads) throw blocked();
+        const current = get();
+        if (current.day === data.day) {
+          current.reads -= reads - actual;
+          put(current);
+        }
+      }
+      return { ...response, json: () => value };
+    };
+    return { request: wrapped, ensure, snapshot: get };
+  }
+
   // mailer/email-format.js
   var months = ["janar", "shkurt", "mars", "prill", "maj", "qershor", "korrik", "gusht", "shtator", "tetor", "n\xEBntor", "dhjetor"];
   function emailDate(date) {
@@ -93,7 +153,8 @@ var UniversityMailer = (() => {
     const call = async (suffix, method = "GET", body) => {
       const response = await request(base + suffix, { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, ...body ? { body: JSON.stringify(body) } : {}, signal: void 0 });
       const data = await response.json();
-      if (!response.ok) throw Object.assign(Error("firestore-request-failed"), { code: data.error?.status || "HTTP_ERROR" });
+      const error = data.error || (Array.isArray(data) ? data.find((row) => row.error)?.error : null);
+      if (!response.ok || error) throw Object.assign(Error("firestore-request-failed"), { code: error?.status || "HTTP_ERROR" });
       return data;
     };
     const snapshot = (raw) => ({ exists: !!raw, id: raw?.name?.split("/").at(-1), updateTime: raw?.updateTime, data: () => raw ? decode({ mapValue: { fields: raw.fields } }) : void 0 });
@@ -142,7 +203,8 @@ var UniversityMailer = (() => {
         }
       },
       upcoming: async (date) => {
-        const rows = await call(":runQuery", "POST", { structuredQuery: { from: [{ collectionId: "publicBookings" }], where: { fieldFilter: { field: { fieldPath: "date" }, op: "GREATER_THAN_OR_EQUAL", value: encode(date) } } } });
+        const rows = await call(":runQuery", "POST", { structuredQuery: { from: [{ collectionId: "publicBookings" }], where: { fieldFilter: { field: { fieldPath: "date" }, op: "GREATER_THAN_OR_EQUAL", value: encode(date) } }, limit: 500 } });
+        if (rows.filter((r) => r.document).length >= 500) throw Error("public-booking-export-limit");
         return rows.filter((r) => r.document).map((r) => snapshot(r.document));
       },
       publicReceipts: async (weekStart) => {
@@ -392,8 +454,10 @@ var UniversityMailer = (() => {
       await send({ to: owner.email, ...content, messageId: `<${work.kind === "request-submitted" ? "request-submitted" : work.outcome ? "request-decision" : work.before ? "modification" : "cancellation"}-${createHash("sha256").update(ref.id).digest("hex")}@filozofiku.github.io>` });
       await finish({ status: "sent", sentAt: timestamp2(now()) });
     } catch (error) {
+      if (error.code === "RESOURCE_EXHAUSTED") throw error;
       const terminal = error.code !== "worker-budget" && (["auth/user-not-found", "missing-recipient"].includes(error.code) || work.attempts >= 5);
       await finish({ status: terminal ? "failed" : "retrying", ...error.code === "worker-budget" ? { attempts: Math.max(0, work.attempts - 1) } : {}, lastErrorCode: String(error.code || "delivery-error").slice(0, 80), lastAttemptAt: timestamp2(now()) });
+      if (error.code === "worker-budget") throw error;
       if (!terminal) throw Error("cancellation-email-retry");
     }
   }
@@ -558,8 +622,10 @@ ${recipient}`).digest("hex");
       await finish({ status: "sent", sentAt: timestamp(now()), bookingIds: events.map((e) => e.id) });
       return "sent";
     } catch (error) {
-      const failed = work.attempts >= 5;
-      await finish({ status: failed ? "failed" : "retrying", lastErrorCode: "delivery-error", lastAttemptAt: timestamp(now()) });
+      if (error.code === "RESOURCE_EXHAUSTED") throw error;
+      const deferred = error.code === "worker-budget", failed = !deferred && work.attempts >= 5;
+      await finish({ status: failed ? "failed" : "retrying", ...deferred ? { attempts: Math.max(0, work.attempts - 1) } : {}, lastErrorCode: deferred ? "worker-budget" : "delivery-error", lastAttemptAt: timestamp(now()) });
+      if (deferred) throw error;
       throw Error(failed ? "public-week-delivery-failed" : "public-week-delivery-retry");
     }
   }
@@ -574,7 +640,7 @@ ${recipient}`).digest("hex");
     const response = UrlFetchApp.fetch(url, { method: options.method || "GET", headers: options.headers || {}, ...options.body ? { payload: options.body } : {}, muteHttpExceptions: true, followRedirects: false });
     return { ok: response.getResponseCode() >= 200 && response.getResponseCode() < 300, json: () => JSON.parse(response.getContentText()) };
   }
-  async function database() {
+  async function database(request = http) {
     const properties = PropertiesService.getScriptProperties(), refresh = properties.getProperty("FIREBASE_REFRESH_TOKEN");
     if (!refresh) throw Error("Set FIREBASE_REFRESH_TOKEN in Script properties.");
     const cached = CacheService.getScriptCache().get("firebase-worker-token");
@@ -587,7 +653,9 @@ ${recipient}`).digest("hex");
       if (data.refresh_token) properties.setProperty("FIREBASE_REFRESH_TOKEN", data.refresh_token);
       CacheService.getScriptCache().put("firebase-worker-token", token, 3e3);
     }
-    const db = firestoreRest(firebase_config_default.projectId, token, http);
+    const db = firestoreRest(firebase_config_default.projectId, token, request);
+    const originalCollection = db.collection;
+    db.collection = (name) => ["periods", "rooms"].includes(name) ? { get: async () => ({ docs: (await references({ collection: originalCollection }, name)).map((data) => ({ id: data.id, data: () => data })) }) } : originalCollection(name);
     return db;
   }
   async function references(db, collection) {
@@ -612,25 +680,33 @@ ${recipient}`).digest("hex");
     const lock = LockService.getScriptLock();
     if (!lock.tryLock(1e3)) return { busy: true };
     const started = Date.now(), deadline = started + 18e4;
+    const budget = requestBudget(http, props);
     const report = { checkedAt: (/* @__PURE__ */ new Date()).toISOString(), mode: checkOnly ? "check" : "send", pending: 0, sent: 0, errors: 0, deferred: false, quota: MailApp.getRemainingDailyQuota() };
     try {
-      const db = await database();
-      const queues = ["studentChangeNotifications", "studentNotifications", "requestNotifications", "requestDecisions", "cancellationNotifications", "modificationNotifications"];
-      const queue = [];
-      for (const name of queues) queue.push(...await db.pending(name));
-      report.pending = queue.length;
+      if (!checkOnly && props.getProperty("QUOTA_BLOCKED_DAY") === quotaDay(Date.now())) return { quotaPaused: true };
+      budget.ensure(1);
       const window = publicEventWeek(Date.now());
-      const checkPublic = checkOnly || Date.now() >= window.dueAt && Date.now() >= Number(props.getProperty("PUBLIC_SCAN_AFTER") || 0);
-      const settings = checkPublic ? (await db.doc("mailSettings/publicEvents").get()).data() : null;
-      const periods = checkPublic ? await references(db, "periods") : [];
-      const week = settings?.enabled ? await preparePublicWeek(db, Date.now(), periods, { create: !checkOnly }) : null;
-      if (checkOnly) {
-        await db.collection("publicEventRecipients").get();
-        await db.publicReceipts(publicEventWeek(Date.now()).start);
+      const scanQueues = checkOnly || Date.now() - Number(props.getProperty("LAST_QUEUE_SCAN") || 0) >= 3e5;
+      const initialPublic = Date.now() >= window.dueAt && props.getProperty("PUBLIC_DONE_WEEK") !== window.start;
+      if (!scanQueues && !initialPublic) return { idle: true };
+      const db = await database(budget.request);
+      const queues = ["requestNotifications", "requestDecisions", "studentChangeNotifications", "studentNotifications", "cancellationNotifications", "modificationNotifications"];
+      const queue = [];
+      if (scanQueues) for (const name of queues) queue.push(...await db.pending(name));
+      report.pending = queue.length;
+      let retries = [];
+      if (scanQueues && !initialPublic) for (const ref of await db.pending("publicEventDeliveries")) {
+        const data = (await ref.get()).data();
+        if (data?.weekStart === window.start) retries.push(data.recipient);
       }
+      const processPublic = checkOnly || initialPublic || retries.length > 0;
+      const settings = processPublic ? (await db.doc("mailSettings/publicEvents").get()).data() : null;
+      const periods = processPublic ? await references(db, "periods") : [];
+      const week = settings?.enabled ? await preparePublicWeek(db, Date.now(), periods, { create: !checkOnly }) : null;
       report.publicEventsDue = week?.bookingIds.length || 0;
       report.publicWeek = week?.start || null;
       if (checkOnly) {
+        await db.doc("publicEventRecipients/_health").get();
         report.message = "Connection verified. No email sent.";
         return report;
       }
@@ -638,6 +714,7 @@ ${recipient}`).digest("hex");
       const exhausted = () => Date.now() >= deadline || remaining <= 0 || report.sent >= 50;
       const send = async (mail) => {
         if (exhausted()) throw Object.assign(Error("Worker budget exhausted"), { code: "worker-budget" });
+        budget.ensure(12, 3);
         MailApp.sendEmail({ to: mail.to, subject: mail.subject, body: mail.text, htmlBody: emailHtml(mail.text, mail.descriptionSections), name: "Fakulteti Filozofik \xB7 Universiteti i Prishtin\xEBs" });
         remaining--;
         report.sent++;
@@ -650,36 +727,50 @@ ${recipient}`).digest("hex");
         try {
           await deliverCancellation(ref, { db, auth: { getUser: async (uid) => (await db.doc("users/" + uid).get()).data() || {} }, send, now: Date.now, timestamp, token: Utilities.getUuid() });
           if ((await ref.get()).data()?.status === "failed") report.errors++;
-        } catch {
+        } catch (error) {
+          if (["worker-budget", "RESOURCE_EXHAUSTED"].includes(error.code)) throw error;
           report.errors++;
         }
       }
+      if (scanQueues) props.setProperty("LAST_QUEUE_SCAN", String(Date.now()));
       if (week && !exhausted()) {
-        const rooms = await references(db, "rooms");
-        const catalog = (await db.doc("resourceCatalog/current").get()).data() || {};
-        const finished = new Set((await db.publicReceipts(week.start)).filter((r) => ["sent", "failed", "skipped"].includes(r.status)).map((r) => r.recipient));
-        for (const recipient of settings.recipients || []) {
-          if (finished.has(recipient)) continue;
+        const rooms = await references(db, "rooms"), catalog = (await db.doc("resourceCatalog/current").get()).data() || {};
+        const recipients = initialPublic ? settings.recipients || [] : [...new Set(retries)].filter((r) => settings.recipients.includes(r));
+        const cursor = initialPublic && props.getProperty("PUBLIC_CURSOR_WEEK") === week.start ? Number(props.getProperty("PUBLIC_CURSOR") || 0) : 0;
+        for (let index = cursor; index < recipients.length; index++) {
           if (exhausted()) {
             report.deferred = true;
             break;
           }
           try {
-            await deliverPublicWeek(week, recipient, { db, periods, rooms, catalog, send, now: Date.now, token: Utilities.getUuid() });
-          } catch {
+            await deliverPublicWeek(week, recipients[index], { db, periods, rooms, catalog, send, now: Date.now, token: Utilities.getUuid() });
+          } catch (error) {
+            if (["worker-budget", "RESOURCE_EXHAUSTED"].includes(error.code)) throw error;
             report.errors++;
           }
+          if (initialPublic) {
+            props.setProperty("PUBLIC_CURSOR_WEEK", week.start);
+            props.setProperty("PUBLIC_CURSOR", String(index + 1));
+          }
         }
+        if (initialPublic && !report.deferred) props.setProperty("PUBLIC_DONE_WEEK", week.start);
       } else if (week) report.deferred = true;
-      if (checkPublic) props.setProperty("PUBLIC_SCAN_AFTER", String(Date.now() + (report.deferred || report.errors ? 6e4 : 36e5)));
+      else if (initialPublic) props.setProperty("PUBLIC_DONE_WEEK", window.start);
       report.quotaRemaining = remaining;
       if (report.errors) throw Error("Some notifications failed; inspect Statusi i njoftimeve me email.");
       return report;
     } catch (error) {
+      if (error.code === "worker-budget") {
+        report.deferred = true;
+        report.databaseBudgetReached = true;
+        return report;
+      }
       report.failure = true;
       report.failureCode = ["RESOURCE_EXHAUSTED", "PERMISSION_DENIED", "UNAUTHENTICATED", "UNAVAILABLE"].includes(error.code) ? error.code : "WORKER_ERROR";
+      if (error.code === "RESOURCE_EXHAUSTED") props.setProperty("QUOTA_BLOCKED_DAY", quotaDay(Date.now()));
       throw error;
     } finally {
+      report.databaseUsage = budget.snapshot();
       report.durationMs = Date.now() - started;
       props.setProperty("LAST_RUN", JSON.stringify(report));
       console.log(JSON.stringify(report));

@@ -2,6 +2,7 @@ import {EN,t,getLanguage,locale,roomLabel,initLanguage} from '../public-schedule
 import {englishTimetableLabel} from '../public-schedule/timetable-en.js';
 export {getLanguage,locale,initLanguage};
 export const BOOKING_EN={
+"Rezervimet janë pezulluar përkohësisht gjatë kontrollit të shërbimit. Orari publik dhe rezervimet ekzistuese mbeten të dukshme në orar.":"Bookings are temporarily paused while the service is reviewed. The public timetable and existing reservations remain visible in the timetable.",
  "Rezervimi i sallave për stafin akademik":"Room booking for academic staff",
  "Për të rezervuar salla dhe për të menaxhuar rezervimet tuaja, hyni me llogarinë tuaj institucionale @uni-pr.edu. Qasja kërkon miratimin e llogarisë nga administratori.":"To book rooms and manage your reservations, sign in with your institutional @uni-pr.edu account. Your account must be approved by the administrator.",
  "Duke kontrolluar qasjen…":"Checking access…",

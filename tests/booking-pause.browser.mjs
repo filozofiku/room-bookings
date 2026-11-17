@@ -1,0 +1,15 @@
+import {readFileSync} from 'node:fs';import {createRequire} from 'node:module';import assert from 'node:assert/strict';
+const require=createRequire(`${process.env.TEST_MODULES_DIR}/package.json`),{chromium}=require('playwright');
+const auth=`export class GoogleAuthProvider{setCustomParameters(){}};export const signInWithPopup=async()=>{};export const signOut=async()=>{};export function onAuthStateChanged(auth,cb){cb({uid:'teacher',displayName:'Teacher'});}`;
+const firestore=`window.databaseReads=[];export const doc=(db,...parts)=>({path:parts.join('/')});export const collection=(db,path)=>path;export const query=(path,...filters)=>path;export const where=()=>{};export const runTransaction=async()=>{throw Error('Bookings paused')};export const serverTimestamp=()=>({});export const getDoc=async ref=>{window.databaseReads.push(ref.path);return {exists:()=>true,data:()=>ref.path==='users/teacher'?{active:true,role:'teacher'}:{bookingOpen:false,slotStorage:'resources-v2'}};};export const getDocs=async()=>{throw Error('Paused page must not download collections')};`;
+const browser=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
+try{const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.route('https://pause.test/**',route=>{const path=new URL(route.request().url()).pathname;let body,type='text/javascript';
+  if(path==='/'){body=readFileSync('index.html');type='text/html';}else if(path==='/auth.js')body=auth;else if(path==='/firestore.js')body=firestore;else if(path==='/src/firebase.js')body='export const db={};export const auth={};';
+  else if(/^\/(src|public-schedule)\/[\w-]+\.js$/.test(path))body=readFileSync(path.slice(1),'utf8').replaceAll("'firebase/auth'","'/auth.js'").replaceAll("'firebase/firestore'","'/firestore.js'");
+  else if(path.endsWith('.css')){body=readFileSync(path.startsWith('/src/')?path.slice(1):'public'+path);type='text/css';}else if(path.endsWith('.png')){body=readFileSync('public'+path);type='image/png';}else if(path==='/university-shell.js')body=readFileSync('public/university-shell.js');else return route.abort();return route.fulfill({body,contentType:type});});
+ await page.route('https://static.cloudflareinsights.com/**',route=>route.abort());await page.goto('https://pause.test/');await page.waitForFunction(()=>document.getElementById('message').textContent.includes('pezulluar përkohësisht'));
+ assert.equal(await page.locator('#app').isVisible(),false);assert.deepEqual(await page.evaluate(()=>window.databaseReads),['users/teacher','settings/control']);
+ await page.selectOption('#languagePicker','en');assert.match(await page.locator('#message').textContent(),/Bookings are temporarily paused/);assert.deepEqual(await page.evaluate(()=>window.databaseReads),['users/teacher','settings/control']);assert.deepEqual(errors,[]);
+ console.log('Paused booking page: no form, only two document reads, and no extra reads when switching language.');
+}finally{await browser.close();}

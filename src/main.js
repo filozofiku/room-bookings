@@ -623,14 +623,18 @@ async function loadApp() {
     await reportsController.load();
     return;
   }
-  const [settingsSnap,roomSnap,periodSnap,catalogSnap] = await Promise.all([
-    getDoc(doc(db,'settings','control')),
-    getDocs(collection(db,'rooms')),
-    getDocs(collection(db,'periods')),
-    getDoc(doc(db,'resourceCatalog','current'))
-  ]);
+  const settingsSnap=await getDoc(doc(db,'settings','control'));
   if (!settingsSnap.exists()) throw new BookingError(bt('Administratori duhet të importojë fillimisht orarin.'));
   settings = settingsSnap.data();
+  if(generation!==authenticationGeneration)return;
+  if(!settings.bookingOpen){
+    $('app').hidden=true;
+    message(bt('Rezervimet janë pezulluar përkohësisht gjatë kontrollit të shërbimit. Orari publik dhe rezervimet ekzistuese mbeten të dukshme në orar.'));
+    return;
+  }
+  const [roomSnap,periodSnap,catalogSnap]=await Promise.all([
+    getDocs(collection(db,'rooms')),getDocs(collection(db,'periods')),getDoc(doc(db,'resourceCatalog','current'))
+  ]);
   if(generation!==authenticationGeneration)return;
   if (settings.slotStorage !== 'resources-v2') throw new BookingError(bt('Rezervimet po përditësohen. Provoni përsëri së shpejti.'));
   rooms = roomSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.name.localeCompare(b.name));
@@ -756,7 +760,7 @@ function refreshLanguage(){
  }
  for(const id of ['message','booking-message','selection-hint','cancel-question','cancel-error','request-decision-heading','request-decision-error','email-delivery-feedback','edit-notice'])$(id).textContent=bt($(id).textContent);
  if(reportsView){reportsController?.render();return;}
- if(currentUser&&settings){
+ if(currentUser&&settings?.bookingOpen){
   $('booking-heading').textContent=bt(editing?'Redaktoni rezervimin':'Rezervoni një aktivitet');
   $('management-scope').textContent=bt(canCancelAll?'Shfaqen kërkesat dhe rezervimet e të gjithë përdoruesve.':'Shfaqen vetëm kërkesat, njoftimet dhe rezervimet tuaja.');
   updateRequestHint();

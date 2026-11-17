@@ -97,8 +97,10 @@ export async function deliverCancellation(ref, {db, auth, send, now, timestamp, 
     await send({to:owner.email,...content,messageId:`<${work.kind==='request-submitted'?'request-submitted':work.outcome?'request-decision':work.before?'modification':'cancellation'}-${createHash('sha256').update(ref.id).digest('hex')}@filozofiku.github.io>`});
     await finish({status:'sent',sentAt:timestamp(now())});
   } catch(error) {
+    if(error.code==='RESOURCE_EXHAUSTED')throw error;
     const terminal=error.code!=='worker-budget' && (['auth/user-not-found','missing-recipient'].includes(error.code) || work.attempts>=5);
     await finish({status:terminal?'failed':'retrying',...(error.code==='worker-budget'?{attempts:Math.max(0,work.attempts-1)}:{}),lastErrorCode:String(error.code || 'delivery-error').slice(0,80),lastAttemptAt:timestamp(now())});
+    if(error.code==='worker-budget')throw error;
     if(!terminal) throw Error('cancellation-email-retry');
   }
 }

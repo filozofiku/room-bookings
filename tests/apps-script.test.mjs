@@ -1,7 +1,7 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import {readFileSync} from 'node:fs';import {createHash} from 'node:crypto';
 import {encode,decode} from '../mailer/firestore-rest.js';import {deliveryId} from '../mailer/public-event-email.js';
 function fixture({quota=100,email='zzha.filozofik@uni-pr.edu',enabled=true,now='2026-11-16T07:00:00Z'}={}){
- const props=new Map([['FIREBASE_REFRESH_TOKEN','secret-test'],['EMAIL_ENABLED',String(enabled)]]),cache=new Map(),sent=[],triggers=[],calls=[];let version=0,locked=false;
+ const props=new Map([['FIREBASE_REFRESH_TOKEN','secret-test'],['EMAIL_ENABLED',String(enabled)]]),cache=new Map(),sent=[],triggers=[],calls=[],failures=new Map();let version=0,locked=false;
  const booking={ownerUid:'owner',creatorName:'Teacher',date:'2026-11-16',periodIds:['p1'],title:'Panel',roomId:'',groupIds:[],teacherIds:[],isPublic:true,mode:'online',onlineUrl:'https://example.test/event',description:'Përshkrim'};
  const records=new Map(Object.entries({'periods/p1':{start:'13:00',end:'13:15'},'users/owner':{email:'owner@example.test'},'resourceCatalog/current':{},'mailSettings/publicEvents':{enabled:true,recipients:['staff@example.test']},'publicBookings/event':booking,'cancellationNotifications/cancel':{booking,reason:'Arsye',status:'pending'},'requestNotifications/request':{booking,kind:'request-submitted',status:'pending'}}));
  const versions=new Map();const raw=path=>({name:'projects/filozofiku/databases/(default)/documents/'+path,fields:encode(records.get(path)).mapValue.fields,updateTime:versions.get(path)||'2026-01-01T00:00:00Z'});
@@ -18,6 +18,7 @@ function fixture({quota=100,email='zzha.filozofik@uni-pr.edu',enabled=true,now='
    calls.push(url);
    if(url.startsWith('https://securetoken.googleapis.com/'))return response({user_id:'cancellation-mail-worker',id_token:'id-test',refresh_token:'secret-test'});
    const suffix=url.split('/documents')[1],body=options.payload?JSON.parse(options.payload):null;
+   if(failures.has(suffix))return response({error:{status:failures.get(suffix)}},429);
    if(suffix===':runQuery'){
     const q=body.structuredQuery,name=q.from[0].collectionId,f=q.where.fieldFilter,val=decode(f.value);
     return response([...records.keys()].filter(p=>p.startsWith(name+'/')).filter(p=>f.op==='IN'?val.includes(records.get(p)[f.field.fieldPath]):f.op==='EQUAL'?records.get(p)[f.field.fieldPath]===val:records.get(p)[f.field.fieldPath]>=val).slice(0,q.limit||10000).map(p=>({document:raw(p)})));
@@ -33,7 +34,7 @@ function fixture({quota=100,email='zzha.filozofik@uni-pr.edu',enabled=true,now='
    return records.has(path)?response(raw(path)):response({error:{status:'NOT_FOUND'}},404);
   }}
  });vm.runInContext(readFileSync('apps-script/Code.gs','utf8'),context);
- return {context,records,sent,props,triggers,booking,calls};
+ return {context,records,sent,props,triggers,booking,calls,failures,setNow:value=>now=value};
 }
 test('connection check sends nothing and preserves pending records',async()=>{const f=fixture();const report=await f.context.checkConnection();assert.equal(report.mode,'check');assert.equal(f.sent.length,0);assert.equal(f.records.get('requestNotifications/request').status,'pending');assert(!f.records.has('publicEventWeeks/2026-11-16'));});
 test('request priority, shared receipts, public delivery IDs, and repeat suppression',async()=>{const f=fixture();await f.context.runEmailWorker();assert.equal(f.sent[0].to,'arsim.sinani@uni-pr.edu');assert(f.sent.every(m=>m.htmlBody.includes('<html lang="sq">')));assert(f.sent.every(m=>!m.body.includes('Kërkuesi:')&&!m.body.includes('Rezervuar nga:')));assert.equal(f.sent.length,3);assert.equal(f.records.get('publicEventDeliveries/'+deliveryId('2026-11-16','staff@example.test')).status,'sent');assert.equal(f.records.get('cancellationNotifications/cancel').status,'sent');f.props.set('LAST_PUBLIC_SCAN','0');await f.context.runEmailWorker();assert.equal(f.sent.length,3);});
@@ -50,5 +51,33 @@ test('public digests wait until Monday 08:00 local and never send 48-hour notice
 test('completed digests do not reread reference collections and recipient receipts each minute',async()=>{
  const f=fixture();await f.context.runEmailWorker();const count=f.calls.length;await f.context.runEmailWorker();
  const followup=f.calls.slice(count);assert(!followup.some(url=>url.includes('/periods?')||url.includes('/rooms?')||url.includes('/mailSettings/')));
- assert.equal(f.sent.length,3);assert(f.props.has('PUBLIC_SCAN_AFTER'));
+ assert.equal(f.sent.length,3);assert(f.props.has('PUBLIC_DONE_WEEK'));
+});
+
+test('24 hours of idle worker ticks stay below the daily allowance and do not resend completed mail',async()=>{
+ const f=fixture({now:'2026-11-16T08:00Z'}),start=Date.parse('2026-11-16T08:00Z');
+ for(let minute=0;minute<1440;minute++){f.setNow(new Date(start+minute*60000).toISOString());await f.context.runEmailWorker();}
+ const usage=JSON.parse(f.props.get('FIRESTORE_BUDGET_V1'));assert(usage.reads<2500,JSON.stringify(usage));assert.equal(f.sent.length,3);
+ assert.equal(f.calls.filter(url=>url.includes('/periods?')).length,1); // one shared cached reference load for all mail types
+});
+
+test('the real inventory size and 86-recipient weekly digest stay within the worker budget over 24 hours',async()=>{
+ const f=fixture({quota:1000,now:'2026-11-16T08:00Z'}),start=Date.parse('2026-11-16T08:00Z');
+ for(let n=2;n<=53;n++)f.records.set('periods/p'+n,{start:'13:00',end:'13:15'});
+ for(let n=1;n<=21;n++)f.records.set('rooms/r'+n,{name:'Room '+n});
+ f.records.set('mailSettings/publicEvents',{enabled:true,recipients:Array.from({length:86},(_,n)=>'staff'+n+'@example.test')});
+ for(let minute=0;minute<1440;minute++){f.setNow(new Date(start+minute*60000).toISOString());await f.context.runEmailWorker();}
+ const usage=JSON.parse(f.props.get('FIRESTORE_BUDGET_V1'));assert(usage.reads<4000,JSON.stringify(usage));assert.equal(f.sent.length,88);assert.equal(new Set(f.sent.filter(m=>m.subject.includes('Aktivitetet publike')).map(m=>m.to)).size,86);
+});
+
+test('database exhaustion inside a delivery stops all further automatic requests for that quota day',async()=>{
+ const f=fixture({now:'2026-11-16T08:00Z'});f.failures.set('/users/owner','RESOURCE_EXHAUSTED');
+ await assert.rejects(f.context.runEmailWorker(),e=>e.code==='RESOURCE_EXHAUSTED');
+ assert.equal(f.props.get('QUOTA_BLOCKED_DAY'),'2026-11-16');assert.equal(f.sent.length,1); // reviewer notice preceded the failed owner lookup
+ const count=f.calls.length;f.setNow('2026-11-16T09:00Z');await f.context.runEmailWorker();assert.equal(f.calls.length,count);assert.equal(f.sent.length,1);
+});
+
+test('the persistent daily budget defers work before any database request or mail send',async()=>{
+ const f=fixture({now:'2026-11-16T08:00Z'});f.props.set('FIRESTORE_BUDGET_V1',JSON.stringify({day:'2026-11-16',reads:6000,writes:0}));
+ const report=await f.context.runEmailWorker();assert.equal(report.databaseBudgetReached,true);assert.equal(f.calls.length,0);assert.equal(f.sent.length,0);
 });

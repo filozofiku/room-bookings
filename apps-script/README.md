@@ -4,9 +4,10 @@ This is the existing Firebase email worker adapted to Google Apps Script. It sen
 `zzha.filozofik@uni-pr.edu`, using MailApp authorization rather than an app password.
 It needs no Firebase Blaze plan, web-app deployment, public endpoint, or spreadsheet.
 
-The worker checks reservation notification queues each minute. Public reference data
-is cached for an hour, and a completed weekly batch is checked hourly for explicit retries. Weekly public-event digests start on Monday at
-08:00 Europe/Tirane; urgent reservation notices keep their existing checks.
+The minute trigger scans pending reservation and public-email queues every five
+minutes. Public reference data is cached for an hour. Completed weekly batches do
+not reread all delivery receipts. Weekly public-event digests start on Monday at
+08:00 Europe/Tirane and continue across runs until the initial batch is processed.
 
 It covers reviewer requests (Arsim Sinani, rooms 102/127), approval/refusal decisions,
 cancellations, modifications, and one weekly public-event digest per recipient.
@@ -49,13 +50,24 @@ It preserves the dashboard, delivery receipts, atomic leases and administrator r
 ## Pause and rollback
 
 Run **stopEmailWorker** to disable sending and remove this account's worker timer.
-Then re-enable the GitHub `Send reservation emails` workflow if needed.
+Keep the GitHub `Send reservation emails` workflow disabled during the quota review.
+That fallback does not use the Apps Script daily database budget.
 Never delete delivery records to force a retry. Use the booking application's retry button.
 A failed record is not automatically reset during migration.
 
 ## Limits and delivery expectations
 
-- One-minute checks improve timeliness but are not a guaranteed one-minute delivery SLA.
+- Ordinary notification queues are checked every five minutes; delivery timing also
+  depends on leases, quotas and available runtime.
+- A persistent, per-project daily budget permits at most 6,000 accounted worker reads
+  and 1,500 writes per Pacific quota day. Queries reserve their maximum bounded
+  result count before the request, then refund unused reads. Failed requests retain
+  their reservation. Writes include an allowance for security-rule reads.
+  Reaching the budget defers mail until the next quota day, without clearing receipts.
+  This protects against the worker's repeated reads; it is not a project-wide billing
+  cap and does not cover website visitors, calendar services or other worker copies.
+- `RESOURCE_EXHAUSTED` stops automatic Firestore attempts for the rest of that
+  Pacific quota day. `checkConnection` remains an explicit, budgeted diagnostic.
 - The script stops starting new work after three minutes or 50 accepted messages per run.
   Deferred work remains for later runs. It checks remaining MailApp recipient quota.
 - The existing five-minute Firestore leases protect against concurrent delivery; a
@@ -149,3 +161,14 @@ If `checkConnection` reports `RESOURCE_EXHAUSTED`, Firestore is refusing reads d
 to quota. Changing the recipient does not clear that quota. The new worker avoids
 minute-by-minute reads of public reference collections and completed weekly receipts.
 When access returns, queued notifications can resume using the new recipient.
+
+## Quota maintenance: 17 November 2026
+
+See [the incident audit and paid-plan assessment](../docs/quota-audit-2026-11-17.md).
+Bookings remain paused in `settings/control`; the email service must remain stopped.
+To install the correction in the existing Apps Script project, replace the entire
+`Code.gs` with this version and save, preserving all existing Script properties.
+Keep `EMAIL_ENABLED=false`. Do **not** run `installMinuteTrigger` during maintenance:
+it enables sending. Saving replacement code does not itself resume the service.
+`checkConnection` sends no messages, but does make a small number of budgeted reads.
+Do not clear budget, cursor or receipt properties to force a retry.
