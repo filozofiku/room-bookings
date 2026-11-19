@@ -27,6 +27,7 @@ try{
    else if(path==='/auth.js')body=auth;
    else if(path==='/firestore.js')body=firestore;
    else if(path==='/src/firebase.js')body='export const db={};export const auth={};';
+   else if(path==='/public-schedule/date-picker.css'){body=readFileSync('public-schedule/date-picker.css');type='text/css';}
    else if(['/university-shell.css','/src/reports.css'].includes(path)){body=readFileSync(path.startsWith('/src/')?path.slice(1):'public'+path);type='text/css';}
    else if(path==='/university-logo.png'){body=readFileSync('public/university-logo.png');type='image/png';}
    else if(path==='/university-shell.js')body=readFileSync('public/university-shell.js');
@@ -49,8 +50,8 @@ try{
  assert.equal(await page.locator('header h1').textContent(),'Statistics and reports');
  assert.match(await page.locator('#reports-content').textContent(),/Distinct addresses/);
  const download=page.waitForEvent('download');await page.click('#report-export');assert.match((await download).suggestedFilename(),/^faculty-report-2026-11-01-2026-11-15\.csv$/);
- await page.fill('#report-start','2026-12-01');await page.locator('#report-start').dispatchEvent('change');assert.equal(await page.locator('#report-export').isDisabled(),true);
- await page.fill('#report-end','2026-12-31');await page.locator('#report-end').dispatchEvent('change');assert.equal(await page.locator('#report-export').isDisabled(),false);
+ await page.locator('#report-start-calendar button[aria-label="Next month"]').click();await page.locator('#report-start-calendar button[data-date="2026-12-01"]').click();assert.equal(await page.locator('#report-export').isDisabled(),true);
+ await page.locator('#report-end-calendar button[aria-label="Next month"]').click();await page.locator('#report-end-calendar button[data-date="2026-12-31"]').click();assert.equal(await page.locator('#report-export').isDisabled(),false);
  assert.match(await page.locator('#reports-content').textContent(),/No synchronized traffic data/);
  await page.selectOption('#report-period','month');
  await page.screenshot({path:'/tmp/fet-reporting-dashboard-desktop.png',fullPage:true});

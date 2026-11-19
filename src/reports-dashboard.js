@@ -1,3 +1,5 @@
+import {formatDate,formatDateTime} from '../public-schedule/dates.js';
+import {inlineCalendar} from '../public-schedule/date-picker.js';
 import {collection,doc,getDoc,getDocs} from 'firebase/firestore';
 import {getLanguage,locale} from './booking-i18n.js';
 import {summarizeReport,reportCsv,reportDate,milliseconds,activityHistory} from './reporting-model.js';
@@ -21,7 +23,8 @@ function table(headers,rows,caption){
   if(!rows.length){const row=element('tr'),cell=element('td',text('Nuk ka të dhëna për këtë periudhë.','No data for this period.'));cell.colSpan=headers.length;row.append(cell);body.append(row);}
   table.append(body);wrapper.append(table);return wrapper;
 }
-function dateTime(value){const time=milliseconds(value);return Number.isFinite(time)?new Intl.DateTimeFormat(locale(),{timeZone:'Europe/Tirane',dateStyle:'medium',timeStyle:'short'}).format(time):'—';}
+const displayDate=value=>formatDate(value,getLanguage());
+function dateTime(value){const time=milliseconds(value);return Number.isFinite(time)?formatDateTime(time,getLanguage()):'—';}
 function duration(ms){if(ms===null)return '—';const minutes=Math.round(ms/60000);return minutes<60?`${minutes} min`:`${Math.floor(minutes/60)} h ${minutes%60} min`;}
 function trendChart(rows){
   const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');
@@ -30,9 +33,9 @@ function trendChart(rows){
   rows.forEach((row,i)=>['reservations','requests','messages'].forEach((key,j)=>{
     const bar=document.createElementNS(ns,'rect'),height=row[key]/max*130;
     for(const [k,v] of Object.entries({x:30+i*step+j*step*.25,y:145-height,width:Math.max(1,step*.22),height,fill:['#99080d','#405c7a','#43806d'][j]}))bar.setAttribute(k,String(v));
-    const title=document.createElementNS(ns,'title');title.textContent=`${row.date}: ${row[key]}`;bar.append(title);svg.append(bar);
+    const title=document.createElementNS(ns,'title');title.textContent=`${displayDate(row.date)}: ${row[key]}`;bar.append(title);svg.append(bar);
   }));
-  for(const [value,x] of [[rows[0]?.date,30],[rows.at(-1)?.date,780]])if(value){const label=document.createElementNS(ns,'text');label.setAttribute('x',x);label.setAttribute('y','172');label.setAttribute('font-size','12');label.textContent=value;svg.append(label);}
+  for(const [value,x] of [[rows[0]?.date,30],[rows.at(-1)?.date,780]])if(value){const label=document.createElementNS(ns,'text');label.setAttribute('x',x);label.setAttribute('y','172');label.setAttribute('font-size','12');label.textContent=displayDate(value);svg.append(label);}
   return svg;
 }
 
@@ -41,6 +44,7 @@ export function createReportsDashboard(db,user){
   const root=$('reports-content'),feedback=$('reports-feedback');
   const today=reportDate(new Date());
   $('report-start').value=today.slice(0,7)+'-01';$('report-end').value=today;
+  const calendars=['report-start','report-end'].map(id=>inlineCalendar($(id),{language:getLanguage}));
   function disableActions(disabled){$('report-export').disabled=disabled;$('report-print').disabled=disabled;}
   function preset(){
     if(!data)return;
@@ -60,6 +64,7 @@ export function createReportsDashboard(db,user){
   function panel(title,note){const card=element('article',undefined,'report-panel');card.append(element('h3',title));if(note)card.append(element('p',note,'report-note'));root.append(card);return card;}
   function render(){
     if(disposed)return;
+    calendars.forEach(calendar=>calendar.render());
     $('reports-heading').textContent=text('Statistika dhe raporte','Statistics and reports');
     $('reports-description').textContent=text('Përdorimi i portalit dhe aktiviteti i rezervimeve · Vetëm për përdoruesit me autorizim të lartë','Portal use and reservation activity · Elevated users only');
     for(const [id,sq,en] of [['report-period-label','Periudha','Period'],['report-start-label','Nga','From'],['report-end-label','Deri më','Through'],['report-refresh','Rifreskoni të dhënat','Refresh data'],['report-export','Eksporto CSV','Export CSV'],['report-print','Printo / ruaj PDF','Print / save PDF']])$(id).textContent=text(sq,en);
@@ -75,7 +80,7 @@ export function createReportsDashboard(db,user){
       metric(text('Studentë të njoftuar','Student addresses reached'),n.recipients,text('Adresa të ndryshme me të paktën një mesazh të dërguar.','Distinct addresses with at least one message sent.')));
     root.append(overview);
     const coverage=panel(text('Periudha dhe mbulimi i raportit','Report period and coverage'));
-    coverage.append(element('p',`${report.start} — ${report.end} · Europe/Tirane`));
+    coverage.append(element('p',`${displayDate(report.start)} — ${displayDate(report.end)} · Europe/Tirane`));
     coverage.append(element('p',text('Veprimet numërohen sipas kohës së kryerjes, jo sipas datës së aktivitetit.','Actions are counted by when they occurred, not by the scheduled event date.')));
     coverage.append(element('p',report.auditCompleteFrom?
       text('Regjistrim i plotë i veprimeve nga: ','Complete action logging from: ')+dateTime(report.auditCompleteFrom):
@@ -84,7 +89,7 @@ export function createReportsDashboard(db,user){
     const website=panel(text('Përdorimi i faqes','Website use'));
     if(traffic){
       const stats=element('div',undefined,'report-metrics');stats.append(metric(text('Vizita','Visits'),traffic.visits),metric(text('Shikime të faqeve','Page views'),traffic.pageViews),metric(text('Vizitorë të vlerësuar','Estimated visitors'),null,text('Nuk ofrohet nga burimi Cloudflare Web Analytics.','Not supplied by the Cloudflare Web Analytics source.')));website.append(stats);
-      website.append(element('p',text('Ditë të mbuluara: ','Days covered: ')+`${traffic.days} (${traffic.firstDate} — ${traffic.lastDate}). `+text('Ditë me të dhëna të pjesshme: ','Days with partial data: ')+traffic.partialDays+'. '+text('Shifrat për ditën e sotme përfshijnë vetëm periudhën deri në sinkronizimin e fundit.','Today’s figures include only the time through the last synchronization.'),'report-note'));
+      website.append(element('p',text('Ditë të mbuluara: ','Days covered: ')+`${traffic.days} (${displayDate(traffic.firstDate)} — ${displayDate(traffic.lastDate)}). `+text('Ditë me të dhëna të pjesshme: ','Days with partial data: ')+traffic.partialDays+'. '+text('Shifrat për ditën e sotme përfshijnë vetëm periudhën deri në sinkronizimin e fundit.','Today’s figures include only the time through the last synchronization.'),'report-note'));
       website.append(table([text('Faqja / seksioni','Page / section'),text('Shikime','Page views')],traffic.paths.slice(0,20).map(p=>[p.path==='/'?text('Orari publik','Public timetable'):p.path==='/room-bookings/'?text('Portali i rezervimeve','Booking portal'):p.path,p.pageViews])));
       website.append(element('p',text('Renditja bazohet në rrugët që raporton Cloudflare; seksionet me # nuk veçohen kur nuk ofrohen nga burimi.','Ranking uses paths reported by Cloudflare; hash sections are not separated when the source does not provide them.'),'report-note'));
       if(traffic.sampled)website.append(element('p',text('Cloudflare përdor kampionim për disa nga këto të dhëna; shifrat janë vlerësime.','Cloudflare sampled some of these data; the figures are estimates.'),'report-note'));
@@ -112,7 +117,7 @@ export function createReportsDashboard(db,user){
     ]));
     const trend=panel(text('Aktiviteti sipas ditës','Activity by day'),text('E kuqe: rezervime · Blu: kërkesa · E gjelbër: mesazhe për studentët','Red: reservations · Blue: requests · Green: student messages'));
     if(report.trend.length)trend.append(trendChart(report.trend));
-    const detail=element('details');detail.append(element('summary',text('Shfaq vlerat ditore','Show daily values')),table([text('Data','Date'),text('Rezervime','Reservations'),text('Kërkesa','Requests'),text('Mesazhe','Messages')],report.trend.map(d=>[d.date,d.reservations,d.requests,d.messages])));trend.append(detail);
+    const detail=element('details');detail.append(element('summary',text('Shfaq vlerat ditore','Show daily values')),table([text('Data','Date'),text('Rezervime','Reservations'),text('Kërkesa','Requests'),text('Mesazhe','Messages')],report.trend.map(d=>[displayDate(d.date),d.reservations,d.requests,d.messages])));trend.append(detail);
     const history=panel(text('Historiku i veprimeve','Activity history'),text('Shfaqen deri në 100 veprimet më të fundit të periudhës.','Shows up to the 100 latest actions in the period.'));
     history.append(table([text('Koha','Time'),text('Veprimi','Action'),text('Aktiviteti','Event'),text('Burimi','Source')],report.events.slice(0,100).map(e=>[dateTime(e.occurredAt),labels[e.kind]?.()||e.kind,e.title,e.source==='historical'?text('I rindërtuar','Reconstructed'):e.source==='import'?text('Import','Import'):text('I regjistruar','Recorded')])));
     feedback.textContent=text('Përditësuar më: ','Updated: ')+dateTime(data.loadedAt);
@@ -141,5 +146,5 @@ export function createReportsDashboard(db,user){
   };
   $('report-print').onclick=()=>{if(report&&!disposed)window.print();};
   render();
-  return {load,render,dispose(){disposed=true;generation++;data=null;report=null;root.replaceChildren();disableActions(true);for(const id of ['report-period','report-start','report-end'])$(id).onchange=null;$('report-filters').onsubmit=null;$('report-export').onclick=null;$('report-print').onclick=null;}};
+  return {load,render,dispose(){calendars.forEach(calendar=>calendar.destroy());disposed=true;generation++;data=null;report=null;root.replaceChildren();disableActions(true);for(const id of ['report-period','report-start','report-end'])$(id).onchange=null;$('report-filters').onsubmit=null;$('report-export').onclick=null;$('report-print').onclick=null;}};
 }

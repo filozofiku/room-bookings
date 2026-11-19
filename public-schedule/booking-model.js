@@ -5,12 +5,8 @@ export function bookingText(booking, language = 'sq') {
     description: language === 'en' && booking.descriptionEn?.trim() ? booking.descriptionEn : booking.description || ''
   };
 }
-export function localDate(now = new Date()) {
-  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/Tirane', year: 'numeric', month: '2-digit', day: '2-digit'
-  }).formatToParts(now).map(p => [p.type, p.value]));
-  return `${parts.year}-${parts.month}-${parts.day}`;
-}
+export {localDate} from './dates.js';
+import {formatDateTime} from './dates.js';
 export function bookingRows(bookings, rooms, periods, catalog = {}) {
   return bookings.map(booking => {
     const room = rooms.find(r => r.id === booking.roomId);
@@ -57,11 +53,7 @@ export function reservationEvents(rows, room, dates, days, times, kind = 'rooms'
   });
 }
 export function bookingTimestamp(value, locale = 'sq-AL') {
-  const date = typeof value?.toDate === 'function' ? value.toDate() :
-    typeof value?.seconds === 'number' ? new Date(value.seconds * 1000) : null;
-  return date && Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat(locale, {
-    timeZone:'Europe/Tirane',dateStyle:'medium',timeStyle:'short'
-  }).format(date) : 'Koha nuk është e disponueshme';
+  return formatDateTime(value,locale,'Koha nuk është e disponueshme');
 }
 
 // Reuse non-overlapping lanes and keep card widths consistent throughout a day.

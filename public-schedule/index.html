@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#99080d">
   <meta name="description" content="Orari mësimor i Fakultetit Filozofik, Universiteti i Prishtinës. Kërko sipas grupit të studentëve, mësimdhënësit ose sallës dhe gjej sallat e lira.">
   <title>Orari mësimor | Universiteti i Prishtinës</title>
+  <link rel="stylesheet" href="./date-picker.css">
   <style>
     :root{
       --ink:#242222;--ink-soft:#595353;--muted:#706969;--line:#e2dddd;
@@ -267,6 +268,8 @@
   connectStaffNavigation(config).catch(() => {});
 </script>
 <script type="module">
+  import {formatDate,formatDateTime,formatTimetableStamp} from './dates.js';
+  import {inlineCalendar} from './date-picker.js';
   import {t,locale,getLanguage,initLanguage,roomLabel} from './i18n.js';
   import {englishTimetableLabel} from './timetable-en.js';
   import {calendarActions} from "./calendar-export.js";
@@ -275,6 +278,8 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
   "use strict";
   let data;
   let selectedEvent=null;
+  const dateCalendar=inlineCalendar(document.getElementById('bookingDate'),{language:getLanguage});
+  const displayDate=value=>formatDate(value,getLanguage());
   const label=value=>getLanguage()==='en'?t(englishTimetableLabel(roomLabel(value))):value;
   const eventTitle=event=>event.booking?bookingText(event,getLanguage()).title:label(event.t);
   const tags=value=>String(value||'').split(' · ').map(part=>t(part)).join(' · ');
@@ -294,15 +299,16 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
   function dateForDay(d) {
     return datesInView().find(date => dayIndex(data.days,new Date(`${date}T12:00:00Z`).getUTCDay()) === d);
   }
-  function dayHeading(d) { return `${t(data.days[d])} · ${dateForDay(d)}`; }
+  function dayHeading(d) { return `${t(data.days[d])} · ${displayDate(dateForDay(d))}`; }
   function visibleEvents() {
     const recurring = (state.item?.e || []).filter(e => publicState.days?.[dateForDay(e.d)]?.fetActive !== false);
     if (publicState.status !== 'ready') return recurring;
     return [...recurring,...reservationEvents(publicState.rows,state.item?.n,datesInView(),data.days,data.times,state.type)];
   }
   function updateWeekRange() {
+    dateCalendar.render();
     const dates = datesInView();
-    $('weekRange').textContent = t('Java {start} – {end}',{start:dates[0],end:dates[6]});
+    $('weekRange').textContent = t('Java {start} – {end}',{start:displayDate(dates[0]),end:displayDate(dates[6])});
   }
   function moveWeek(offset) {
     const date = new Date(`${datesInView()[0]}T12:00:00Z`);
@@ -443,6 +449,7 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
       times:baseline.times,days:baseline.days,date:baseline.stamp||"Datë e pacaktuar"};
   }
 
+  const displayStamp=value=>formatTimetableStamp(value,getLanguage());
   function setHash(){
     const hash = state.page === "today" ? "#sot" : state.page === "free" ? "#sallat-e-lira" :
       "#orari/" + state.type + "/" + encodeURIComponent(state.item?.n ?? "");
@@ -577,7 +584,7 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
   function display(){
     displayRoomFeatures();
     $("selectedTitle").textContent=state.item?entityLabel(state.item):t("Nuk ka rezultate");
-    $("selectedMeta").textContent=state.item?t('{category} · {count} aktivitete · {start} – {end}',{category:t(categoryLabel[state.type]),count:visibleEvents().length,start:datesInView()[0],end:datesInView()[6]}):t("Provo një emër tjetër.");
+    $("selectedMeta").textContent=state.item?t('{category} · {count} aktivitete · {start} – {end}',{category:t(categoryLabel[state.type]),count:visibleEvents().length,start:displayDate(datesInView()[0]),end:displayDate(datesInView()[6])}):t("Provo një emër tjetër.");
     week();agenda();renderView();
     if(state.page==="schedules"&&!state.suspendHash)setHash();
   }
@@ -586,7 +593,7 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
     $("modalTitle").textContent=eventTitle(e);
     $("modalTag").textContent=tags(e.a) || t("Aktivitet mësimor");
     const pairs=[["Kategoria e aktivitetit",t(EVENT_CATEGORY_LABELS[eventCategory(e)])],["Dita",t(data.days[e.d])],["Ora",hours(e)],["Studentët / Grupi",label(e.g)],["Mësimdhënësi",t(e.p)],["Salla",label(e.r)]];
-    if(e.booking) pairs.push(["Përshkrimi",bookingText(e,getLanguage()).description],["Data",e.date],["Rezervuar nga",t(e.creatorName)],["Rezervimi u krijua më",t(bookingTimestamp(e.createdAt,locale()))],["Mënyra e zhvillimit",e.mode === "online" ? "Online" : e.mode === "physical" ? t("Fizik") : ""]);
+    if(e.booking) pairs.push(["Përshkrimi",bookingText(e,getLanguage()).description],["Data",displayDate(e.date)],["Rezervuar nga",t(e.creatorName)],["Rezervimi u krijua më",t(bookingTimestamp(e.createdAt,locale()))],["Mënyra e zhvillimit",e.mode === "online" ? "Online" : e.mode === "physical" ? t("Fizik") : ""]);
     $("modalDetails").innerHTML=pairs.filter(([,v])=>v).map(([k,v])=>`<dt>${esc(t(k))}</dt><dd>${esc(v)}</dd>`).join("");
     if(e.booking && e.mode === 'online' && /^https?:\/\//i.test(e.onlineUrl || '')) {
       const dt=document.createElement('dt'), dd=document.createElement('dd'), link=document.createElement('a');
@@ -612,7 +619,7 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
     const now=new Date(),date=localDate(now);
     const clock=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Tirane',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(now);
     const minute=parseMinutes(clock),d=dayIndex(data.days,new Date(date+'T12:00:00Z').getUTCDay());
-    $('todayDate').textContent=new Intl.DateTimeFormat(locale(),{timeZone:'Europe/Tirane',dateStyle:'full'}).format(now)+' · '+clock;
+    $('todayDate').textContent=t(data.days[d])+' · '+formatDateTime(now,getLanguage());
     $('todayBook').href='https://filozofiku.github.io/room-bookings/?'+new URLSearchParams({date,section:'booking'});
     const ready=publicState.status==='ready'&&publicState.date===date;
     const day=ready?publicState.day:null;
@@ -676,7 +683,7 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
     const unavailable = publicState.status !== 'ready' || !day || (day.fetActive && d < 0);
     if (unavailable || !day.bookingAllowed) {
       $('freeCount').textContent = unavailable ? t('Disponueshmëria nuk mund të verifikohet') : t('Data është e mbyllur për rezervime');
-      $('freeSummary').textContent = $('bookingDate').value;
+      $('freeSummary').textContent = displayDate($('bookingDate').value);
       $('roomResults').replaceChildren();
       return;
     }
@@ -690,7 +697,7 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
       (!day.fetActive || !room.e.some(event=>event.d===d&&event.s<e&&event.e>s)) &&
       !publicState.rows.some(b => b.date === publicState.date && overlaps(b,room.n,data.times[s],data.times[e])));
     $("freeCount").textContent=t('{count} nga {total} salla të lira që përputhen me kërkimin',{count:free.length,total:data.rooms.length});
-    $("freeSummary").textContent=`${publicState.date} · ${data.times[s]}–${data.times[e]}`;
+    $("freeSummary").textContent=`${displayDate(publicState.date)} · ${data.times[s]}–${data.times[e]}`;
     const bookingLink=room=>{
       const url=new URL('https://filozofiku.github.io/room-bookings/');
       url.search=new URLSearchParams({date:publicState.date,room:room.n,start:data.times[s],end:data.times[e]}).toString();
@@ -756,7 +763,7 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
       $("statSubgroups").textContent=t('{count} grupe',{count:data.subgroups.length});
       $("statTeachers").textContent=t('{count} mësimdhënës',{count:data.teachers.length});
       $("statRooms").textContent=t('{count} salla',{count:data.rooms.length});
-      $("updateDate").textContent="FET · "+t(data.date);
+      $("updateDate").textContent="FET · "+displayStamp(data.date);
       initFree();
       startBookings();
       state.suspendHash=true;setCategory("subgroups");routeFromHash();state.suspendHash=false;
@@ -776,6 +783,7 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
     $('statSubgroups').textContent=t('{count} grupe',{count:data.subgroups.length});
     $('statTeachers').textContent=t('{count} mësimdhënës',{count:data.teachers.length});
     $('statRooms').textContent=t('{count} salla',{count:data.rooms.length});
+    $('updateDate').textContent='FET · '+displayStamp(data.date);
     options();updateWeekRange();renderFree();renderToday();
     if(publicState.status!=='ready')$('bookingStatus').textContent=publicState.status==='loading'?t('Duke ngarkuar rezervimet…'):t(publicState.message||'');
     if($('detailDialog').open&&selectedEvent)showEvent(selectedEvent);

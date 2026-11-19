@@ -48,6 +48,7 @@ const path=new URL(route.request().url()).pathname;
 let body,contentType='text/javascript';
 if(path==='/'){body=readFileSync('index.html','utf8');contentType='text/html';}
 else if(path==='/university-shell.js')body=readFileSync('public/university-shell.js','utf8');
+else if(path==='/public-schedule/date-picker.css'){body=readFileSync('public-schedule/date-picker.css','utf8');contentType='text/css';}
 else if(path==='/src/reports.css'){body=readFileSync('src/reports.css','utf8');contentType='text/css';}
 else if(path==='/university-shell.css'){body=readFileSync('public/university-shell.css','utf8');contentType='text/css';}
 else if(path==='/university-logo.png')return route.fulfill({contentType:'image/png',body:readFileSync('public/university-logo.png')});
@@ -55,7 +56,7 @@ else if(path==='/auth.js')body=authModule;
 else if(path==='/firestore.js')body=firestoreModule;
 else if(path==='/src/firebase.js')body='export const auth={};export const db={};';
 else if(['/src/main.js','/src/activity-events.js','/src/update-reservation.js','/src/reservation-requests.js','/src/email-delivery.js'].includes(path))body=readFileSync(path.slice(1),'utf8').replaceAll("'firebase/auth'","'/auth.js'").replaceAll("'firebase/firestore'","'/firestore.js'");
-else if(['/src/public-event-week.js','/src/booking-ui.js','/src/booking-resources.js','/src/calendar-export.js','/src/student-emails.js','/src/booking-i18n.js','/public-schedule/booking-model.js','/public-schedule/i18n.js','/public-schedule/timetable-en.js','/public-schedule/staff-navigation.js'].includes(path))body=readFileSync(path.slice(1),'utf8');
+else if(['/src/public-event-week.js','/src/booking-ui.js','/src/booking-resources.js','/src/calendar-export.js','/src/student-emails.js','/src/booking-i18n.js','/public-schedule/date-picker.js','/public-schedule/dates.js','/public-schedule/booking-model.js','/public-schedule/i18n.js','/public-schedule/timetable-en.js','/public-schedule/staff-navigation.js'].includes(path))body=readFileSync(path.slice(1),'utf8');
 else return route.abort();
 return route.fulfill({contentType,body});
 });
@@ -67,6 +68,9 @@ async function submitBooking(){
 }
 await page.goto('https://booking.test/');
 await page.waitForSelector('#app:not([hidden])');
+assert.equal(await page.locator('#date-calendar').isVisible(),true);
+assert.equal(await page.locator('#date-calendar .calendar-selection').textContent(),'23 tetor 2026');
+await page.locator('#date-calendar button[data-date="2026-10-23"]').click();
 assert.equal(await page.locator('.app-panel[open]').count(),0);
 // Verify booking-only navigation, then expose shared controls in this mock
 // fixture to exercise the existing combined booking/management workflows.

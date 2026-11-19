@@ -79,9 +79,9 @@ try {
   await page.click('#nextWeek');assert.equal(await page.locator('#bookingDate').inputValue(),'2026-10-26');
   assert.equal(await page.evaluate(()=>window.testDate),'2026-10-26');
   await page.click('#previousWeek');assert.equal(await page.locator('#bookingDate').inputValue(),'2026-10-19');
-  await page.click('#navFree');assert.equal(await page.locator('#bookingDate').isVisible(),true);
+  await page.click('#navFree');assert.equal(await page.locator('#bookingDate-calendar').isVisible(),true);
   assert.equal(await page.locator('#weekNavigation').isVisible(),false);
-  await page.locator('#bookingDate').fill('2026-10-23');await page.locator('#bookingDate').dispatchEvent('change');
+  await page.locator('#bookingDate-calendar button[data-date="2026-10-23"]').click();
   await page.click('#navSchedules');assert.equal(await page.locator('#bookingDate').isVisible(),false);
   await page.selectOption('#category','rooms');
   const roomName = await page.locator('#entity').inputValue();
@@ -107,9 +107,9 @@ try {
   assert.equal(await page.locator('#freeDay').evaluate(el=>el.tagName),'OUTPUT');
   assert.equal(await page.locator('#freeDay').textContent(),'E premte');
   assert.match(await page.locator('#freeDayHint').textContent(),/ndryshoni datën/);
-  await page.locator('#bookingDate').fill('2026-10-24');await page.locator('#bookingDate').dispatchEvent('change');
+  await page.locator('#bookingDate').evaluate((el,value)=>{el.value=value},'2026-10-24');await page.locator('#bookingDate').dispatchEvent('change');
   assert.equal(await page.locator('#freeDay').textContent(),'E shtunë');
-  await page.locator('#bookingDate').fill('2026-10-23');await page.locator('#bookingDate').dispatchEvent('change');
+  await page.locator('#bookingDate').evaluate((el,value)=>{el.value=value},'2026-10-23');await page.locator('#bookingDate').dispatchEvent('change');
   await page.evaluate(value=>window.testReport(value),result);
   assert.equal(await page.locator('.room-choice').count(),1);
   {const link=new URL(await page.locator('.room-choice').first().getAttribute('href'));

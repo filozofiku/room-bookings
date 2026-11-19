@@ -364,3 +364,11 @@ listën fillestare nga `studentNotifications` deri në redaktimin e parë. Heqja
 gjitha adresave ndalon njoftimet e ardhshme për atë listë; historia e dërgimit ruhet.
 
 Aktivitetet publike kërkojnë përshkrim prej **100–500 fjalësh**, si gjatë krijimit, ashtu edhe gjatë redaktimit. Kufiri zbatohet në formular dhe në rregullat e Firestore.
+
+## Kalendari i dukshëm dhe datat
+
+Përzgjedhja e datës së rezervimit, kërkimi i sallave dhe filtrat e raporteve
+përdorin kalendar të dukshëm, me javën që fillon të hënën, navigim me tastierë
+dhe kufijtë e semestrit në rezervime. Datat në ndërfaqe përdorin muaj të shkruar,
+p.sh. “10 dhjetor 2026” ose “10 December 2026”, sipas gjuhës. Formati i të dhënave,
+lidhjeve dhe eksportit CSV vazhdon të përdorë ISO për përpunim të saktë.

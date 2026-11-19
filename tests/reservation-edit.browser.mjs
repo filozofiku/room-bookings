@@ -23,6 +23,7 @@ try{
   else if(path==='/firestore.js')body=firestore;
   else if(path==='/src/firebase.js')body='export const auth={};export const db={};';
   else if(/^\/(src|public-schedule)\/[\w-]+\.js$/.test(path))body=readFileSync(path.slice(1),'utf8').replaceAll("'firebase/auth'","'/auth.js'").replaceAll("'firebase/firestore'","'/firestore.js'");
+  else if(path==='/public-schedule/date-picker.css'){body=readFileSync('public-schedule/date-picker.css');type='text/css';}
   else if(path.endsWith('.css')){body=readFileSync(path.startsWith('/src/')?path.slice(1):'public'+path);type='text/css';}
   else if(path.endsWith('.png')){body=readFileSync('public'+path);type='image/png';}
   else if(path==='/university-shell.js')body=readFileSync('public/university-shell.js');

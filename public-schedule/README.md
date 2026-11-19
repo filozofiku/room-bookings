@@ -158,3 +158,11 @@ The calendar action subscribes to one activity's read-only feed. Classes repeat 
 versione opsionale të autorit. Orari, lista, pamja “Sot”, hollësitë dhe shkarkimi
 lokal i kalendarit përdorin gjuhën e zgjedhur. Për çdo fushë angleze që mungon,
 shfaqet teksti shqip. Rezervimet ekzistuese vazhdojnë të shfaqen pa migrim.
+
+## Visible date calendar
+
+`date-picker.js` and `date-picker.css` render a persistent, keyboard-accessible
+month calendar for the available-room date selector. `dates.js` provides written
+Albanian/English dates across week headings, event details, Today, availability,
+and the FET generation date. Month names render consistently without relying on
+the browser having Albanian locale data. Internal dates remain ISO strings.
