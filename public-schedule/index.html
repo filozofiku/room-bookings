@@ -299,7 +299,7 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
   function dateForDay(d) {
     return datesInView().find(date => dayIndex(data.days,new Date(`${date}T12:00:00Z`).getUTCDay()) === d);
   }
-  function dayHeading(d) { return `${t(data.days[d])} · ${displayDate(dateForDay(d))}`; }
+  function dayHeading(d) { const date=dateForDay(d);return date?displayDate(date):t(data.days[d]); }
   function visibleEvents() {
     const recurring = (state.item?.e || []).filter(e => publicState.days?.[dateForDay(e.d)]?.fetActive !== false);
     if (publicState.status !== 'ready') return recurring;
@@ -619,7 +619,7 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
     const now=new Date(),date=localDate(now);
     const clock=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Tirane',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(now);
     const minute=parseMinutes(clock),d=dayIndex(data.days,new Date(date+'T12:00:00Z').getUTCDay());
-    $('todayDate').textContent=t(data.days[d])+' · '+formatDateTime(now,getLanguage());
+    $('todayDate').textContent=formatDateTime(now,getLanguage());
     $('todayBook').href='https://filozofiku.github.io/room-bookings/?'+new URLSearchParams({date,section:'booking'});
     const ready=publicState.status==='ready'&&publicState.date===date;
     const day=ready?publicState.day:null;

@@ -69,7 +69,7 @@ async function submitBooking(){
 await page.goto('https://booking.test/');
 await page.waitForSelector('#app:not([hidden])');
 assert.equal(await page.locator('#date-calendar').isVisible(),true);
-assert.equal(await page.locator('#date-calendar .calendar-selection').textContent(),'23 tetor 2026');
+assert.equal(await page.locator('#date-calendar .calendar-selection').textContent(),'E premte · 23 tetor 2026');
 await page.locator('#date-calendar button[data-date="2026-10-23"]').click();
 assert.equal(await page.locator('.app-panel[open]').count(),0);
 // Verify booking-only navigation, then expose shared controls in this mock

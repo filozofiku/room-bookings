@@ -35,7 +35,7 @@ function trendChart(rows){
     for(const [k,v] of Object.entries({x:30+i*step+j*step*.25,y:145-height,width:Math.max(1,step*.22),height,fill:['#99080d','#405c7a','#43806d'][j]}))bar.setAttribute(k,String(v));
     const title=document.createElementNS(ns,'title');title.textContent=`${displayDate(row.date)}: ${row[key]}`;bar.append(title);svg.append(bar);
   }));
-  for(const [value,x] of [[rows[0]?.date,30],[rows.at(-1)?.date,780]])if(value){const label=document.createElementNS(ns,'text');label.setAttribute('x',x);label.setAttribute('y','172');label.setAttribute('font-size','12');label.textContent=displayDate(value);svg.append(label);}
+  for(const [value,x] of [[rows[0]?.date,30],[rows.at(-1)?.date,870]])if(value){const label=document.createElementNS(ns,'text');label.setAttribute('x',x);label.setAttribute('y','172');label.setAttribute('font-size','12');label.setAttribute('text-anchor',x===30?'start':'end');label.textContent=displayDate(value);svg.append(label);}
   return svg;
 }
 

@@ -1,5 +1,7 @@
 const zone='Europe/Tirane';
 const sqMonths=['janar','shkurt','mars','prill','maj','qershor','korrik','gusht','shtator','tetor','nëntor','dhjetor'];
+const sqWeekdays=['E diel','E hënë','E martë','E mërkurë','E enjte','E premte','E shtunë'];
+const enWeekdays=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const enMonths=['January','February','March','April','May','June','July','August','September','October','November','December'];
 export const monthName=(number,language='sq')=>(String(language).startsWith('en')?enMonths:sqMonths)[number-1];
 export function parseDate(value){
@@ -9,7 +11,8 @@ export function parseDate(value){
 }
 export function formatDate(value,language='sq'){
  const date=parseDate(value);if(!date)return value||'—';
- return `${date.getUTCDate()} ${monthName(date.getUTCMonth()+1,language)} ${date.getUTCFullYear()}`;
+ const weekday=(String(language).startsWith('en')?enWeekdays:sqWeekdays)[date.getUTCDay()];
+ return `${weekday} · ${date.getUTCDate()} ${monthName(date.getUTCMonth()+1,language)} ${date.getUTCFullYear()}`;
 }
 export function formatDateTime(value,language='sq',fallback='—'){
  const date=typeof value?.toDate==='function'?value.toDate():typeof value?.seconds==='number'?new Date(value.seconds*1000):value instanceof Date?value:typeof value==='number'||typeof value==='string'?new Date(value):null;

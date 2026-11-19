@@ -9,13 +9,13 @@ try{
   if(!['/date-picker.js','/dates.js','/date-picker.css'].includes(path))return route.abort();return route.fulfill({contentType:path.endsWith('.css')?'text/css':'text/javascript',body:readFileSync('public-schedule'+path)});
  });
  await page.goto('https://calendar.test/');await page.waitForSelector('.calendar-grid');
- assert.equal(await page.locator('#date').isVisible(),false);assert.equal(await page.locator('.calendar-selection').textContent(),'10 dhjetor 2026');
+ assert.equal(await page.locator('#date').isVisible(),false);assert.equal(await page.locator('.calendar-selection').textContent(),'E enjte · 10 dhjetor 2026');
  assert.equal(await page.locator('[role=gridcell]').count(),42);
  await page.getByRole('button',{name:'Muaji i mëparshëm',exact:true}).click();
  assert.equal(await page.locator('[data-date="2026-11-18"]').isDisabled(),true);
  assert.equal(await page.locator('[data-date="2026-11-18"]').evaluate(el=>getComputedStyle(el).backgroundColor),'rgba(0, 0, 0, 0)');
  await page.locator('[data-date="2026-11-19"]').click();assert.equal(await page.locator('#date').inputValue(),'2026-11-19');assert.equal(await page.evaluate(()=>changes),1);
- await page.evaluate(()=>{language='en';calendar.render()});assert.equal(await page.locator('.calendar-selection').textContent(),'19 November 2026');
+ await page.evaluate(()=>{language='en';calendar.render()});assert.equal(await page.locator('.calendar-selection').textContent(),'Thursday · 19 November 2026');
  await page.getByRole('button',{name:'Next month',exact:true}).click();await page.locator('[data-date="2026-12-10"]').click();
  await page.keyboard.press('ArrowRight');assert.equal(await page.locator(':focus').getAttribute('data-date'),'2026-12-11');
  assert.equal(await page.locator('#date').inputValue(),'2026-12-10');await page.keyboard.press('Enter');assert.equal(await page.locator('#date').inputValue(),'2026-12-11');
