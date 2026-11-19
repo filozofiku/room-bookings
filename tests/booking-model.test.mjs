@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {localDate, bookingRows, overlaps, dayIndex, weekDates, reservationEvents, bookingTimestamp} from '../public-schedule/booking-model.js';
+import {bookingText, localDate, bookingRows, overlaps, dayIndex, weekDates, reservationEvents, bookingTimestamp} from '../public-schedule/booking-model.js';
 const rooms = [{id:'r1',name:'Salla 1'}];
 const periods = [{id:'p01',start:'08:00',end:'08:15'},{id:'p02',start:'08:15',end:'08:30'}];
 test('resolves room IDs and actual period times, preserving calendar dates', () => {
@@ -74,4 +74,16 @@ test('a standalone activity beside a later parallel pair uses one aligned column
  const sequential=[{s:0,e:1},{s:1,e:2}];
  assert.deepEqual([...eventLanes(sequential).values()],[{lane:0,count:1},{lane:0,count:1}]);
  assert.equal(eventLanes([]).size,0);
+});
+
+test('authored English title and description switch independently with Albanian fallback',()=>{
+ const source={title:'Takimi',description:'Përshkrimi',titleEn:'Meeting',descriptionEn:'Description'};
+ assert.deepEqual(bookingText(source),{title:'Takimi',description:'Përshkrimi'});
+ assert.deepEqual(bookingText(source,'en'),{title:'Meeting',description:'Description'});
+ assert.deepEqual(bookingText({...source,titleEn:''},'en'),{title:'Takimi',description:'Description'});
+ assert.deepEqual(bookingText({...source,descriptionEn:'  '},'en'),{title:'Meeting',description:'Përshkrimi'});
+ assert.deepEqual(bookingText({title:'Legacy',description:'Original'},'en'),{title:'Legacy',description:'Original'});
+ const [event]=reservationEvents([{...source,date:'2026-10-22',room:'Salla 1',slots:periods}],'Salla 1',weekDates('2026-10-22'),['Thursday'],['08:00','08:15','08:30']);
+ assert.deepEqual(bookingText(event,'en'),{title:'Meeting',description:'Description'});
+ assert.equal(source.title,'Takimi');
 });

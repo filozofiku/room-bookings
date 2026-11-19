@@ -52,8 +52,9 @@ test('special-room metadata and student edits publish immediately; schedule prop
   for(const d of [date,next])await seed('calendarDays/'+d,{bookingAllowed:true,fetActive:false});
   await seed('reservations/event',initial);const {ownerUid,studentEmails,...published}=initial;await seed('publicBookings/event',published);
   await seed('eventDays/'+date,{bookings:Object.fromEntries(slotKeys(initial).map(k=>[k,'event'])),changedReservationId:'event'});
-  await assertSucceeds(edit({title:'Edited',mode:'online',onlineUrl:'https://example.test',groupIds:['g'],teacherIds:['t'],studentEmails:['b@student.uni-pr.edu']}));
+  await assertSucceeds(edit({title:'Edited',titleEn:'English edit',isPublic:true,description:Array(100).fill('shqip').join(' '),descriptionEn:Array(100).fill('English').join(' '),mode:'online',onlineUrl:'https://example.test',groupIds:['g'],teacherIds:['t'],studentEmails:['b@student.uni-pr.edu']}));
   assert.equal((await current()).title,'Edited');assert.equal((await current()).roomId,rooms[0]);assert.deepEqual((await current()).studentEmails,['b@student.uni-pr.edu']);
+  assert.equal((await current()).titleEn,'English edit');
   const publicData=(await getDoc(doc(anon,'publicBookings/event'))).data();assert(!('studentEmails' in publicData));assert(!('ownerUid' in publicData));
   await assertFails(getDoc(doc(other,'reservations/event')));
   await assertFails(getDocs(collection(owner,'reservations')));
@@ -63,12 +64,12 @@ test('special-room metadata and student edits publish immediately; schedule prop
   for(const patch of [{roomId:rooms[1]},{roomId:'normal'},{roomId:''},{date:next},{periodIds:['p1','p2']},{periodIds:['p2']}])await assertFails(edit(patch));
   const original=await current();
   await assertFails(submit('metadata',{title:'No approval needed'}));await assertFails(submit('stale',{periodIds:['p2']},{expectedRevision:0}));
-  await assertSucceeds(submit('move',{roomId:rooms[1],periodIds:['p2'],title:'Awaiting approval',studentEmails:['c@student.uni-pr.edu']}));
+  await assertSucceeds(submit('move',{roomId:rooms[1],periodIds:['p2'],title:'Awaiting approval',titleEn:'Proposed English title',studentEmails:['c@student.uni-pr.edu']}));
   assert.deepEqual(await current(),original);assert.equal((await getDoc(doc(anon,'publicBookings/event'))).data().title,'Edited');
   await assertFails(getDoc(doc(anon,'reservationEditRequests/move')));await assertFails(getDoc(doc(other,'reservationEditRequests/move')));
   await assertSucceeds(getDocs(query(collection(owner,'reservationEditRequests'),where('ownerUid','==','owner'))));
   for(const options of [{apply:false},{delete:false},{patch:{title:'Tampered'}},{decision:{reservationId:'different'}}])await assertFails(decide('move','approved',options));
-  await assertSucceeds(decide('move'));const approved=await current();assert.equal(approved.title,'Awaiting approval');assert.equal(approved.roomId,rooms[1]);assert.deepEqual(approved.periodIds,['p2']);assert.equal(approved.createdAt.toMillis(),original.createdAt.toMillis());
+  await assertSucceeds(decide('move'));const approved=await current();assert.equal(approved.title,'Awaiting approval');assert.equal(approved.titleEn,'Proposed English title');assert.equal(approved.roomId,rooms[1]);assert.deepEqual(approved.periodIds,['p2']);assert.equal(approved.createdAt.toMillis(),original.createdAt.toMillis());
   assert.equal((await getDoc(doc(manager,'reservationEditRequests/move'))).exists(),false);
   assert(!Object.keys((await getDoc(doc(owner,'eventDays/'+date))).data().bookings).includes(rooms[0]+'__p1'));
   await assertSucceeds(edit({title:'Room 127 metadata',studentEmails:[]}));

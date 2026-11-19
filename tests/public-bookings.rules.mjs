@@ -48,6 +48,16 @@ test('resource reservations: atomic publication, optional resources, conflicts, 
   await seed('weeklyResources/5',{busyKeys:[]});
   await assertSucceeds(create('makeup',{eventType:'Zëvendësim i mësimit',groupIds:base.groupIds.slice(0,1),teacherIds:base.teacherIds.slice(0,1)}));
   await assertSucceeds(cancel('makeup'));
+  for(const translation of [{titleEn:123},{titleEn:'x'.repeat(121)},{descriptionEn:[]},{descriptionEn:'word'},{descriptionEn:Array(501).fill('word').join(' ')}])await assertFails(create('bad-translation',translation));
+  await assertSucceeds(create('english-title',{titleEn:'English title'}));
+  assert.equal((await getDoc(doc(anon,'publicBookings/english-title'))).data().titleEn,'English title');
+  await assertSucceeds(cancel('english-title'));
+  const bilingual={isPublic:true,description:Array(100).fill('shqip').join(' '),titleEn:'English title',descriptionEn:Array(100).fill('English').join(' ')};
+  await assertSucceeds(create('bilingual',bilingual));
+  assert.equal((await getDoc(doc(anon,'publicBookings/bilingual'))).data().descriptionEn,bilingual.descriptionEn);
+  await assertSucceeds(cancel('bilingual'));
+  await assertFails(create('private-translation',{descriptionEn:bilingual.descriptionEn}));
+  await assertFails(create('copied-translation',{...bilingual,titleEn:Array(100).fill('English').join(' ')}));
   for(let n=1;n<=16;n++){
    await assertSucceeds(create('valid',{periodIds:periods.slice(0,n).map(p=>p.id)}));
    await assertSucceeds(cancel('valid'));

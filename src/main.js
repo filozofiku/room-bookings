@@ -13,6 +13,7 @@ import { EVENT_TYPES, slotKeys, conflictMessage, wordCount, publicDescriptionErr
 import {updateReservation} from './update-reservation.js';
 import {isSpecialRoom,submitReservationRequest,decideReservationRequest,submitReservationEditRequest,decideReservationEditRequest,needsReapproval} from './reservation-requests.js';
 import { auth, db } from './firebase.js';
+import {bookingText} from '../public-schedule/booking-model.js';
 import {hasStaffAccess,setStaffNavigation} from '../public-schedule/staff-navigation.js';
 
 const $ = (id) => document.getElementById(id);
@@ -33,6 +34,7 @@ let occupied = new Map();
 let editing = null;
 let confirmationData=null,decisionPreviewData=null,lastReceipt=null;
 const errText = error=>bt(errorText(error));
+const localizedText=data=>bookingText(data,getLanguage());
 function message(text, isError = false) {
   $('message').textContent = bt(text);
   $('message').className = isError ? 'error' : 'ok';
@@ -88,7 +90,7 @@ function renderConfirmation(data) {
   const summary = $('reservation-summary');
   summary.replaceChildren();
   const fields = [
-    [bt('Titulli'),data.title], [bt('Lloji i aktivitetit'),bt(data.eventType)],
+    [bt('Titulli'),localizedText(data).title], [bt('Lloji i aktivitetit'),bt(data.eventType)],
     [bt('Data'),data.date], [bt('Ora'),reservationTime(data.periodIds,periods)],
     [bt('Salla'),displayRoom(rooms.find(room=>room.id===data.roomId)?.name || bt('Pa sallë'))],
     [bt('Grupet e studentëve'),data.groupIds.map(id=>displayGroup(catalog.groups[id] || id)).join(', ') || bt('Pa grup të studentëve')],
@@ -101,7 +103,7 @@ function renderConfirmation(data) {
   if(data.location)fields.push([bt('Lokacioni'),data.location]);
   if(data.onlineUrl)fields.push([bt('Linku i ngjarjes online'),data.onlineUrl]);
   if(data.studentEmails?.length)fields.push([bt('Studentë për njoftim'),data.studentEmails.join('; ')]);
-  if(data.description)fields.push([bt('Përshkrimi'),data.description]);
+  if(localizedText(data).description)fields.push([bt('Përshkrimi'),localizedText(data).description]);
   for(const [label,value] of fields){
     const term=document.createElement('dt'),detail=document.createElement('dd');
     term.textContent=bt(label);term.style.fontWeight='600';
@@ -120,7 +122,7 @@ function confirmReservation(data){
 }
 function confirmCancellation(data) {
   const dialog = $('cancel-dialog');
-  $('cancel-question').textContent = bt("Ta anuloni rezervimin \"{v0}\" më {v1}?",{v0:data.title,v1:data.date});
+  $('cancel-question').textContent = bt("Ta anuloni rezervimin \"{v0}\" më {v1}?",{v0:localizedText(data).title,v1:data.date});
   const otherOwner = data.ownerUid !== currentUser.uid;
   $('cancel-reason-field').hidden = !otherOwner;
   $('cancel-reason').required = otherOwner;
@@ -196,6 +198,7 @@ function stopEditing() {
   $('booking-heading').textContent=bt('Rezervoni një aktivitet');
   $('booking-form').querySelector('button').textContent=bt('Bëni rezervimin');
   $('title').value='';
+  $('title-en').value='';$('description-en').value='';$('english-fields').open=false;$('description-en').oninput();
   $('booking-message').textContent='';
   updateRequestHint();
 }
@@ -214,6 +217,8 @@ async function startEditing(id,data) {
   $('student-emails-field').hidden=false;
   $('student-emails').value=studentEmails.join('\n');
   $('date').value=data.date;$('room').value=data.roomId;
+  $('title-en').value=data.titleEn||'';$('description-en').value=data.descriptionEn||'';
+  $('english-fields').open=Boolean(data.titleEn||data.descriptionEn);$('description-en').oninput();
   $('title').value=data.title;$('event-type').value=data.eventType||EVENT_TYPES[0];
   $('from').value=data.periodIds[0];$('through').value=data.periodIds.at(-1);
   $('visibility').value=data.isPublic?'public':'private';$('visibility').onchange();
@@ -249,10 +254,10 @@ function statusBadge(kind){
 }
 function bookingCalendar(id,data){
  const slots=periods.filter(p=>data.periodIds.includes(p.id)).sort((a,b)=>a.start.localeCompare(b.start));
- return calendarActions({id,title:data.title,date:data.date,start:slots[0].start,end:slots.at(-1).end,room:data.roomId?displayRoom(rooms.find(r=>r.id===data.roomId)?.name||data.roomId):data.location||bt('Pa sallë'),description:data.description,onlineUrl:data.onlineUrl},bt);
+ return calendarActions({id,...localizedText(data),date:data.date,start:slots[0].start,end:slots.at(-1).end,room:data.roomId?displayRoom(rooms.find(r=>r.id===data.roomId)?.name||data.roomId):data.location||bt('Pa sallë'),onlineUrl:data.onlineUrl},bt);
 }
 function requestDetails(data) {
-  const lines=[`${data.date} · ${displayRoom(rooms.find(r=>r.id===data.roomId)?.name||data.roomId)} · ${reservationTime(data.periodIds,periods)}`,data.title,
+  const lines=[`${data.date} · ${displayRoom(rooms.find(r=>r.id===data.roomId)?.name||data.roomId)} · ${reservationTime(data.periodIds,periods)}`,localizedText(data).title,
     bt("Kërkuesi: {v0}",{v0:data.creatorName}),bt("Lloji: {v0}",{v0:bt(data.eventType)}),
     bt("Grupet: {v0}",{v0:data.groupIds.map(id=>displayGroup(catalog.groups[id]||id)).join(', ')||bt('Pa grup')}),
     bt("Mësimdhënësit: {v0}",{v0:data.teacherIds.map(id=>catalog.teachers[id]||id).join(', ')||bt('Pa mësimdhënës')}),
@@ -260,7 +265,7 @@ function requestDetails(data) {
   if(data.studentEmails?.length)lines.push(bt('Studentë për njoftim')+': '+data.studentEmails.join('; '));
   if(data.location)lines.push(bt("Lokacioni: {v0}",{v0:data.location}));
   if(data.onlineUrl)lines.push(data.onlineUrl);
-  if(data.description)lines.push(data.description);
+  if(localizedText(data).description)lines.push(localizedText(data).description);
   return lines.join('\n');
 }
 function confirmRequestDecision(data,outcome) {
@@ -281,7 +286,7 @@ function decisionTimestamp(value) {
 function decisionCard(decision) {
   const data=decision.booking,card=document.createElement('article');card.className='decision-card';
   const heading=document.createElement('h3');
-  heading.textContent=`${decision.reservationId?bt('Ndryshim rezervimi')+' · ':''}${decision.outcome==='approved'?bt('Miratuar'):bt('Refuzuar')} · ${data.title}`;
+  heading.textContent=`${decision.reservationId?bt('Ndryshim rezervimi')+' · ':''}${decision.outcome==='approved'?bt('Miratuar'):bt('Refuzuar')} · ${localizedText(data).title}`;
   const details=document.createElement('dl');details.className='decision-details';
   const fields=[
     [bt('Kërkuesi'),data.creatorName||bt('Emri nuk është i disponueshëm')],
@@ -294,7 +299,7 @@ function decisionCard(decision) {
     [bt('Mënyra e zhvillimit'),data.mode==='online'?bt('Online'):bt('Fizik')],
     ...(data.location?[[bt('Lokacioni'),data.location]]:[]),
     ...(data.onlineUrl?[[bt('Linku i ngjarjes online'),data.onlineUrl]]:[]),
-    ...(data.description?[[bt('Përshkrimi i aktivitetit'),data.description]]:[]),
+    ...(localizedText(data).description?[[bt('Përshkrimi i aktivitetit'),localizedText(data).description]]:[]),
     ...(data.studentEmails?.length?[[bt('Studentë për njoftim'),data.studentEmails.join('; ')]]:[]),
     [bt('Kërkesa u dërgua më'),decisionTimestamp(data.createdAt)],
     [bt('Vendimi nga'),decision.deciderName||bt('Emri nuk është i disponueshëm')],
@@ -365,9 +370,9 @@ async function readMyBookings() {
     const roomName = data.roomId?displayRoom(rooms.find(r=>r.id===data.roomId)?.name||data.roomId):data.location||bt('Pa sallë');
     const div = document.createElement('div');
     div.className = 'slot';
-    div.dataset.search=normalizeSearch([data.title,data.date,roomName,rooms.find(r=>r.id===data.roomId)?.name,data.creatorName,data.eventType,bt(data.eventType),data.description,...(data.groupIds||[]).map(id=>catalog.groups[id]||id),reservationTime(data.periodIds,periods),...(data.groupIds||[]).map(id=>displayGroup(catalog.groups[id]||id)),...(data.teacherIds||[]).map(id=>catalog.teachers[id]||id)].filter(Boolean).join(' '));
+    div.dataset.search=normalizeSearch([data.title,data.titleEn,data.descriptionEn,data.date,roomName,rooms.find(r=>r.id===data.roomId)?.name,data.creatorName,data.eventType,bt(data.eventType),data.description,...(data.groupIds||[]).map(id=>catalog.groups[id]||id),reservationTime(data.periodIds,periods),...(data.groupIds||[]).map(id=>displayGroup(catalog.groups[id]||id)),...(data.teacherIds||[]).map(id=>catalog.teachers[id]||id)].filter(Boolean).join(' '));
     const description = document.createElement('span');
-    description.append(safeText(`${data.date} · ${roomName} · ${data.title} · ${reservationTime(data.periodIds, periods)}`));
+    description.append(safeText(`${data.date} · ${roomName} · ${localizedText(data).title} · ${reservationTime(data.periodIds, periods)}`));
     if (canCancelAll) description.append(safeText(bt(" · Rezervuar nga: {v0}",{v0:data.creatorName || (data.ownerUid === currentUser.uid ? currentUser.displayName : '') || bt('Emri nuk është i disponueshëm')})));
     const button = document.createElement('button');
     button.className = 'danger';
@@ -410,7 +415,7 @@ async function readEmailDelivery(){
   };
   for(const notice of notices.filter(n=>n.status!=='recorded').sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0))){
    const card=document.createElement('article');card.className='decision-card';
-   const heading=document.createElement('h3');heading.textContent=`${bt(notice.kind)} · ${notice.booking?.title||bt('Rezervim')}`;
+   const heading=document.createElement('h3');heading.textContent=`${bt(notice.kind)} · ${localizedText(notice.booking||{}).title||bt('Rezervim')}`;
    const text=document.createElement('p');text.style.whiteSpace='pre-wrap';text.textContent=[bt("Statusi: {v0}",{v0:bt(deliveryLabel(notice.status))}),bt("Data e aktivitetit: {v0}",{v0:notice.booking?.date||'—'}),bt("Kërkuesi: {v0}",{v0:notice.booking?.creatorName||'—'}),bt("Krijuar: {v0}",{v0:decisionTimestamp(notice.createdAt)}),notice.sentAt?bt("Dërguar: {v0}",{v0:decisionTimestamp(notice.sentAt)}):'',notice.lastAttemptAt?bt("Përpjekja e fundit: {v0}",{v0:decisionTimestamp(notice.lastAttemptAt)}):'',notice.status==='failed'?bt('Dërgimi kërkon ndërhyrjen e administratorit.'):''].filter(Boolean).join('\n');card.append(heading,text);
    if(elevated&&notice.status==='failed')retryButton(card,[notice.path]);list.append(card);
   }
@@ -468,6 +473,8 @@ async function createReservation(event) {
   const date = $('date').value;
   const roomId = $('room').value;
   const title = $('title').value.trim();
+  const titleEn = $('title-en').value.trim();
+  if(titleEn.length>120)return bookingMessage(bt('Titulli në anglisht mund të ketë deri në 120 karaktere.'),true);
   let periodIds;
   try { periodIds = selectedPeriodIds(); } catch(e) { return bookingMessage(errText(e),true); }
   if (!title) return bookingMessage(bt('Shkruani titullin e aktivitetit.'), true);
@@ -483,8 +490,11 @@ async function createReservation(event) {
   const description = $('visibility').value === 'public' ? $('description').value.trim() : '';
   const descriptionError = $('visibility').value === 'public' ? publicDescriptionError(title, description) : '';
   if (descriptionError) return bookingMessage(bt(descriptionError), true);
+  const descriptionEn = $('visibility').value === 'public' ? $('description-en').value.trim() : '';
+  const englishError = descriptionEn ? publicDescriptionError(titleEn||title,descriptionEn) : '';
+  if(englishError){$('english-fields').open=true;$('description-en').focus();return bookingMessage(bt('Përshkrimi në anglisht')+': '+bt(englishError),true);}
   const checked = id => [...$(id).querySelectorAll('input:checked')].map(input => input.value);
-  const data = {title, date, roomId, periodIds, description, location, studentEmails, groupIds:checked('groups'), teacherIds:checked('teachers'),
+  const data = {title, titleEn, date, roomId, periodIds, description, descriptionEn, location, studentEmails, groupIds:checked('groups'), teacherIds:checked('teachers'),
     eventType:$('event-type').value, isPublic:$('visibility').value === 'public', mode:$('mode').value, onlineUrl,
     creatorName:edit?.data.creatorName || currentUser.displayName || 'Mësimdhënës'};
   if(edit && Object.entries(data).every(([key,value])=>JSON.stringify(value)===JSON.stringify(edit.data[key] ?? (Array.isArray(value)?[]:typeof value==='boolean'?false:'')))) {
@@ -532,6 +542,7 @@ async function createReservation(event) {
     });
     $('student-emails').value = '';
     $('title').value = '';
+    $('title-en').value='';$('description-en').value='';$('english-fields').open=false;$('description-en').oninput();
     $('location').value = '';
     $('description').value = '';
     $('description').oninput();
@@ -725,7 +736,7 @@ $('cancel-form').onsubmit = event => {
   $('cancel-dialog').close('cancel');
 };
 $('visibility').onchange = () => {
-  $('email-notice').hidden = $('description-field').hidden = $('visibility').value !== 'public';
+  $('description-en-field').hidden = $('email-notice').hidden = $('description-field').hidden = $('visibility').value !== 'public';
   $('description').required = $('visibility').value === 'public';
 };
 $('description').oninput = () => {
@@ -733,6 +744,11 @@ $('description').oninput = () => {
 
   $('description-count').textContent = bt('{v0} / 100–500 fjalë',{v0:count});
   $('description-count').className = count < 100 || count > 500 ? 'error' : '';
+};
+$('description-en').oninput = () => {
+ const count=wordCount($('description-en').value);
+ $('description-en-count').textContent=count?bt('{v0} / 100–500 fjalë',{v0:count}):bt('Opsionale');
+ $('description-en-count').className=count&&(count<100||count>500)?'error':'';
 };
 function updateLocationField(){ $('location-field').hidden=$('mode').value!=='physical'||$('room').value!==''; }
 $('mode').onchange = () => { $('online-field').hidden = $('mode').value !== 'online';updateLocationField(); };
@@ -771,7 +787,7 @@ function refreshLanguage(){
   updateRequestHint();
   Promise.all([readAvailability(),readMyBookings(),readRequests(),$('email-delivery-section').open?readEmailDelivery():Promise.resolve()]).catch(e=>message(errText(e),true));
  }
- $('description').oninput();
+ $('description').oninput();$('description-en').oninput();
  if(!$('booking-receipt').hidden&&lastReceipt)renderReceipt();
  if($('reservation-dialog').open&&confirmationData)renderConfirmation(confirmationData);
  if($('request-decision-dialog').open&&decisionPreviewData)$('request-decision-summary').textContent=requestDetails(decisionPreviewData);

@@ -154,6 +154,20 @@ try {
     }
   }
 
+  const bilingual={...booking,title:'Takimi shqip',titleEn:'English meeting',description:'Përshkrimi shqip',descriptionEn:'English description <script>unsafe</script>'};
+  await page.evaluate(value=>window.testReport(value),{...result,rows:[bilingual]});
+  await page.click('#navSchedules');await page.click('#viewWeek');
+  await page.locator('#weekBody .reservation-event').click();
+  assert.equal(await page.locator('#modalTitle').textContent(),'Takimi shqip');
+  await page.selectOption('#languagePicker','en');
+  assert.equal(await page.locator('#modalTitle').textContent(),'English meeting');
+  assert.match(await page.locator('#modalDetails').textContent(),/English description <script>unsafe<\/script>/);
+  assert.equal(await page.locator('#modalDetails script').count(),0);
+  await page.click('#closeDialog');
+  assert.match(await page.locator('#weekBody .reservation-event').textContent(),/English meeting/);
+  await page.click('#viewList');assert.match(await page.locator('#agendaView .reservation-event').textContent(),/English meeting/);
+  await page.selectOption('#languagePicker','sq');
+  assert.match(await page.locator('#agendaView .reservation-event').textContent(),/Takimi shqip/);
   await page.evaluate(value => window.testReport(value),{...result,rows:[booking]});
   assert.equal(await page.locator('.room-choice').count(),0);
   await page.click('#navSchedules');

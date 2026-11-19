@@ -21,6 +21,13 @@ shfaqet në hollësitë e aktivitetit në orarin publik. Kufiri kontrollohet edh
 rregullat e Firebase. Te “Orari mësimor” navigimi bëhet me shigjeta javore;
 te “Sallat e lira” mbetet zgjedhja e datës.
 
+Titulli dhe përshkrimi kryesor jepen në shqip. “Shto versionin në anglisht
+(opsionale)” hap fushat shtesë `titleEn` dhe `descriptionEn`. Secila mund të
+lihet bosh; në anglisht, fushat pa përkthim përdorin tekstin shqip. Titulli në
+anglisht ka deri në 120 karaktere; përshkrimi publik në anglisht, kur jepet,
+ka 100–500 fjalë. Të dy versionet ruhen gjatë redaktimit dhe miratimit dhe
+ndërrohen sipas gjuhës në orar, hollësi, rezervime dhe kërkesa.
+
 Kërkimi i grupeve dhe mësimdhënësve filtron listat pa hequr përzgjedhjet e bëra.
 Përdoruesit me `users/{uid}.canCancelAll: true` shohin “Të gjitha rezervimet” dhe
 mund të anulojnë çdo rezervim. Kjo leje vendoset vetëm nga administratori përmes

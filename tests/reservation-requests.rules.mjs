@@ -143,5 +143,11 @@ test('special rooms require private requests and atomic elevated decisions',asyn
   await assertSucceeds(submit('restricted-reject',{...base,roomId:'',creatorName:'Këshilli Studentor'}));
   await assertSucceeds(decide(manager,'restricted-reject','rejected'));
   assert.equal((await getDoc(doc(env.unauthenticatedContext().firestore(),'publicBookings','restricted-reject'))).exists(),false);
+  const bilingual={...base,roomId:'',creatorName:'Këshilli Studentor',isPublic:true,description:Array(100).fill('shqip').join(' '),titleEn:'Public panel',descriptionEn:Array(100).fill('English').join(' ')};
+  await assertFails(submit('invalid-english-title',{...bilingual,titleEn:123}));
+  await assertFails(submit('invalid-english-description',{...bilingual,descriptionEn:[]}));
+  await assertSucceeds(submit('bilingual-request',bilingual));
+  await assertSucceeds(decide(manager,'bilingual-request'));
+  assert.equal((await getDoc(doc(manager,'reservations/bilingual-request'))).data().titleEn,'Public panel');
  }finally{await env.cleanup();}
 });

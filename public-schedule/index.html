@@ -270,13 +270,13 @@
   import {t,locale,getLanguage,initLanguage,roomLabel} from './i18n.js';
   import {englishTimetableLabel} from './timetable-en.js';
   import {calendarActions} from "./calendar-export.js";
-import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTimestamp, eventLanes, eventCategory, EVENT_CATEGORY_LABELS} from './booking-model.js';
+import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTimestamp, eventLanes, eventCategory, EVENT_CATEGORY_LABELS} from './booking-model.js';
 (() => {
   "use strict";
   let data;
   let selectedEvent=null;
   const label=value=>getLanguage()==='en'?t(englishTimetableLabel(roomLabel(value))):value;
-  const eventTitle=event=>event.booking?event.t:label(event.t);
+  const eventTitle=event=>event.booking?bookingText(event,getLanguage()).title:label(event.t);
   const tags=value=>String(value||'').split(' · ').map(part=>t(part)).join(' · ');
   const entityLabel=entity=>state.type==='teachers'?entity.l:label(entity.l);
   let publicState = {status:'loading'};
@@ -586,7 +586,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
     $("modalTitle").textContent=eventTitle(e);
     $("modalTag").textContent=tags(e.a) || t("Aktivitet mësimor");
     const pairs=[["Kategoria e aktivitetit",t(EVENT_CATEGORY_LABELS[eventCategory(e)])],["Dita",t(data.days[e.d])],["Ora",hours(e)],["Studentët / Grupi",label(e.g)],["Mësimdhënësi",t(e.p)],["Salla",label(e.r)]];
-    if(e.booking) pairs.push(["Përshkrimi",e.description],["Data",e.date],["Rezervuar nga",t(e.creatorName)],["Rezervimi u krijua më",t(bookingTimestamp(e.createdAt,locale()))],["Mënyra e zhvillimit",e.mode === "online" ? "Online" : e.mode === "physical" ? t("Fizik") : ""]);
+    if(e.booking) pairs.push(["Përshkrimi",bookingText(e,getLanguage()).description],["Data",e.date],["Rezervuar nga",t(e.creatorName)],["Rezervimi u krijua më",t(bookingTimestamp(e.createdAt,locale()))],["Mënyra e zhvillimit",e.mode === "online" ? "Online" : e.mode === "physical" ? t("Fizik") : ""]);
     $("modalDetails").innerHTML=pairs.filter(([,v])=>v).map(([k,v])=>`<dt>${esc(t(k))}</dt><dd>${esc(v)}</dd>`).join("");
     if(e.booking && e.mode === 'online' && /^https?:\/\//i.test(e.onlineUrl || '')) {
       const dt=document.createElement('dt'), dd=document.createElement('dd'), link=document.createElement('a');
@@ -603,7 +603,7 @@ import {localDate, overlaps, dayIndex, weekDates, reservationEvents, bookingTime
       id:e.id||JSON.stringify([e.t,e.a,e.g,e.p,e.d,e.s]),weekly:!e.booking,
       classKey:JSON.stringify([e.d,data.times[e.s],data.times[e.e],e.t,e.a,e.g,e.p,e.r].map((value,index)=>index===0?value:String(value||'').normalize('NFC').replace(/\s+/g,' ').trim())),
       title:eventTitle(e),date:eventDate,start:data.times[e.s],end:data.times[e.e],room:label(e.r),
-      description:[e.description,e.g?t('Studentët / Grupi: {group}',{group:label(e.g)}):'',e.p?t('Mësimdhënësi: {teacher}',{teacher:e.p}):''].filter(Boolean).join('\n\n'),onlineUrl:e.onlineUrl
+      description:[e.booking?bookingText(e,getLanguage()).description:e.description,e.g?t('Studentët / Grupi: {group}',{group:label(e.g)}):'',e.p?t('Mësimdhënësi: {teacher}',{teacher:e.p}):''].filter(Boolean).join('\n\n'),onlineUrl:e.onlineUrl
     },t));
     if(!$("detailDialog").open)$("detailDialog").showModal();
   }

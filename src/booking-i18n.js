@@ -2,6 +2,13 @@ import {EN,t,getLanguage,locale,roomLabel,initLanguage} from '../public-schedule
 import {englishTimetableLabel} from '../public-schedule/timetable-en.js';
 export {getLanguage,locale,initLanguage};
 export const BOOKING_EN={
+ 'Shto versionin në anglisht (opsionale)':'Add English version (optional)',
+ 'Teksti kryesor është në shqip. Nëse versioni në anglisht lihet bosh, shfaqet teksti në shqip.':'The main text is in Albanian. If an English field is left blank, the Albanian text is shown.',
+ 'Titulli në anglisht (opsional)':'Title in English (optional)',
+ 'Përshkrimi në anglisht (opsional, 100–500 fjalë)':'Description in English (optional, 100–500 words)',
+ 'Përshkrimi në anglisht':'Description in English',
+ 'Titulli në anglisht mund të ketë deri në 120 karaktere.':'The English title can contain up to 120 characters.',
+ 'Opsionale':'Optional',
  'Çdo rezervim dhe ndryshim nga kjo llogari kërkon miratim.':'Every reservation and change from this account requires approval.',
  'Çdo rezervim dhe ndryshim nga kjo llogari kërkon miratim. Kërkesat, me ose pa sallë, shfaqen në orar vetëm pas miratimit. Deri atëherë, rezervimi ekzistues mbetet në fuqi.':'Every reservation and change from this account requires approval. Requests, with or without a room, appear in the timetable only after approval. Until then, the existing reservation remains valid.',
  'Kërkesa shfaqet në orar vetëm pas miratimit nga një përdorues me autorizim.':'The request appears in the timetable only after approval by an authorised reviewer.',

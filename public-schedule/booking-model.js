@@ -1,3 +1,10 @@
+// Author-provided translations fall back independently to the Albanian text.
+export function bookingText(booking, language = 'sq') {
+  return {
+    title: language === 'en' && booking.titleEn?.trim() ? booking.titleEn : booking.title ?? booking.t ?? '',
+    description: language === 'en' && booking.descriptionEn?.trim() ? booking.descriptionEn : booking.description || ''
+  };
+}
 export function localDate(now = new Date()) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/Tirane', year: 'numeric', month: '2-digit', day: '2-digit'
@@ -44,6 +51,7 @@ export function reservationEvents(rows, room, dates, days, times, kind = 'rooms'
       if (s < 0 || e <= s) throw Error('Orët e rezervimit nuk përputhen me orarin zyrtar.');
       return {id:b.id,d:dayIndex(days,new Date(`${b.date}T12:00:00Z`).getUTCDay()),s,e,
         t:b.title,r:b.room || 'Pa sallë',a:b.eventType || 'Rezervim',g:b.groups?.join(', ') || 'Pa grup të studentëve',p:b.teachers?.join(', ') || 'Pa mësimdhënës',booking:true,isPublic:b.isPublic===true,date:b.date,mode:b.mode,onlineUrl:b.onlineUrl,description:b.description,
+        titleEn:b.titleEn,descriptionEn:b.descriptionEn,
         creatorName:b.creatorName || 'Emri nuk është i disponueshëm',createdAt:b.createdAt};
     });
   });

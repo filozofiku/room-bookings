@@ -136,8 +136,9 @@ its selection locally. `i18n.js` contains interface translations;
 `timetable-en.js` contains display translations for official courses and student
 programmes. Add translations there when new official names are introduced.
 Translated labels never replace resource names used for matching, URLs, or
-bookings. Personal names and organizer-written event titles/descriptions remain
-as entered. The booking application shares the language preference and uses
+bookings. Personal names remain as entered. Reservation titles and descriptions
+use the optional author-provided English version when English is selected, with
+Albanian fallback for each field. The booking application shares the language preference and uses
 `src/booking-i18n.js` for its interface. All outgoing email templates remain in
 Albanian. Calendar controls on the public site follow the selected language.
 
@@ -150,3 +151,10 @@ while serving the public timetable at `http://127.0.0.1:8765` (or `PREVIEW_URL`)
 The calendar action subscribes to one activity's read-only feed. Classes repeat weekly through 31 December 2026 at Europe/Tirane wall time; reservations do not repeat. Changes and cancellations appear when Google refreshes the subscription. Existing imported copies remain independent. Downloads are labelled as local snapshots.
 
 `calendar-config.json` supplies the separately deployed Apps Script `/exec` endpoint. See [`calendar-service/README.md`](../calendar-service/README.md) in the booking repository for deployment instructions. The endpoint uses only public data and has no email access. `calendar-classes.json` maps official activities to stable FET IDs. The public-site Actions workflow rebuilds this catalog on every deployment; when changing CSV metadata, regenerate it with the CSV before publishing to preserve original activity IDs.
+
+## Teksti i rezervimeve në dy gjuhë
+
+`title` dhe `description` janë teksti shqip; `titleEn` dhe `descriptionEn` janë
+versione opsionale të autorit. Orari, lista, pamja “Sot”, hollësitë dhe shkarkimi
+lokal i kalendarit përdorin gjuhën e zgjedhur. Për çdo fushë angleze që mungon,
+shfaqet teksti shqip. Rezervimet ekzistuese vazhdojnë të shfaqen pa migrim.

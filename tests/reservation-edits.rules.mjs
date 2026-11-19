@@ -69,7 +69,7 @@ test('reservation edits are atomic, conflict-safe and require owner notification
   await seed('weeklyResources/4',{busyKeys:[]});
   // Full-size resource sets exercise the rules expression and document-read limits.
   await setup({...initial,revision:10,updatedAt:new Date(),periodIds:periods.slice(0,16).map(p=>p.id),groupIds:Object.keys(groups),teacherIds:Object.keys(teachers)});
-  await assertSucceeds(edit(manager,{date:next}));
+  await assertSucceeds(edit(manager,{date:next,isPublic:true,description:Array(100).fill('shqip').join(' '),titleEn:'English event',descriptionEn:Array(100).fill('English').join(' ')}));
   await assertSucceeds(edit(manager,{periodIds:periods.slice(1,17).map(p=>p.id)}));
   await assertSucceeds(edit(manager,{roomId:'',groupIds:[],teacherIds:[]}));
   await assertSucceeds(edit(manager,{roomId,groupIds:Object.keys(groups),teacherIds:Object.keys(teachers)}));
