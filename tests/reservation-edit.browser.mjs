@@ -49,5 +49,40 @@ try{
  await page.locator('#requests-section > summary').click();
  await page.locator('#reservation-requests').getByRole('button',{name:'Refuzoni',exact:true}).click();await page.fill('#request-decision-reason','Rejected');await page.locator('#request-decision-dialog button[value="confirm"]').click();await page.waitForFunction(key=>!window.testStore.has(key),reject);
  assert.equal(await page.evaluate(()=>window.testStore.get('publicBookings/event').roomId),'normal');assert.equal(await page.evaluate(()=>window.testStore.get('publicBookings/event').title),'Pending schedule');assert.deepEqual(errors,[]);
+ // Restricted accounts also propose metadata edits instead of publishing them.
+ await page.evaluate(()=>{window.testStore.set('users/owner',{active:true,role:'teacher',requiresApproval:true,bookingName:'Këshilli Studentor'});return window.testAuth({uid:'owner',displayName:'Google name'});});
+ await begin();await page.fill('#title','Council metadata');await submit();
+ assert.equal(await page.evaluate(()=>window.testStore.get('publicBookings/event').title),'Pending schedule');
+ const restrictedEdit=await page.evaluate(()=>[...window.testStore.keys()].find(k=>k.startsWith('reservationEditRequests/')));assert(restrictedEdit);
+ await page.evaluate(()=>window.testAuth({uid:'admin',displayName:'Admin'}));
+ await page.waitForFunction(()=>document.getElementById('reservation-requests').textContent.includes('Council metadata'));
+ await page.locator('#requests-section > summary').click();
+ await page.locator('#reservation-requests').getByRole('button',{name:'Miratoni',exact:true}).click();await page.fill('#request-decision-reason','Approved');await page.locator('#request-decision-dialog button[value="confirm"]').click();await page.waitForFunction(key=>!window.testStore.has(key),restrictedEdit);
+ assert.equal(await page.evaluate(()=>window.testStore.get('publicBookings/event').title),'Council metadata');
+ for(const roomId of ['normal','']){
+  await page.evaluate(()=>window.testAuth({uid:'owner',displayName:'Google name'}));
+  await page.waitForSelector('#app:not([hidden])');
+  await page.evaluate(()=>{document.getElementById('reservation-entry').hidden=false;document.getElementById('booking-section').hidden=false;document.getElementById('booking-section').open=true;});
+  await page.selectOption('#event-type','Panel');await page.selectOption('#room',roomId);await page.selectOption('#from','p1');await page.selectOption('#through','p1');await page.fill('#title','Council '+(roomId||'roomless'));
+  assert.match(await page.locator('#request-hint').textContent(),/Çdo rezervim/);
+  await page.locator('#booking-form button').click();await page.waitForSelector('#reservation-dialog[open]');
+  assert.equal(await page.locator('#reservation-heading').textContent(),'Konfirmoni kërkesën për rezervim');
+  assert.match(await page.locator('#reservation-summary').textContent(),/Këshilli Studentor/);
+  await page.locator('#reservation-dialog button[value="confirm"]').click();await page.waitForFunction(()=>!document.querySelector('#booking-form button').disabled);
+  const pending=await page.evaluate(()=>[...window.testStore.keys()].find(k=>k.startsWith('reservationRequests/')));assert(pending);
+  const id=pending.split('/')[1];
+  const locksBefore=await page.evaluate(()=>JSON.stringify(window.testStore.get('eventDays/2026-11-16')));
+  assert.equal(await page.evaluate(id=>window.testStore.has('publicBookings/'+id),id),false);
+  assert.equal(await page.evaluate(id=>window.testStore.has('reservations/'+id),id),false);
+  assert.equal(await page.locator('#booking-receipt .status-pending').count(),1);
+  await page.evaluate(()=>window.testAuth({uid:'admin',displayName:'Admin'}));await page.waitForFunction(()=>document.getElementById('reservation-requests').textContent.includes('Council '));
+  if(await page.locator('#requests-section').getAttribute('open')===null)await page.locator('#requests-section > summary').click();
+  await page.locator('#reservation-requests').getByRole('button',{name:'Miratoni',exact:true}).click();await page.fill('#request-decision-reason','Approved');await page.locator('#request-decision-dialog button[value="confirm"]').click();await page.waitForFunction(key=>!window.testStore.has(key),pending);
+  assert.equal(await page.evaluate(id=>window.testStore.get('publicBookings/'+id).creatorName,id),'Këshilli Studentor');
+  assert.equal(await page.evaluate(id=>window.testStore.get('publicBookings/'+id).roomId,id),roomId);
+  if(!roomId)assert.equal(await page.evaluate(()=>JSON.stringify(window.testStore.get('eventDays/2026-11-16'))),locksBefore);
+ }
+ assert.deepEqual(errors,[]);
+
  console.log('Edit flow passed: private student lists, immediate metadata/group/teacher/mode changes, pending room/time changes, approval, rejection, and stable reservation identity.');
 }finally{await browser.close();}

@@ -36,6 +36,14 @@ Për lejen e anulimit të çdo rezervimi, përdorni `cancel-all` në vend të `t
 Pa `--apply` bëhet vetëm kontrolli paraprak. Llogaritë e reja hyjnë me Google;
 skripti nuk vendos fjalëkalim dhe nuk dërgon email.
 
+Llogaritë me `users/{uid}.requiresApproval: true` dërgojnë kërkesë për çdo rezervim,
+me ose pa sallë, dhe për çdo ndryshim të mëvonshëm. Vetëm përdoruesit me
+`canCancelAll: true` mund t'i miratojnë; deri atëherë kërkesa nuk publikohet dhe
+rezervimi ekzistues mbetet në fuqi. Firebase ndalon krijimin ose ndryshimin direkt.
+Për aktivizim: `node scripts/manage-booking-user.mjs studentet.filozofiku@uni-pr.edu request-only --name 'Këshilli Studentor' --apply`.
+Emri ruhet në Firebase Auth dhe te `bookingName` në profil, që të përdoret edhe
+nëse Google kthen një emër tjetër gjatë hyrjes.
+
 Modeli aktiv:
 - `resourceCatalog/current`: emrat dhe identifikuesit e sallave, grupeve dhe mësimdhënësve.
 - `weeklyResources/{weekday}`: intervalet e zëna sipas tre eksporteve zyrtare HTML.

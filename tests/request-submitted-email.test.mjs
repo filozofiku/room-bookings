@@ -11,6 +11,12 @@ test('new request email contains Albanian details and review link',()=>{
   for(const text of ['Takim',name,'30 tetor 2026','08:00–08:15','Mbledhje',booking.description,'https://filozofiku.github.io/room-bookings/','mos iu përgjigjni'])assert.ok(mail.text.includes(text));
  }
 });
+test('roomless approval requests use general reservation wording',()=>{
+ const mail=requestSubmittedEmail({...booking,roomId:''},periods);
+ assert.equal(mail.subject,'Kërkesë e re për rezervim');
+ assert.doesNotMatch(mail.text,/rezervimin e një salle|Salla:/);
+ assert.match(mail.text,/Kërkesat për miratim/);
+});
 test('reviewer notification retries, uses a fixed recipient, and suppresses successful duplicates',async()=>{
  let data={booking,kind:'request-submitted',status:'pending'},attempts=0;
  const sent=[],ref={id:'request'};

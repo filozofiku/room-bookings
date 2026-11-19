@@ -4,9 +4,9 @@ export function requestSubmittedEmail(booking,periods,roomName){
  const selected=booking.periodIds.map(id=>periods.find(p=>p.id===id));
  if(!selected.length||selected.some(p=>!p))throw Error('missing-periods');
  selected.sort((a,b)=>a.start.localeCompare(b.start));
- return {descriptionSections:[{label:'Përshkrimi:',text:booking.description||''}],subject:'Kërkesë e re për rezervimin e sallës',text:[
+ return {descriptionSections:[{label:'Përshkrimi:',text:booking.description||''}],subject:'Kërkesë e re për rezervim',text:[
   'Përshëndetje,','',
-  'Është paraqitur një kërkesë e re për rezervimin e një salle që kërkon miratim.','',
+  'Është paraqitur një kërkesë e re për rezervim që kërkon miratim.','',
   `Aktiviteti: ${booking.title}`,`Lloji: ${booking.eventType}`,
   ...(booking.roomId?[`Salla: ${roomName||booking.roomId}`]:[]),`Data: ${emailDate(booking.date)}`,`Ora: ${selected[0].start}–${selected.at(-1).end}`,
   ...(booking.description?['','Përshkrimi:',booking.description]:[]),'',

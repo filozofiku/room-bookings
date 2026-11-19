@@ -2,6 +2,9 @@ import {EN,t,getLanguage,locale,roomLabel,initLanguage} from '../public-schedule
 import {englishTimetableLabel} from '../public-schedule/timetable-en.js';
 export {getLanguage,locale,initLanguage};
 export const BOOKING_EN={
+ 'Çdo rezervim dhe ndryshim nga kjo llogari kërkon miratim.':'Every reservation and change from this account requires approval.',
+ 'Çdo rezervim dhe ndryshim nga kjo llogari kërkon miratim. Kërkesat, me ose pa sallë, shfaqen në orar vetëm pas miratimit. Deri atëherë, rezervimi ekzistues mbetet në fuqi.':'Every reservation and change from this account requires approval. Requests, with or without a room, appear in the timetable only after approval. Until then, the existing reservation remains valid.',
+ 'Kërkesa shfaqet në orar vetëm pas miratimit nga një përdorues me autorizim.':'The request appears in the timetable only after approval by an authorised reviewer.',
 "Rezervimet janë pezulluar përkohësisht gjatë kontrollit të shërbimit. Orari publik dhe rezervimet ekzistuese mbeten të dukshme në orar.":"Bookings are temporarily paused while the service is reviewed. The public timetable and existing reservations remain visible in the timetable.",
  "Rezervimi i sallave për stafin akademik":"Room booking for academic staff",
  "Për të rezervuar salla dhe për të menaxhuar rezervimet tuaja, hyni me llogarinë tuaj institucionale @uni-pr.edu. Qasja kërkon miratimin e llogarisë nga administratori.":"To book rooms and manage your reservations, sign in with your institutional @uni-pr.edu account. Your account must be approved by the administrator.",
@@ -52,7 +55,7 @@ export const BOOKING_EN={
 'Lista e njoftimeve merr një përmbledhje javore çdo të hënë në 08:00 (ora lokale e Prishtinës/Tiranës), për aktivitetet e javës e hënë–e diel. Përmbledhja përgatitet në ekzekutimin e parë pas 08:00; aktivitetet e shtuara më pas nuk dërgohen veçmas. Çdo email përmban lidhje abonimi në kalendar dhe çregjistrimi nga njoftimet javore.':'The mailing list receives a weekly summary each Monday at 08:00 (Prishtina/Tirana local time), covering Monday–Sunday. The summary is prepared on the first run after 08:00; events added afterwards are not emailed separately. Every email includes calendar subscription and unsubscribe links.',
 'Aktivitetet publike dhe jo publike shfaqen në orarin zyrtar. Vetëm aktivitetet publike përfshihen në përmbledhjen javore me email.':'Public and non-public events appear in the official timetable. Only public events are included in the weekly email summary.',
 'Titulli i aktivitetit (publikohet me emrin tuaj dhe kohën e rezervimit)':'Event title (published with your name and reservation creation time)','Mbledhje e departamentit':'Department meeting','Bëni rezervimin':'Create reservation',
-'Kërkesat e mia':'My requests','Kërkesat për miratim':'Requests for approval','Rifreskoni kërkesat':'Refresh requests','Vendimet për kërkesat':'Request decisions',
+ 'Kërkesat e mia':'My requests','Kërkesat për miratim':'Requests for approval','Rifreskoni kërkesat':'Refresh requests','Vendimet për kërkesat':'Request decisions',
 'Të dhënat më poshtë paraqesin kërkesën në kohën e vendimit. Rezervimi mund të jetë ndryshuar ose anuluar më pas.':'The information below shows the request as it was when the decision was made. The reservation may have been changed or cancelled since then.',
 'Statusi i njoftimeve me email':'Email notification status',
 '“Në pritje” përfshin njoftimet që presin ekzekutimin e radhës. “Dërguar” do të thotë se shërbimi i emailit e ka pranuar mesazhin; nuk garanton mbërritjen në inbox. Mund të ketë vonesa.':'“Pending” includes notifications waiting for the next service run. “Sent” means the email service has accepted the message; it does not guarantee inbox delivery. Delays are possible.',

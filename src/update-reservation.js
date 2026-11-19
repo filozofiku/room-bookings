@@ -19,6 +19,7 @@ export async function applyReservationEdit(tx,db,id,before,data,user,students){
   const controls=await tx.get(doc(db,'settings','control'));
   const profile=await tx.get(doc(db,'users',user.uid));
   if(!profile.data()?.active || (before.ownerUid!==user.uid && !profile.data()?.canCancelAll))throw new BookingError('Nuk keni leje për ta ndryshuar këtë rezervim.');
+  if(profile.data()?.requiresApproval===true)throw new BookingError('Çdo rezervim dhe ndryshim nga kjo llogari kërkon miratim.');
   if(!profile.data()?.canCancelAll && needsReapproval(before,data))throw new BookingError('Ndryshimi i sallës, datës ose orës kërkon miratim.');
   if(!controls.data()?.bookingOpen)throw new BookingError('Rezervimet janë pezulluar.');
   const calendar=await tx.get(doc(db,'calendarDays',data.date));

@@ -21,6 +21,7 @@ auth.languageCode = getLanguage();
 provider.setCustomParameters({hl:getLanguage(),prompt:'select_account'});
 let currentUser = null;
 let canCancelAll = false;
+let requiresApproval = false;
 let reportsController=null;
 let authenticationGeneration=0;
 let staffAccessState='checking';
@@ -81,7 +82,7 @@ function prepareReservation(period) {
 }
 function renderConfirmation(data) {
   const dialog = $('reservation-dialog');
-  const requestOnly=!canCancelAll&&(editing?needsReapproval(editing.data,data):isSpecialRoom(data.roomId));
+  const requestOnly=requiresApproval||!canCancelAll&&(editing?needsReapproval(editing.data,data):isSpecialRoom(data.roomId));
   $('reservation-heading').textContent=editing?bt('Konfirmoni ndryshimet'):requestOnly?bt('Konfirmoni kërkesën për rezervim'):bt('Konfirmoni rezervimin');
   dialog.querySelector('[value=confirm]').textContent=editing?bt('Konfirmo ndryshimet'):requestOnly?bt('Dërgo kërkesën'):bt('Konfirmo rezervimin');
   const summary = $('reservation-summary');
@@ -96,7 +97,7 @@ function renderConfirmation(data) {
     [bt('Mënyra e zhvillimit'),data.mode==='online' ? bt('Online') : bt('Fizik')],
     [bt('Rezervuar nga'),data.creatorName]
   ];
-  if(requestOnly)fields.push([bt('Miratimi'),bt(editing?'Kërkesa për ndryshim u dërgua për miratim. Rezervimi ekzistues mbetet në fuqi.':'Kërkesa nuk rezervon sallën. Rezervimi dhe njoftimet publike bëhen vetëm pas miratimit.')]);
+  if(requestOnly)fields.push([bt('Miratimi'),bt(editing?'Kërkesa për ndryshim u dërgua për miratim. Rezervimi ekzistues mbetet në fuqi.':requiresApproval?'Kërkesa shfaqet në orar vetëm pas miratimit nga një përdorues me autorizim.':'Kërkesa nuk rezervon sallën. Rezervimi dhe njoftimet publike bëhen vetëm pas miratimit.')]);
   if(data.location)fields.push([bt('Lokacioni'),data.location]);
   if(data.onlineUrl)fields.push([bt('Linku i ngjarjes online'),data.onlineUrl]);
   if(data.studentEmails?.length)fields.push([bt('Studentë për njoftim'),data.studentEmails.join('; ')]);
@@ -233,9 +234,11 @@ async function startEditing(id,data) {
   $('booking-heading').scrollIntoView({behavior:'smooth'});
 }
 function updateRequestHint() {
-  const special=!canCancelAll&&(isSpecialRoom($('room').value)||isSpecialRoom(editing?.data.roomId));
+  const special=requiresApproval||!canCancelAll&&(isSpecialRoom($('room').value)||isSpecialRoom(editing?.data.roomId));
   $('request-hint').hidden=!special;
-  $('request-hint').textContent=editing
+  $('request-hint').textContent=requiresApproval
+    ? bt('Çdo rezervim dhe ndryshim nga kjo llogari kërkon miratim. Kërkesat, me ose pa sallë, shfaqen në orar vetëm pas miratimit. Deri atëherë, rezervimi ekzistues mbetet në fuqi.')
+    : editing
     ? bt('Vetëm ndryshimi i sallës, datës ose orës kërkon miratim. Të dhënat e tjera mund të ruhen menjëherë. Deri në miratim, rezervimi ekzistues mbetet në fuqi.')
     : bt('Kjo sallë kërkon miratim. Kërkesa nuk e zë sallën dhe nuk shfaqet në orarin publik deri në miratim.');
   $('booking-form').querySelector('button').textContent=editing?bt('Ruani ndryshimet'):special?bt('Dërgoni kërkesën për rezervim'):bt('Bëni rezervimin');
@@ -451,7 +454,7 @@ function renderReceipt(){
  if(!lastReceipt)return;
  const {id,data,requestOnly}=lastReceipt,receipt=$('booking-receipt');receipt.replaceChildren(statusBadge(requestOnly?'pending':'confirmed'));
  const summary=document.createElement('p');summary.style.whiteSpace='pre-wrap';summary.textContent=requestDetails(data);receipt.append(summary);
- const next=document.createElement('p');next.textContent=bt(requestOnly&&lastReceipt.editRequest?'Kërkesa për ndryshim u dërgua për miratim. Rezervimi ekzistues mbetet në fuqi.':requestOnly?'Kërkesa do të shqyrtohet nga një përdorues me autorizim. Salla ende nuk është rezervuar. Për vendimin do të njoftoheni me email; dërgimi mund të vonohet.':'Rezervimi shfaqet në orarin zyrtar. Mund ta redaktoni ose anuloni te “Rezervimet e mia”.');receipt.append(next);
+ const next=document.createElement('p');next.textContent=bt(requestOnly&&lastReceipt.editRequest?'Kërkesa për ndryshim u dërgua për miratim. Rezervimi ekzistues mbetet në fuqi.':requestOnly&&requiresApproval?'Kërkesa shfaqet në orar vetëm pas miratimit nga një përdorues me autorizim.':requestOnly?'Kërkesa do të shqyrtohet nga një përdorues me autorizim. Salla ende nuk është rezervuar. Për vendimin do të njoftoheni me email; dërgimi mund të vonohet.':'Rezervimi shfaqet në orarin zyrtar. Mund ta redaktoni ose anuloni te “Rezervimet e mia”.');receipt.append(next);
  if(!requestOnly)receipt.append(bookingCalendar(id,data));receipt.hidden=false;
 }
 async function createReservation(event) {
@@ -487,7 +490,7 @@ async function createReservation(event) {
   if(edit && Object.entries(data).every(([key,value])=>JSON.stringify(value)===JSON.stringify(edit.data[key] ?? (Array.isArray(value)?[]:typeof value==='boolean'?false:'')))) {
     return bookingMessage(bt('Nuk keni bërë ndryshime.'));
   }
-  const requestOnly=!canCancelAll&&(edit?needsReapproval(edit.data,data):isSpecialRoom(roomId));
+  const requestOnly=requiresApproval||!canCancelAll&&(edit?needsReapproval(edit.data,data):isSpecialRoom(roomId));
   const ownerUid=currentUser.uid;
   const reservationRef = doc(collection(db,'reservations'));
   const publicRef = doc(db,'publicBookings',reservationRef.id);
@@ -611,6 +614,8 @@ async function loadApp() {
   }
   setStaffAccess('authorized');
   canCancelAll = userSnap.data().canCancelAll === true;
+  requiresApproval = userSnap.data().requiresApproval === true;
+  if(userSnap.data().bookingName)currentUser={uid:user.uid,email:user.email,displayName:userSnap.data().bookingName};
   $('reports-link').hidden=!canCancelAll;
   if(reportsView){
     $('booking-help').closest('section').hidden=true;
@@ -666,7 +671,7 @@ async function loadApp() {
    $('management-scope').textContent=canCancelAll?bt('Shfaqen kërkesat dhe rezervimet e të gjithë përdoruesve.'):bt('Shfaqen vetëm kërkesat, njoftimet dhe rezervimet tuaja.');
   }
 
-  message(managementView?bt('Keni hyrë me sukses. Këtu mund të menaxhoni rezervimet dhe njoftimet tuaja.'):settings.bookingOpen ? bt('Keni hyrë me sukses. Mund të rezervoni një sallë.') : bt('Rezervimet janë pezulluar përkohësisht gjatë përditësimit të orarit.'));
+  message(managementView?bt('Keni hyrë me sukses. Këtu mund të menaxhoni rezervimet dhe njoftimet tuaja.'):requiresApproval?bt('Çdo rezervim dhe ndryshim nga kjo llogari kërkon miratim.'):settings.bookingOpen ? bt('Keni hyrë me sukses. Mund të rezervoni një sallë.') : bt('Rezervimet janë pezulluar përkohësisht gjatë përditësimit të orarit.'));
   openLinkedSection();
   applyBookingLink();
   await Promise.all([readAvailability(), readMyBookings(), readRequests()]);
@@ -783,6 +788,7 @@ onAuthStateChanged(auth,async user => {
   if(currentUser?.uid!==user?.uid){lastReceipt=null;confirmationData=null;decisionPreviewData=null;$('booking-receipt').hidden=true;}
   currentUser = user;
   canCancelAll = false;
+  requiresApproval = false;
   $('login').hidden = Boolean(user);
   $('logout').hidden = !user;
   $('identity').textContent = user?.email || '';

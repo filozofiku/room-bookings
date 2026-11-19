@@ -27,7 +27,7 @@ test('special rooms require private requests and atomic elevated decisions',asyn
  const create=async(db,id,data=base)=>{
   const batch=writeBatch(db),booking={...data,createdAt:serverTimestamp()}, {ownerUid,...published}=booking;
   batch.set(doc(db,'reservations',id),booking);batch.set(doc(db,'publicBookings',id),published);
-  batch.set(doc(db,'eventDays',date),{bookings:Object.fromEntries(slotKeys(booking).map(k=>[k,id])),changedReservationId:id});
+  if(slotKeys(booking).length)batch.set(doc(db,'eventDays',date),{bookings:Object.fromEntries(slotKeys(booking).map(k=>[k,id])),changedReservationId:id});
   return batch.commit();
  };
  const decide=async(db,id,outcome='approved',options={})=>{
@@ -39,7 +39,7 @@ test('special rooms require private requests and atomic elevated decisions',asyn
    const booking={...data,createdAt:serverTimestamp(),...options.booking},{ownerUid,...published}=booking;
    batch.set(doc(db,'reservations',id),booking);
    if(options.publish!==false)batch.set(doc(db,'publicBookings',id),published);
-   if(options.locks!==false)batch.set(doc(db,'eventDays',date),{bookings:Object.fromEntries(slotKeys(booking).map(k=>[k,id])),changedReservationId:id});
+   if(options.locks!==false && slotKeys(booking).length)batch.set(doc(db,'eventDays',date),{bookings:Object.fromEntries(slotKeys(booking).map(k=>[k,id])),changedReservationId:id});
   }
   return batch.commit();
  };
@@ -125,5 +125,23 @@ test('special rooms require private requests and atomic elevated decisions',asyn
   for(const mail of requestMails){assert.equal(mail.to,'arsim.sinani@uni-pr.edu');assert.doesNotMatch(mail.text,/Kërkuesi: Owner/);assert.match(mail.text,/Kërkesat për miratim/);assert.match(mail.messageId,/^<request-submitted-/);}
 
 
+  // Request-only accounts cannot publish even ordinary-room or roomless events.
+  await seed('users/owner',{active:true,role:'teacher',requiresApproval:true,canCancelAll:false,bookingName:'Këshilli Studentor'});
+  await assertFails(setDoc(doc(owner,'users/owner'),{requiresApproval:false},{merge:true}));
+  for(const roomId of ['normal','',rooms[0]]){
+   await seed(`eventDays/${date}`,{bookings:{},changedReservationId:'reset'});
+   const booking={...base,roomId,creatorName:'Këshilli Studentor'},id='restricted-'+(roomId||'roomless');
+   await assertFails(create(owner,id,booking));
+   await assertFails(submit(id,{...booking,creatorName:'Owner'}));
+   await assertSucceeds(submit(id,booking));
+   assert.equal((await getDoc(doc(env.unauthenticatedContext().firestore(),'publicBookings',id))).exists(),false);
+   await assertFails(decide(owner,id));
+   await assertSucceeds(decide(manager,id));
+   const published=(await getDoc(doc(env.unauthenticatedContext().firestore(),'publicBookings',id))).data();
+   assert.equal(published.creatorName,'Këshilli Studentor');assert.equal(published.roomId,roomId);
+  }
+  await assertSucceeds(submit('restricted-reject',{...base,roomId:'',creatorName:'Këshilli Studentor'}));
+  await assertSucceeds(decide(manager,'restricted-reject','rejected'));
+  assert.equal((await getDoc(doc(env.unauthenticatedContext().firestore(),'publicBookings','restricted-reject'))).exists(),false);
  }finally{await env.cleanup();}
 });

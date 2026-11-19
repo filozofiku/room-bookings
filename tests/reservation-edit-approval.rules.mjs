@@ -80,5 +80,17 @@ test('special-room metadata and student edits publish immediately; schedule prop
   await assertFails(decide('outdated'));await assertSucceeds(decide('outdated','rejected'));
   await assertSucceeds(submit('conflict',{periodIds:['p3']}));await seed('eventDays/'+date,{bookings:{[rooms[1]+'__p2']:'event',[rooms[1]+'__p3']:'someone'},changedReservationId:'someone'});
   await assertFails(decide('conflict'));assert.deepEqual((await current()).periodIds,['p2']);
+  // Every edit by a request-only account needs approval, including metadata.
+  await seed('users/owner',{active:true,role:'teacher',requiresApproval:true,canCancelAll:false});
+  await seed('eventDays/'+date,{bookings:Object.fromEntries(slotKeys(await current()).map(k=>[k,'event'])),changedReservationId:'event'});
+  for(const roomId of ['normal','']){
+   await assertSucceeds(edit({roomId},manager));
+   const before=await current();
+   await assertFails(edit({title:'Bypass approval'}));
+   await assertSucceeds(submit('restricted-edit-'+(roomId||'roomless'),{title:'Council proposal'}));
+   assert.deepEqual(await current(),before);
+   await assertSucceeds(decide('restricted-edit-'+(roomId||'roomless')));
+   assert.equal((await current()).title,'Council proposal');
+  }
  }finally{await env.cleanup();}
 });

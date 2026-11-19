@@ -31,4 +31,4 @@ export function publicDescriptionError(title, description) {
 export const SPECIAL_ROOMS=['r_9c3ca97a27ce','r_a8ae63f60a13'];
 export const isSpecialRoom=id=>SPECIAL_ROOMS.includes(id);
 export const scheduleChanged=(before,after)=>before.date!==after.date || before.roomId!==after.roomId || JSON.stringify(before.periodIds)!==JSON.stringify(after.periodIds);
-export const needsReapproval=(before,after)=> (isSpecialRoom(before.roomId)||isSpecialRoom(after.roomId)) && scheduleChanged(before,after);
+export const needsReapproval=(before,after,requiresApproval=false)=> requiresApproval || (isSpecialRoom(before.roomId)||isSpecialRoom(after.roomId)) && scheduleChanged(before,after);

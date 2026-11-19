@@ -48,8 +48,8 @@ export async function decideReservationRequest(db,id,outcome,reason,user){
    const booking={...data,createdAt:serverTimestamp()}, {ownerUid,studentEmails,...published}=booking;
    tx.set(doc(db,'reservations',id),booking);tx.set(doc(db,'publicBookings',id),published);
    recordActivity(tx,db,'created',id,booking,user,{method:'approved'});
-   slotKeys(data).forEach(key=>locks[key]=id);
-   tx.set(occupancyRef,{bookings:locks,changedReservationId:id});
+   const keys=slotKeys(data);keys.forEach(key=>locks[key]=id);
+   if(keys.length)tx.set(occupancyRef,{bookings:locks,changedReservationId:id});
   }
   tx.set(doc(db,'requestDecisions',id),{booking:data,outcome,reason,status:'pending',decidedBy:user.uid,deciderName:user.displayName||'Mësimdhënës',createdAt:serverTimestamp()});
   recordActivity(tx,db,outcome==='approved'?'approved':'declined',id,data,user,{requestedAt:data.createdAt});
@@ -72,7 +72,7 @@ export async function submitReservationEditRequest(db,id,expectedRevision,data,u
   if((before.revision||0)!==expectedRevision)throw new BookingError('Rezervimi është ndryshuar ndërkohë. Hapeni përsëri për redaktim.');
   if(!control.data()?.bookingOpen)throw new BookingError('Rezervimet janë pezulluar.');
   if(!day.data()?.bookingAllowed)throw new BookingError('Rezervimet janë të mbyllura për këtë datë.');
-  if(!needsReapproval(before,data))throw new BookingError('Ky ndryshim nuk kërkon miratim. Ruani ndryshimet drejtpërdrejt.');
+  if(!needsReapproval(before,data,profile.data()?.requiresApproval===true))throw new BookingError('Ky ndryshim nuk kërkon miratim. Ruani ndryshimet drejtpërdrejt.');
   const occupied=await tx.get(doc(db,'eventDays',data.date));
   const weekly=day.data().fetActive?await tx.get(doc(db,'weeklyResources',String(day.data().weekday))):null;
   const locks=Object.fromEntries(Object.entries(occupied.data()?.bookings||{}).filter(([,value])=>value!==id));
