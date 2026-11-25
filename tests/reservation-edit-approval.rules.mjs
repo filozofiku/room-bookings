@@ -93,5 +93,15 @@ test('special-room metadata and student edits publish immediately; schedule prop
    await assertSucceeds(decide('restricted-edit-'+(roomId||'roomless')));
    assert.equal((await current()).title,'Council proposal');
   }
+  // Restricted replacement edits carry the chosen database course, missed date
+  // and private student recipients all the way through approval.
+  await seed('weeklyRooms/1__course-room',{activities:{p1:{subject:'Replacement course'}}});
+  const replacement={eventType:'Zëvendësim i mësimit',title:'Replacement course',titleEn:'',description:'',descriptionEn:'',isPublic:false,groupIds:['g'],teacherIds:['t'],studentEmails:['new@student.uni-pr.edu'],replacementDate:date,courseSource:{weeklyRoomId:'1__course-room',periodId:'p1'}};
+  for(const invalid of [{replacementDate:''},{courseSource:{}},{title:'Invented course'},{isPublic:true,description:Array(100).fill('word').join(' ')}])await assertFails(submit('invalid-replacement',{...replacement,...invalid}));
+  await assertSucceeds(submit('replacement-edit',replacement));
+  await assertSucceeds(decide('replacement-edit'));
+  assert.equal((await current()).replacementDate,date);
+  assert.equal((await current()).title,'Replacement course');
+  assert.equal((await getDoc(doc(anon,'publicBookings/event'))).data().courseSource.periodId,'p1');
  }finally{await env.cleanup();}
 });

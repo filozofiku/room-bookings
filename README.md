@@ -7,6 +7,17 @@ for immutable audit logging, private traffic synchronization and historical cove
 
 ## Rezervime me grupe dhe mësimdhënës (resources-v2)
 
+“Zëvendësim i mësimit” dhe “Kolokium” lejohen vetëm si “Jo publik”. Për
+zëvendësimin kërkohet edhe `replacementDate`: data e mësimit të pambajtur ose
+që nuk do të mbahet, brenda semestrit të konfiguruar. Titulli i lirë dhe
+përkthimi i tij fshihen; përdoruesi zgjedh një lëndë nga `weeklyRooms.activities`.
+Lista bashkon lëndët e njëjta dhe filtrohet sipas grupeve të përzgjedhura.
+Importet CSV ruajnë anëtarësinë e saktë `groupIds`; për importet më të vjetra
+përdoren emrat e grupeve. `courseSource` tregon dokumentin dhe periudhën e
+lëndës në orarin e importuar; Firebase kontrollon që titulli përputhet me atë
+lëndë. Rezervimet e vjetra mund të anulohen; kur redaktohen, duhet të plotësojnë
+kërkesat e reja. Ndryshimi kërkon publikimin e aplikacionit dhe të `firestore.rules`.
+
 Formulari mbështet katër llojet e aktivitetit, asnjë ose disa grupe/mësimdhënës,
 sallë opsionale dhe zhvillim fizik ose online. “Publik” aktivizon njoftimin me email për listën e konfiguruar: 24 orë para
 fillimit, ose në ekzekutimin e parë nëse rezervimi bëhet brenda këtij afati.

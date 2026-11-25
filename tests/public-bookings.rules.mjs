@@ -46,7 +46,16 @@ test('resource reservations: atomic publication, optional resources, conflicts, 
   await seed('resourceCatalog/current',{rooms:{[roomId]:'Salla 014'},groups,teachers});
   await seed(`calendarDays/${date}`,{weekday:'5',bookingAllowed:true,fetActive:true});
   await seed('weeklyResources/5',{busyKeys:[]});
-  await assertSucceeds(create('makeup',{eventType:'Zëvendësim i mësimit',groupIds:base.groupIds.slice(0,1),teacherIds:base.teacherIds.slice(0,1)}));
+  for(const missing of [{groupIds:[]},{teacherIds:[]},{groupIds:[],teacherIds:[]}]) {
+   await assertFails(create('makeup-missing',{eventType:'Zëvendësim i mësimit',...missing}));
+  }
+  const makeup={eventType:'Zëvendësim i mësimit',title:'Course',replacementDate:'2026-10-22',courseSource:{weeklyRoomId:'1__course-room',periodId:'p01'},groupIds:base.groupIds.slice(0,1),teacherIds:base.teacherIds.slice(0,1)};
+  await seed('weeklyRooms/1__course-room',{activities:{p01:{subject:'Course'}}});
+  await seed('calendarDays/2026-10-22',{weekday:'4',bookingAllowed:true,fetActive:true});
+  for(const invalid of [{replacementDate:''},{replacementDate:'2026-02-30'},{replacementDate:'2025-10-22'},{courseSource:{}},{courseSource:{weeklyRoomId:'1__missing',periodId:'p01'}},{title:'Invented course'},{titleEn:'Invented English title'},{isPublic:true,description:Array(100).fill('word').join(' ')}])await assertFails(create('makeup-invalid',{...makeup,...invalid}));
+  await assertFails(create('public-colloquium',{eventType:'Kolokium',isPublic:true,description:Array(100).fill('word').join(' ')}));
+  await assertSucceeds(create('private-colloquium',{eventType:'Kolokium'}));await assertSucceeds(cancel('private-colloquium'));
+  await assertSucceeds(create('makeup',makeup));
   await assertSucceeds(cancel('makeup'));
   for(const translation of [{titleEn:123},{titleEn:'x'.repeat(121)},{descriptionEn:[]},{descriptionEn:'word'},{descriptionEn:Array(501).fill('word').join(' ')}])await assertFails(create('bad-translation',translation));
   await assertSucceeds(create('english-title',{titleEn:'English title'}));

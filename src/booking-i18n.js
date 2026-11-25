@@ -2,6 +2,17 @@ import {EN,t,getLanguage,locale,roomLabel,initLanguage} from '../public-schedule
 import {englishTimetableLabel} from '../public-schedule/timetable-en.js';
 export {getLanguage,locale,initLanguage};
 export const BOOKING_EN={
+ 'Lënda':'Course',
+ 'Zgjidhni lëndën':'Select a course',
+ 'Zgjidhni lëndën nga lista.':'Select a course from the list.',
+ 'Data e mësimit që zëvendësohet':'Date of the class being replaced',
+ 'Zgjidhni datën kur nuk e keni mbajtur ose nuk do ta mbani mësimin sipas orarit të rregullt.':'Select the date when you did not or will not teach the regularly scheduled class.',
+ 'Zgjidhni datën e mësimit që zëvendësohet brenda semestrit.':'Select the date of the class being replaced within the semester.',
+ 'Zëvendësimi i mësimit dhe kolokiumi nuk përfshihen në njoftimet publike.':'Make-up classes and colloquia cannot be included in public notifications.',
+ 'Nuk ka lëndë në orarin e importuar. Kontaktoni administratorin.':'There are no courses in the imported timetable. Contact the administrator.',
+ 'Nuk ka lëndë për grupet e përzgjedhura.':'There are no courses for the selected groups.',
+ 'Lëndët janë filtruar sipas grupeve të përzgjedhura.':'Courses are filtered by the selected groups.',
+ 'Zgjidhni grupin e studentëve për të filtruar lëndët.':'Select a student group to filter courses.',
  'Shto versionin në anglisht (opsionale)':'Add English version (optional)',
  'Teksti kryesor është në shqip. Nëse versioni në anglisht lihet bosh, shfaqet teksti në shqip.':'The main text is in Albanian. If an English field is left blank, the Albanian text is shown.',
  'Titulli në anglisht (opsional)':'Title in English (optional)',
@@ -41,6 +52,8 @@ export const BOOKING_EN={
 'Te “Rezervimet e mia”, rezervimet e sotme dhe të ardhshme janë në listën kryesore; të mëparshmet te “Rezervimet e kaluara”.':'Under “My reservations”, today’s and future reservations appear in the main list; older ones are under “Past reservations”.',
 'Disponueshmëria e sallës':'Room availability','Rezervoni një aktivitet':'Reserve an event','Hiqni dorë nga redaktimi':'Stop editing','Lloji i aktivitetit':'Event type','Titulli':'Title','Miratimi':'Approval','Lokacioni':'Location','Shkruani lokacionin e aktivitetit':'Enter the event location','Ora e fillimit':'Start time','Ora e përfundimit':'End time',
 'Mund të zgjidhni një ose më shumë grupe. Pa përzgjedhje: pa grup të studentëve.':'You can select one or more groups. No selection means no student group.',
+'Për zëvendësim të mësimit, zgjidhni të paktën një grup të studentëve.':'For a make-up class, select at least one student group.',
+'Për zëvendësim të mësimit, zgjidhni të paktën një mësimdhënës.':'For a make-up class, select at least one teacher.',
 'Kërko grupin e studentëve':'Search student groups','Shkruani emrin e grupit':'Enter a group name',
 'Mund të zgjidhni një ose më shumë mësimdhënës. Pa përzgjedhje: pa mësimdhënës.':'You can select one or more teachers. No selection means no teacher.',
 'Kërko mësimdhënësin':'Search teachers','Shkruani emrin e mësimdhënësit':'Enter a teacher’s name',

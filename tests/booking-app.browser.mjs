@@ -22,6 +22,7 @@ const store=new Map([
 ['calendarDays/'+date,{weekday:'5',bookingAllowed:true,fetActive:true}],
 ['resourceCatalog/current',{groups:{g_one:'Grupi 1',g_two:'Grupi 2'},teachers:{t_one:'Mësimdhënësi 1',t_two:'Mësimdhënësi 2'}}],
 ['weeklyResources/5',{busyKeys:[room+'__p18']}],
+['weeklyRooms/1__'+room,{weekday:'1',roomId:room,activities:{p01:{subject:'Seminar',studentSets:'Grupi 1+Grupi 2'},p02:{subject:'Rezervimi i ndryshuar',groupIds:['g_one','g_two']},p03:{subject:'Vetëm grupi 2',groupIds:['g_two']}}}],
 ['eventDays/'+date,{bookings:{[room+'__p17']:'existing'},changedReservationId:'existing'}],
 ['reservations/existing',{date,roomId:room,periodIds:['p17'],title:'Mbledhje',ownerUid:'teacher'}],
 ...periods.map(p=>['periods/'+p.id,p])]);
@@ -56,7 +57,7 @@ else if(path==='/auth.js')body=authModule;
 else if(path==='/firestore.js')body=firestoreModule;
 else if(path==='/src/firebase.js')body='export const auth={};export const db={};';
 else if(['/src/main.js','/src/activity-events.js','/src/update-reservation.js','/src/reservation-requests.js','/src/email-delivery.js'].includes(path))body=readFileSync(path.slice(1),'utf8').replaceAll("'firebase/auth'","'/auth.js'").replaceAll("'firebase/firestore'","'/firestore.js'");
-else if(['/src/public-event-week.js','/src/booking-ui.js','/src/booking-resources.js','/src/calendar-export.js','/src/student-emails.js','/src/booking-i18n.js','/public-schedule/date-picker.js','/public-schedule/dates.js','/public-schedule/booking-model.js','/public-schedule/i18n.js','/public-schedule/timetable-en.js','/public-schedule/staff-navigation.js'].includes(path))body=readFileSync(path.slice(1),'utf8');
+else if(['/src/replacement-courses.js','/src/public-event-week.js','/src/booking-ui.js','/src/booking-resources.js','/src/calendar-export.js','/src/student-emails.js','/src/booking-i18n.js','/public-schedule/date-picker.js','/public-schedule/dates.js','/public-schedule/booking-model.js','/public-schedule/i18n.js','/public-schedule/timetable-en.js','/public-schedule/staff-navigation.js'].includes(path))body=readFileSync(path.slice(1),'utf8');
 else return route.abort();
 return route.fulfill({contentType,body});
 });
@@ -124,19 +125,48 @@ assert.equal(await page.locator('#through').inputValue(),'p18');
 assert.match(await page.locator('#selection-hint').textContent(),/12:30/);
 await page.selectOption('#from','p01');
 assert.equal(await page.locator('#selection-hint').textContent(),'');
-await page.fill('#title','Seminar');await page.selectOption('#through','p17');
+assert.equal(await page.locator('#title').isVisible(),false);
+assert.equal(await page.locator('#title-en').isEnabled(),false);
+assert.equal(await page.locator('#replacement-course').isVisible(),true);
+assert.equal(await page.locator('#visibility option[value="public"]').isDisabled(),true);
+await page.selectOption('#replacement-course','Seminar');await page.selectOption('#through','p17');
 await submitBooking();
 assert.match(await page.locator('#booking-message').textContent(),/më shumë se 16 periudha/);
 assert.equal(await page.locator('#booking-message').isVisible(),true);
 assert.equal(await page.getByText('Zgjidhni 1–16 periudha të njëpasnjëshme (deri në 4 orë).',{exact:false}).count(),0);
 await page.selectOption('#through','p16');
+// Make-up classes require both participant types before confirmation or writes.
+assert.match(await page.locator('#groups-hint').textContent(),/të paktën një grup/);
+assert.match(await page.locator('#teachers-hint').textContent(),/të paktën një mësimdhënës/);
+await submitBooking();
+assert.match(await page.locator('#booking-message').textContent(),/të paktën një grup/);
+assert.match(await page.locator('#booking-message').textContent(),/të paktën një mësimdhënës/);
+assert.equal(await page.locator('#reservation-dialog').isVisible(),false);
+assert.equal(await page.evaluate(()=>window.testStore.has('reservations/new')),false);
+assert.match(await page.locator('#booking-message').textContent(),/datën e mësimit që zëvendësohet/);
+await page.fill('#replacement-date','2026-10-23');
+await page.locator('#groups input').first().check();
+assert.equal(await page.locator('#replacement-course option[value="Vetëm grupi 2"]').count(),0);
+await page.selectOption('#replacement-course','');
+await submitBooking();assert.match(await page.locator('#booking-message').textContent(),/Zgjidhni lëndën/);
+await page.selectOption('#replacement-course','Seminar');
+await submitBooking();
+assert.equal(await page.locator('#booking-message').textContent(),'Për zëvendësim të mësimit, zgjidhni të paktën një mësimdhënës.');
+await page.locator('#groups input').first().uncheck();
+await page.locator('#teachers input').first().check();
+await page.selectOption('#languagePicker','en');
+assert.equal(await page.locator('#groups-hint').textContent(),'For a make-up class, select at least one student group.');
+await submitBooking();
+assert.equal(await page.locator('#booking-message').textContent(),'For a make-up class, select at least one student group.');
+await page.selectOption('#languagePicker','sq');
+await page.locator('#groups input').first().check();
 await page.getByRole('button',{name:'Bëni rezervimin',exact:true}).click();
 assert.match(await page.locator('#reservation-summary').textContent(),/Seminar/);
 assert.match(await page.locator('#reservation-summary').textContent(),/08:00–12:00/);
 assert.match(await page.locator('#reservation-summary').textContent(),/Salla 014/);
 assert.equal(await page.evaluate(()=>window.testStore.has('reservations/new')),false);
 await page.locator('#reservation-dialog button[value="back"]').click();
-assert.equal(await page.locator('#title').inputValue(),'Seminar');
+assert.equal(await page.locator('#replacement-course').inputValue(),'Seminar');
 assert.equal(await page.evaluate(()=>window.testStore.has('reservations/new')),false);
 await page.locator('#booking-form button').click();await page.keyboard.press('Escape');
 assert.equal(await page.evaluate(()=>window.testStore.has('reservations/new')),false);
@@ -144,17 +174,55 @@ await submitBooking();
 await page.waitForFunction(()=>document.getElementById('message').textContent.includes('u krijua me sukses'));
 await page.waitForFunction(()=>document.getElementById('my-reservations').textContent.includes('08:00–12:00'));
 assert.equal(await page.evaluate(()=>window.testStore.get('reservations/new').periodIds.length),16);
+assert.equal(await page.evaluate(()=>window.testStore.get('reservations/new').replacementDate),'2026-10-23');
+assert.match(await page.locator('#booking-receipt').textContent(),/Data e mësimit që zëvendësohet/);
 await page.locator('#my-reservations .slot').filter({hasText:'Seminar'}).getByRole('button',{name:'Anuloni',exact:true}).click();
 await page.locator('#cancel-dialog button[value="cancel"]').click();
 await page.waitForFunction(()=>document.getElementById('message').textContent.includes('u anulua'));
 assert.equal(await page.evaluate(()=>window.testStore.has('reservations/new')),false);
 // Optional resources, metadata, and exact conflict messages.
+for(const kind of ['groups','teachers'])await page.locator(`#${kind} input`).first().uncheck();
 assert.deepEqual(await page.locator('#event-type option').allTextContents(),['Zëvendësim i mësimit','Konferencë','Panel','Mbrojtje publike','Mbledhje','Tryezë','Diskutim','Punëtori','Ligjëratë e ftuar','Ceremoni','Kolokium','Ekspozitë']);
 await page.selectOption('#room','');
-await page.fill('#title','Ngjarje online');await page.selectOption('#through','p02');
 await page.selectOption('#event-type','Konferencë');
+await page.fill('#title','Ngjarje online');await page.selectOption('#through','p02');
+assert.match(await page.locator('#groups-hint').textContent(),/Pa përzgjedhje/);
+assert.match(await page.locator('#teachers-hint').textContent(),/Pa përzgjedhje/);
+await page.selectOption('#visibility','public');
+await page.selectOption('#event-type','Kolokium');
+assert.equal(await page.locator('#visibility').inputValue(),'private');
+assert.equal(await page.locator('#visibility option[value="public"]').isDisabled(),true);
+assert.equal(await page.locator('#description-field').isVisible(),false);
+await page.selectOption('#event-type','Konferencë');
+assert.equal(await page.locator('#visibility option[value="public"]').isEnabled(),true);
 await page.selectOption('#visibility','public');assert.equal(await page.locator('#email-notice').isVisible(),true);
 assert.equal(await page.locator('#description-field').isVisible(),true);
+assert.equal(await page.locator('#description').getAttribute('minlength'),null);
+assert.equal(await page.locator('#description').getAttribute('required'),'');
+for(const description of ['', 'a'.repeat(99), ' '.repeat(100), ' '+ 'a'.repeat(99)+' ']) {
+ await page.fill('#description',description);await submitBooking();
+ assert.match(await page.locator('#booking-message').textContent(),/të paktën 100 fjalë/);
+ assert.equal(await page.locator('#reservation-dialog').isVisible(),false);
+ assert.equal(await page.evaluate(()=>window.testStore.has('reservations/new')),false);
+}
+const longTitle=Array(20).fill('Panel').join(' ');
+await page.fill('#title',longTitle);
+for(const description of [longTitle, ' '+longTitle.toUpperCase().replaceAll(' ','\n\t')+' ']) {
+ await page.fill('#description',description);await submitBooking();
+ assert.match(await page.locator('#booking-message').textContent(),/kopje e titullit/);
+ assert.equal(await page.locator('#reservation-dialog').isVisible(),false);
+}
+await page.fill('#title','Ngjarje online');
+await page.selectOption('#languagePicker','en');
+await page.fill('#description','a'.repeat(99));await submitBooking();
+assert.equal(await page.locator('#booking-message').textContent(),'The public event description must contain at least 100 words.');
+assert.match(await page.locator('label[for="description"]').textContent(),/100–500 words/);
+await page.fill('#description',Array(100).fill('fjalë').join(' '));
+assert.equal(await page.locator('#description-count').textContent(),'100 / 100–500 words');
+await page.locator('#booking-form button').click();
+assert.equal(await page.locator('#reservation-dialog').isVisible(),true);
+await page.locator('#reservation-dialog button[value="back"]').click();
+await page.selectOption('#languagePicker','sq');
 await page.fill('#description',Array(501).fill('fjalë').join(' '));
 await submitBooking();
 assert.match(await page.locator('#booking-message').textContent(),/500 fjalë/);
@@ -185,6 +253,7 @@ await page.waitForFunction(()=>!window.testStore.has('reservations/new'));
 await page.selectOption('#mode','physical');assert.equal(await page.locator('#online-field').isVisible(),false);
 await page.selectOption('#visibility','private');assert.equal(await page.locator('#email-notice').isVisible(),false);
 assert.equal(await page.locator('#description-field').isVisible(),false);
+assert.equal(await page.locator('#description').getAttribute('required'),null);
 await page.fill('#title','Panel');
 for(const [selector,key,error] of [['#groups input[value="g_one"]','g_one','Grupi i studentëve'],['#teachers input[value="t_one"]','t_one','Mësimdhënësi']]) {
  await page.locator(selector).check();
@@ -224,6 +293,14 @@ await page.locator('#my-reservations .slot').filter({hasText:original.title}).ge
 assert.equal(await page.locator('#title').inputValue(),original.title);
 await submitBooking();assert.match(await page.locator('#booking-message').textContent(),/Nuk keni bërë ndryshime/);
 await page.fill('#title','Rezervimi i ndryshuar');
+await page.selectOption('#event-type','Zëvendësim i mësimit');
+for(const kind of ['groups','teachers'])for(const input of await page.locator(`#${kind} input`).all())await input.uncheck();
+await submitBooking();
+assert.match(await page.locator('#booking-message').textContent(),/të paktën një grup/);
+assert.match(await page.locator('#booking-message').textContent(),/të paktën një mësimdhënës/);
+assert.equal(await page.evaluate(()=>window.testStore.get('reservations/new').title),original.title);
+for(const kind of ['groups','teachers'])for(const input of await page.locator(`#${kind} input`).all())await input.check();
+await page.selectOption('#replacement-course','Rezervimi i ndryshuar');await page.fill('#replacement-date','2026-10-23');
 await submitBooking();
 assert.equal(await page.evaluate(()=>window.testStore.get('reservations/new').title),'Rezervimi i ndryshuar');
 assert.equal(await page.evaluate(()=>window.testStore.get('reservations/new').ownerUid),'teacher');
@@ -241,7 +318,7 @@ assert.deepEqual(await page.evaluate(()=>window.testStore.get('reservations/new'
 await page.locator('#stop-editing').click();
 await page.locator('#my-reservations .slot').filter({hasText:'Rezervimi i ndryshuar'}).getByRole('button',{name:'Redaktoni',exact:true}).click();
 await page.evaluate(()=>{const b=window.testStore.get('reservations/new');window.testStore.set('reservations/new',{...b,revision:3})});
-await page.fill('#title','Stale edit');await submitBooking();
+await page.selectOption('#replacement-course','Seminar');await submitBooking();
 assert.match(await page.locator('#booking-message').textContent(),/ndryshuar ndërkohë/);
 await page.locator('#stop-editing').click();
 await page.evaluate(async()=>{
@@ -258,7 +335,9 @@ await page.evaluate(async()=>{
 assert.equal(await page.locator('#reservations-heading').textContent(),'Të gjitha rezervimet');
 await page.locator('#my-reservations .slot').filter({hasText:'Rezervimi i ndryshuar'}).getByRole('button',{name:'Redaktoni',exact:true}).click();
 assert.match(await page.locator('#edit-notice').textContent(),/njoftohet me email/);
-await page.fill('#title','Ndryshuar nga administratori');await submitBooking();
+await page.selectOption('#event-type','Panel');await page.fill('#title','Ndryshuar nga administratori');await submitBooking();
+assert.equal(await page.evaluate(()=>window.testStore.get('reservations/new').replacementDate),undefined);
+assert.equal(await page.evaluate(()=>window.testStore.get('reservations/new').courseSource),undefined);
 assert.equal(await page.evaluate(()=>window.testStore.get('reservations/new').ownerUid),'teacher');
 assert.equal(await page.evaluate(()=>window.testStore.get('reservations/new').creatorName),'Mësimdhënës');
 assert.equal(await page.evaluate(()=>window.testStore.get('modificationNotifications/new__4').booking.title),'Ndryshuar nga administratori');
@@ -285,6 +364,7 @@ await page.evaluate(async()=>{
  await window.testAuth({uid:'teacher',displayName:'Mësimdhënës',email:'test@example.test'});
 });
 await page.selectOption('#room','r_a8ae63f60a13');
+await page.selectOption('#event-type','Panel');
 await page.fill('#title','Kërkesa për sallën 127');
 await page.selectOption('#from','p01');await page.selectOption('#through','p02');
 for(const kind of ['groups','teachers'])for(const input of await page.locator(`#${kind} input`).all())await input.uncheck();
@@ -492,18 +572,18 @@ assert.equal(await page.locator('#booking-form button').textContent(),'Create re
 assert.equal(await page.locator('#room option:checked').textContent(),'Room 014');
 if(process.env.FET_BOOKING_LANGUAGE_SCREENSHOTS)await page.screenshot({path:'/tmp/fet-booking-language-desktop.png'});
 assert.match(await page.locator('#groups').textContent(),/Group 1/);
-await page.locator('#title').fill('Mbledhje');
 await page.selectOption('#event-type','Mbledhje');
+await page.locator('#title').fill('Mbledhje');
 assert.equal(await page.locator('#event-type option:checked').textContent(),'Meeting');
 await page.selectOption('#visibility','public');
-const descriptionForPublic='Përshkrimi origjinal '+Array(98).fill('hollësi').join(' ');
-await page.locator('#description').fill(descriptionForPublic);
+const originalDescription='Përshkrimi origjinal '+Array(98).fill('hollësi').join(' ');
+await page.locator('#description').fill(originalDescription);
 await page.locator('#student-emails').fill('a@student.uni-pr.edu');
 await page.locator('#groups input').first().check();
 await page.selectOption('#through','p02');
 await page.selectOption('#languagePicker','sq');
 assert.equal(await page.locator('#title').inputValue(),'Mbledhje');
-assert.equal(await page.locator('#description').inputValue(),descriptionForPublic);
+assert.equal(await page.locator('#description').inputValue(),originalDescription);
 assert.equal(await page.locator('#groups input').first().isChecked(),true);
 await page.selectOption('#languagePicker','en');
 await page.locator('#booking-form button').click();
@@ -519,7 +599,7 @@ await page.waitForFunction(()=>!document.querySelector('#booking-form button').d
 assert.match(await page.locator('#booking-message').textContent(),/Reservation created successfully/);
 const savedBooking=await page.evaluate(()=>window.testStore.get('reservations/new'));
 assert.equal(savedBooking.eventType,'Mbledhje');assert.equal(savedBooking.title,'Mbledhje');
-assert.equal(savedBooking.creatorName,'Mësimdhënës');assert.equal(savedBooking.description,descriptionForPublic);
+assert.equal(savedBooking.creatorName,'Mësimdhënës');assert.equal(savedBooking.description,originalDescription);
 assert.deepEqual(savedBooking.groupIds,['g_one']);
 assert.deepEqual(await page.evaluate(()=>window.testStore.get('studentNotifications/new').recipients),['a@student.uni-pr.edu']);
 await page.selectOption('#languagePicker','sq');
@@ -542,6 +622,7 @@ for(const id of ['requests-section','email-delivery-section','reservations-secti
 }
 if(process.env.FET_BOOKING_LANGUAGE_SCREENSHOTS)await page.screenshot({path:'/tmp/fet-management-language-desktop.png'});
 await page.locator('#my-reservations').getByRole('button',{name:'Edit',exact:true}).first().click();
+await page.selectOption('#event-type','Panel');
 await page.locator('#title').fill('Tekst i ruajtur gjatë ndërrimit');
 await page.selectOption('#languagePicker','sq');
 assert.equal(await page.locator('#title').inputValue(),'Tekst i ruajtur gjatë ndërrimit');

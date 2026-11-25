@@ -48,6 +48,37 @@ test('special rooms require private requests and atomic elevated decisions',asyn
   await seed('settings/control',{bookingOpen:true,slotStorage:'resources-v2',startDate:'2026-09-01',endDate:'2026-12-31',periodOrder:Object.fromEntries(periods.map((p,i)=>[p.id,i])),validPeriodRanges:validPeriodRanges(periods)});
   await seed('resourceCatalog/current',{rooms:{[rooms[0]]:'Salla 102',[rooms[1]]:'Salla 127',normal:'Salla 014'},groups,teachers});
   await seed(`calendarDays/${date}`,{weekday:'3',bookingAllowed:true,fetActive:true});await seed('weeklyResources/3',{busyKeys:[]});
+  for(const selected of [{groupIds:[],teacherIds:[]},{groupIds:['g_0'],teacherIds:[]},{groupIds:[],teacherIds:['t_0']}]) {
+   await assertFails(submit('makeup-missing',{...base,eventType:'Zëvendësim i mësimit',...selected}));
+  }
+  await seed('weeklyRooms/1__course-room',{activities:{p01:{subject:'Course'}}});
+  const makeup={...base,eventType:'Zëvendësim i mësimit',title:'Course',replacementDate:date,courseSource:{weeklyRoomId:'1__course-room',periodId:'p01'},groupIds:['g_0'],teacherIds:['t_0']};
+  for(const invalid of [{replacementDate:''},{courseSource:{}},{title:'Invented course'},{isPublic:true,description:Array(100).fill('word').join(' ')}])await assertFails(submit('makeup-invalid',{...makeup,...invalid}));
+  await assertFails(submit('public-colloquium',{...base,eventType:'Kolokium',isPublic:true,description:Array(100).fill('word').join(' ')}));
+  await assertSucceeds(submit('makeup',makeup));
+  await assertSucceeds(decide(manager,'makeup','approved'));
+  assert.equal((await getDoc(doc(manager,'reservations/makeup'))).data().replacementDate,date);
+  assert.equal((await getDoc(doc(manager,'publicBookings/makeup'))).data().courseSource.weeklyRoomId,'1__course-room');
+  await env.withSecurityRulesDisabled(async ctx=>{
+   await deleteDoc(doc(ctx.firestore(),'reservations/makeup'));await deleteDoc(doc(ctx.firestore(),'publicBookings/makeup'));await deleteDoc(doc(ctx.firestore(),'eventDays',date));
+  });
+  // Public requests obey the same description requirements as direct reservations.
+  for(const description of ['', Array(99).fill('word').join(' '), 'a'.repeat(99), ' '.repeat(100)]) {
+   await assertFails(submit('public-invalid',{...base,isPublic:true,description}));
+  }
+  const longTitle=Array(20).fill('Panel').join(' ');
+  await assertFails(submit('public-invalid',{...base,isPublic:true,title:longTitle,description:longTitle.toUpperCase()}));
+  await assertFails(submit('invalid-english-title',{...base,titleEn:123}));
+  await assertFails(submit('invalid-english-description',{...base,descriptionEn:[]}));
+  await assertSucceeds(submit('public-valid',{...base,isPublic:true,description:Array(100).fill('fjalë').join(' '),titleEn:'Public panel',descriptionEn:Array(100).fill('English').join(' ')}));
+  await assertSucceeds(decide(manager,'public-valid'));
+  assert.equal((await getDoc(doc(manager,'reservations/public-valid'))).data().titleEn,'Public panel');
+  // Leave the room free for the remaining request scenarios.
+  await env.withSecurityRulesDisabled(async ctx=>{
+   await deleteDoc(doc(ctx.firestore(),'reservations','public-valid'));
+   await deleteDoc(doc(ctx.firestore(),'publicBookings','public-valid'));
+   await deleteDoc(doc(ctx.firestore(),'eventDays',date));
+  });
   await assertFails(setDoc(doc(owner,'reservationRequests','unqueued'),base));
   await assertFails(submit('bad-status',base,{status:'sent'}));
   await assertFails(submit('bad-recipient',base,{recipient:'someone@example.test'}));
@@ -143,11 +174,5 @@ test('special rooms require private requests and atomic elevated decisions',asyn
   await assertSucceeds(submit('restricted-reject',{...base,roomId:'',creatorName:'Këshilli Studentor'}));
   await assertSucceeds(decide(manager,'restricted-reject','rejected'));
   assert.equal((await getDoc(doc(env.unauthenticatedContext().firestore(),'publicBookings','restricted-reject'))).exists(),false);
-  const bilingual={...base,roomId:'',creatorName:'Këshilli Studentor',isPublic:true,description:Array(100).fill('shqip').join(' '),titleEn:'Public panel',descriptionEn:Array(100).fill('English').join(' ')};
-  await assertFails(submit('invalid-english-title',{...bilingual,titleEn:123}));
-  await assertFails(submit('invalid-english-description',{...bilingual,descriptionEn:[]}));
-  await assertSucceeds(submit('bilingual-request',bilingual));
-  await assertSucceeds(decide(manager,'bilingual-request'));
-  assert.equal((await getDoc(doc(manager,'reservations/bilingual-request'))).data().titleEn,'Public panel');
  }finally{await env.cleanup();}
 });

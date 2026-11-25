@@ -107,15 +107,26 @@ service cloud.firestore {
       let day = get(dayPath(d.date)).data;
       return !day.fetActive || !get(/databases/$(database)/documents/weeklyResources/$(day.weekday)).data.busyKeys.hasAny(expected);
     }
+    function validReplacement(d,config) {
+      let source = d.get('courseSource',{});
+      let date = d.get('replacementDate','');
+      return source is map && source.keys().hasOnly(['weeklyRoomId','periodId']) &&
+        source.weeklyRoomId is string && source.weeklyRoomId.matches('^[0-6]__[^/]+$') &&
+        source.periodId is string && source.periodId in config.periodOrder &&
+        get(/databases/$(database)/documents/weeklyRooms/$(source.weeklyRoomId)).data.activities[source.periodId].subject.trim() == d.title &&
+        d.get('titleEn','') == '' &&
+        date is string && date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+        date >= config.startDate && date <= config.endDate && exists(dayPath(date));
+    }
     function valid(d) {
       let config = controls();
       let resourceCatalog = catalog();
       let description = d.get('description','');
       let words = description.split('\\s+').removeAll(['']).size();
       let location = d.get('location','');
-      return d.keys().hasOnly(['title','titleEn','date','roomId','periodIds','ownerUid','creatorName','createdAt','groupIds','teacherIds','eventType','isPublic','mode','onlineUrl','location','description','descriptionEn','revision','updatedAt','studentEmails']) &&
+      return d.keys().hasOnly(['title','titleEn','date','roomId','periodIds','ownerUid','creatorName','createdAt','groupIds','teacherIds','eventType','isPublic','mode','onlineUrl','location','description','descriptionEn','revision','updatedAt','studentEmails','courseSource','replacementDate']) &&
         validStudentEmails(d.get('studentEmails',[])) &&
-        d.title is string && d.title.size() > 0 && d.title.size() <= 120 &&
+        d.title is string && d.title.size() > 0 && (d.title.size() <= 120 || d.eventType == 'Zëvendësim i mësimit') &&
         d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
         d.roomId is string && (d.roomId == '' || d.roomId in resourceCatalog.rooms) &&
         d.groupIds is list && d.groupIds.toSet().size() == d.groupIds.size() && resourceCatalog.groups.keys().hasAll(d.groupIds) &&
@@ -123,6 +134,8 @@ service cloud.firestore {
         d.periodIds is list && d.periodIds.size() > 0 && d.periodIds.size() <= 16 &&
         config.periodOrder.keys().hasAll(d.periodIds) && d.periodIds.join(',') in config.validPeriodRanges &&
         d.eventType in ['Zëvendësim i mësimit','Konferencë','Panel','Mbrojtje publike','Mbledhje','Tryezë','Diskutim','Punëtori','Ligjëratë e ftuar','Ceremoni','Kolokium','Ekspozitë'] &&
+        (d.eventType != 'Zëvendësim i mësimit' || (d.groupIds.size() > 0 && d.teacherIds.size() > 0)) &&
+        (!d.isPublic || !(d.eventType in ['Zëvendësim i mësimit','Kolokium'])) &&
         location is string && location.size() <= 300 &&
         (location == '' || (d.roomId == '' && d.mode == 'physical')) &&
         description is string && words <= 500 &&
@@ -132,13 +145,16 @@ service cloud.firestore {
         d.isPublic is bool && d.mode in ['physical','online'] && d.onlineUrl is string &&
         (d.mode == 'physical' ? d.onlineUrl == '' : (d.onlineUrl.size() <= 2000 && d.onlineUrl.matches('^https?://[^ /]+.*$')));
     }
-    // Published English text is checked on publicBookings and matched atomically
-    // to reservations. Pending proposals validate it before entering the queue.
-    function validEnglish(d) {
+    // Course/date details and English text are checked on publicBookings and
+    // matched atomically to reservations. Pending proposals validate them here
+    // before entering the queue. This keeps reservation writes within the rules
+    // expression limit, including edits with private student notifications.
+    function validEventDetails(d) {
       let title = d.get('titleEn','');
       let description = d.get('descriptionEn','');
       return title is string && title.size() <= 120 && description is string &&
-        (description == '' || (d.isPublic && validEnglishDescription(description,title == '' ? d.title : title)));
+        (description == '' || (d.isPublic && validEnglishDescription(description,title == '' ? d.title : title))) &&
+        (d.eventType != 'Zëvendësim i mësimit' || validReplacement(d,controls()));
     }
     function validEnglishDescription(description,title) {
       let words = description.split('\\s+').removeAll(['']).size();
@@ -259,7 +275,7 @@ service cloud.firestore {
     }
     match /reservationRequests/{id} {
       allow read: if approved() && (elevated() || resource.data.ownerUid == request.auth.uid);
-      allow create: if canBook(request.resource.data.date) && !elevated() && valid(request.resource.data) && validEnglish(request.resource.data) &&
+      allow create: if canBook(request.resource.data.date) && !elevated() && valid(request.resource.data) && validEventDetails(request.resource.data) &&
         activityRecorded(id,'__requested') &&
         (requiresApproval() || specialRoom(request.resource.data.roomId)) && request.resource.data.ownerUid == request.auth.uid &&
         request.resource.data.creatorName == bookingName() &&
@@ -278,7 +294,7 @@ service cloud.firestore {
         return d.keys().hasOnly(['reservationId','expectedRevision','booking','ownerUid','createdAt']) &&
           d.ownerUid == request.auth.uid && before.ownerUid == request.auth.uid &&
           d.expectedRevision == before.get('revision',0) && d.createdAt == request.time &&
-          valid(d.booking) && validEnglish(d.booking) && d.booking.ownerUid == before.ownerUid && d.booking.creatorName == before.creatorName && d.booking.createdAt == before.createdAt &&
+          valid(d.booking) && validEventDetails(d.booking) && d.booking.ownerUid == before.ownerUid && d.booking.creatorName == before.creatorName && d.booking.createdAt == before.createdAt &&
           (requiresApproval() || ((specialRoom(before.roomId) || specialRoom(d.booking.roomId)) && !sameSchedule(before,d.booking))) &&
           !exists(/databases/$(database)/documents/requestDecisions/$(id)) &&
           getAfter(/databases/$(database)/documents/requestNotifications/$(id)).data.booking == d.booking;
@@ -455,10 +471,10 @@ service cloud.firestore {
     }
     match /publicBookings/{id} {
       allow read: if true;
-      allow create: if approved() && validEnglish(request.resource.data) &&
+      allow create: if approved() && validEventDetails(request.resource.data) &&
         mayCreate(id,getAfter(/databases/$(database)/documents/reservations/$(id)).data) &&
         publicMatches(id, getAfter(/databases/$(database)/documents/reservations/$(id)).data);
-      allow update: if approved() && validEnglish(request.resource.data) && mayCancel(get(/databases/$(database)/documents/reservations/$(id)).data) &&
+      allow update: if approved() && validEventDetails(request.resource.data) && mayCancel(get(/databases/$(database)/documents/reservations/$(id)).data) &&
         getAfter(/databases/$(database)/documents/reservations/$(id)).data.revision == get(/databases/$(database)/documents/reservations/$(id)).data.get('revision',0)+1 &&
         publicMatches(id,getAfter(/databases/$(database)/documents/reservations/$(id)).data);
       allow delete: if approved() && controls().bookingOpen == true &&

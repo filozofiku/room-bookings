@@ -43,7 +43,22 @@ test('reservation edits are atomic, conflict-safe and require owner notification
   await seed('settings/control',{bookingOpen:true,slotStorage:'resources-v2',startDate:'2026-09-01',endDate:'2026-12-31',periodOrder:Object.fromEntries(periods.map((p,i)=>[p.id,i])),validPeriodRanges:validPeriodRanges(periods)});
   await seed('resourceCatalog/current',{rooms:{[roomId]:'Salla'},groups,teachers});
   for(const [d,weekday] of [[date,'3'],[next,'4']]){await seed(`calendarDays/${d}`,{weekday,bookingAllowed:true,fetActive:true});await seed(`weeklyResources/${weekday}`,{busyKeys:[]});}
+  await setup({...initial,revision:100,updatedAt:new Date()});
+  for(const description of ['', Array(99).fill('word').join(' '), 'a'.repeat(99), ' '.repeat(100)]) {
+   await assertFails(edit(owner,{isPublic:true,description}));
+  }
+  const longTitle=Array(20).fill('Panel').join(' ');
+  await assertFails(edit(owner,{isPublic:true,title:longTitle,description:longTitle.toUpperCase()}));
+  await assertSucceeds(edit(owner,{isPublic:true,description:Array(100).fill('fjalë').join(' ')}));
+  await assertFails(edit(owner,{description:'Too short'}));
+  // Existing public records can still be cancelled or made private; edits must validate.
+  await setup({...initial,isPublic:true,description:'',revision:200,updatedAt:new Date()});
+  await assertFails(edit(owner,{title:'Changed legacy public event'}));
+  await assertSucceeds(edit(owner,{isPublic:false,description:''}));
   await setup();
+  for(const selected of [{groupIds:[],teacherIds:[]},{groupIds:[Object.keys(groups)[0]],teacherIds:[]},{groupIds:[],teacherIds:[Object.keys(teachers)[0]]}]) {
+   await assertFails(edit(owner,{eventType:'Zëvendësim i mësimit',...selected}));
+  }
   await assertFails(edit(other,{title:'Unauthorized'}));
   await assertFails(edit(manager,{title:'Missing notice'},{notice:false}));
   for(const notice of [{modifiedBy:'owner'},{modifierName:'Fake'},{status:'sent'},{previousKeys:[]},{before:{...initial,title:'Fake'}},{booking:{...initial,ownerUid:'other'}}])await assertFails(edit(manager,{title:'Invalid notice'},{notice}));
@@ -98,7 +113,15 @@ test('reservation edits are atomic, conflict-safe and require owner notification
   await assertFails(edit(owner,{periodIds:['p02']}));
   await assertFails(edit(owner,{date:next}));
   await assertSucceeds(edit(owner,{groupIds:[Object.keys(groups)[0]]}));
+  await assertFails(edit(owner,{roomId,periodIds:['p01']}));
   await assertSucceeds(edit(manager,{periodIds:['p02']}));
+  // Replacement edits validate both the course source and the original date.
+  await seed('weeklyRooms/1__course-room',{activities:{p01:{subject:'Course'}}});
+  const replacement={eventType:'Zëvendësim i mësimit',title:'Course',replacementDate:date,courseSource:{weeklyRoomId:'1__course-room',periodId:'p01'},teacherIds:[Object.keys(teachers)[0]]};
+  await assertSucceeds(edit(manager,replacement));
+  for(const invalid of [{replacementDate:''},{replacementDate:'2026-02-30'},{courseSource:{}},{title:'Invented course'},{isPublic:true,description:Array(100).fill('word').join(' ')}])await assertFails(edit(owner,invalid));
+  await assertSucceeds(edit(owner,{replacementDate:next}));
+  assert.equal((await getDoc(doc(owner,'reservations/edit'))).data().replacementDate,next);
   await seed('users/manager',{active:true,role:'admin',canCancelAll:false});await assertFails(edit(manager,{title:'Not delegated'}));
   await seed('settings/control',{bookingOpen:false,slotStorage:'resources-v2'});await assertFails(edit(owner,{title:'Paused'}));
  }finally{await env.cleanup();}

@@ -2,6 +2,7 @@ import {bt,getLanguage,locale,initLanguage,displayRoom,displayGroup} from './boo
 const requestedSection=new URLSearchParams(location.search).get('section');
 const managementView=['my-reservations','requests'].includes(requestedSection);
 const reportsView=requestedSection==='reports';
+import {isReplacement,requiresPrivateVisibility,timetableCourses,coursesForGroups,validReplacementDate} from './replacement-courses.js';
 import {recordActivity} from './activity-events.js';
 import {parseStudentEmails} from './student-emails.js';
 import {loadEmailDeliveries,deliveryLabel,retryEmail} from './email-delivery.js';
@@ -34,6 +35,7 @@ let rooms = [];
 let periods = [];
 let settings = null;
 let catalog = null;
+let courses = [];
 let occupied = new Map();
 let editing = null;
 let confirmationData=null,decisionPreviewData=null,cancellationPreviewData=null,lastReceipt=null;
@@ -84,7 +86,7 @@ function prepareReservation(period) {
   $('selection-hint').textContent = minutes(through.end) === target ? '' :
     bt("Ora e përfundimit u vendos në {v0}, sipas periudhave të orarit. Mund ta ndryshoni para rezervimit.",{v0:through.end});
   $('booking-form').scrollIntoView({behavior:'smooth', block:'start'});
-  $('title').focus({preventScroll:true});
+  $(isReplacement($('event-type').value)?'replacement-course':'title').focus({preventScroll:true});
 }
 function renderConfirmation(data) {
   const dialog = $('reservation-dialog');
@@ -103,6 +105,7 @@ function renderConfirmation(data) {
     [bt('Mënyra e zhvillimit'),data.mode==='online' ? bt('Online') : bt('Fizik')],
     [bt('Rezervuar nga'),data.creatorName]
   ];
+  if(data.replacementDate)fields.push([bt('Data e mësimit që zëvendësohet'),displayDate(data.replacementDate)]);
   if(requestOnly)fields.push([bt('Miratimi'),bt(editing?'Kërkesa për ndryshim u dërgua për miratim. Rezervimi ekzistues mbetet në fuqi.':requiresApproval?'Kërkesa shfaqet në orar vetëm pas miratimit nga një përdorues me autorizim.':'Kërkesa nuk rezervon sallën. Rezervimi dhe njoftimet publike bëhen vetëm pas miratimit.')]);
   if(data.location)fields.push([bt('Lokacioni'),data.location]);
   if(data.onlineUrl)fields.push([bt('Linku i ngjarjes online'),data.onlineUrl]);
@@ -204,6 +207,7 @@ function stopEditing() {
   $('booking-heading').textContent=bt('Rezervoni një aktivitet');
   $('booking-form').querySelector('button').textContent=bt('Bëni rezervimin');
   $('title').value='';
+  $('replacement-course').value='';$('replacement-date').value='';
   $('title-en').value='';$('description-en').value='';$('english-fields').open=false;$('description-en').oninput();
   $('booking-message').textContent='';
   updateRequestHint();
@@ -226,6 +230,7 @@ async function startEditing(id,data) {
   $('title-en').value=data.titleEn||'';$('description-en').value=data.descriptionEn||'';
   $('english-fields').open=Boolean(data.titleEn||data.descriptionEn);$('description-en').oninput();
   $('title').value=data.title;$('event-type').value=data.eventType||EVENT_TYPES[0];
+  $('replacement-date').value=data.replacementDate||'';
   $('from').value=data.periodIds[0];$('through').value=data.periodIds.at(-1);
   $('visibility').value=data.isPublic?'public':'private';$('visibility').onchange();
   $('mode').value=data.mode||'physical';$('mode').onchange();
@@ -236,6 +241,8 @@ async function startEditing(id,data) {
     for(const input of $(kind).querySelectorAll('input'))input.checked=ids.includes(input.value);
     filterChoices(kind);
   }
+  updateParticipantRequirements();
+  $('replacement-course').value=coursesForGroups(courses,selectedGroups()).some(course=>course.title===data.title)?data.title:'';
   $('booking-heading').textContent=bt('Redaktoni rezervimin');
   $('booking-form').querySelector('button').textContent=bt('Ruani ndryshimet');
   $('edit-banner').hidden=false;
@@ -268,6 +275,7 @@ function requestDetails(data) {
     bt("Grupet: {v0}",{v0:data.groupIds.map(id=>displayGroup(catalog.groups[id]||id)).join(', ')||bt('Pa grup')}),
     bt("Mësimdhënësit: {v0}",{v0:data.teacherIds.map(id=>catalog.teachers[id]||id).join(', ')||bt('Pa mësimdhënës')}),
     bt("Njoftimi: {v0} · {v1}",{v0:data.isPublic?bt('Publik'):bt('Jo publik'),v1:data.mode==='online'?bt('Online'):bt('Fizik')})];
+  if(data.replacementDate)lines.push(bt('Data e mësimit që zëvendësohet')+': '+displayDate(data.replacementDate));
   if(data.studentEmails?.length)lines.push(bt('Studentë për njoftim')+': '+data.studentEmails.join('; '));
   if(data.location)lines.push(bt("Lokacioni: {v0}",{v0:data.location}));
   if(data.onlineUrl)lines.push(data.onlineUrl);
@@ -299,6 +307,7 @@ function decisionCard(decision) {
     [bt('Salla'),displayRoom(rooms.find(room=>room.id===data.roomId)?.name||catalog.rooms?.[data.roomId]||data.roomId||bt('Pa sallë'))],
     [bt('Data e aktivitetit'),displayDate(data.date)],[bt('Ora'),reservationTime(data.periodIds,periods)],
     [bt('Lloji i aktivitetit'),bt(data.eventType)||bt('Nuk është regjistruar')],
+    ...(data.replacementDate?[[bt('Data e mësimit që zëvendësohet'),displayDate(data.replacementDate)]]:[]),
     [bt('Mësimdhënësit'),(data.teacherIds||[]).map(id=>catalog.teachers[id]||id).join(', ')||bt('Pa mësimdhënës')],
     [bt('Grupet e studentëve'),(data.groupIds||[]).map(id=>displayGroup(catalog.groups[id]||id)).join(', ')||bt('Pa grup të studentëve')],
     [bt('Njoftimi për aktivitetin'),data.isPublic?bt('Publik'):bt('Jo publik')],
@@ -478,12 +487,15 @@ async function createReservation(event) {
   try { studentEmails=parseStudentEmails($('student-emails').value); } catch(e) { return bookingMessage(e.message,true); }
   const date = $('date').value;
   const roomId = $('room').value;
-  const title = $('title').value.trim();
-  const titleEn = $('title-en').value.trim();
+  const replacement=isReplacement($('event-type').value);
+  const course=replacement?coursesForGroups(courses,selectedGroups()).find(course=>course.title===$('replacement-course').value):null;
+  const title = replacement ? course?.title||'' : $('title').value.trim();
+  const titleEn = replacement ? '' : $('title-en').value.trim();
   if(titleEn.length>120)return bookingMessage(bt('Titulli në anglisht mund të ketë deri në 120 karaktere.'),true);
   let periodIds;
   try { periodIds = selectedPeriodIds(); } catch(e) { return bookingMessage(errText(e),true); }
-  if (!title) return bookingMessage(bt('Shkruani titullin e aktivitetit.'), true);
+  if (!replacement && !title) return bookingMessage(bt('Shkruani titullin e aktivitetit.'), true);
+  if(requiresPrivateVisibility($('event-type').value) && $('visibility').value==='public')return bookingMessage(bt('Zëvendësimi i mësimit dhe kolokiumi nuk përfshihen në njoftimet publike.'),true);
   if (date < settings.startDate || date > settings.endDate) return bookingMessage(bt('Data është jashtë semestrit të konfiguruar.'),true);
   if (!settings.bookingOpen) return bookingMessage(bt('Rezervimet janë pezulluar gjatë përditësimit të orarit.'),true);
   const onlineUrl = $('mode').value === 'online' ? $('online-url').value.trim() : '';
@@ -503,6 +515,16 @@ async function createReservation(event) {
   const data = {title, titleEn, date, roomId, periodIds, description, descriptionEn, location, studentEmails, groupIds:checked('groups'), teacherIds:checked('teachers'),
     eventType:$('event-type').value, isPublic:$('visibility').value === 'public', mode:$('mode').value, onlineUrl,
     creatorName:edit?.data.creatorName || currentUser.displayName || 'Mësimdhënës'};
+  if(data.eventType==='Zëvendësim i mësimit') {
+    const missing=[];
+    if(!data.groupIds.length)missing.push(bt('Për zëvendësim të mësimit, zgjidhni të paktën një grup të studentëve.'));
+    if(!data.teacherIds.length)missing.push(bt('Për zëvendësim të mësimit, zgjidhni të paktën një mësimdhënës.'));
+    if(!course)missing.push(bt('Zgjidhni lëndën nga lista.'));
+    const originalDate=$('replacement-date').value;
+    if(!validReplacementDate(originalDate)||originalDate<settings.startDate||originalDate>settings.endDate)missing.push(bt('Zgjidhni datën e mësimit që zëvendësohet brenda semestrit.'));
+    if(missing.length)return bookingMessage(missing.join('\n'),true);
+  }
+  if(replacement){data.courseSource=course.source;data.replacementDate=$('replacement-date').value;}
   if(edit && Object.entries(data).every(([key,value])=>JSON.stringify(value)===JSON.stringify(edit.data[key] ?? (Array.isArray(value)?[]:typeof value==='boolean'?false:'')))) {
     return bookingMessage(bt('Nuk keni bërë ndryshime.'));
   }
@@ -548,6 +570,7 @@ async function createReservation(event) {
     });
     $('student-emails').value = '';
     $('title').value = '';
+    $('replacement-course').value='';$('replacement-date').value='';
     $('title-en').value='';$('description-en').value='';$('english-fields').open=false;$('description-en').oninput();
     $('location').value = '';
     $('description').value = '';
@@ -654,8 +677,8 @@ async function loadApp() {
     message(bt('Rezervimet janë pezulluar përkohësisht gjatë kontrollit të shërbimit. Orari publik dhe rezervimet ekzistuese mbeten të dukshme në orar.'));
     return;
   }
-  const [roomSnap,periodSnap,catalogSnap]=await Promise.all([
-    getDocs(collection(db,'rooms')),getDocs(collection(db,'periods')),getDoc(doc(db,'resourceCatalog','current'))
+  const [roomSnap,periodSnap,catalogSnap,courseSnap]=await Promise.all([
+    getDocs(collection(db,'rooms')),getDocs(collection(db,'periods')),getDoc(doc(db,'resourceCatalog','current')),getDocs(collection(db,'weeklyRooms'))
   ]);
   if(generation!==authenticationGeneration)return;
   if (settings.slotStorage !== 'resources-v2') throw new BookingError(bt('Rezervimet po përditësohen. Provoni përsëri së shpejti.'));
@@ -663,6 +686,7 @@ async function loadApp() {
   periods = periodSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.id.localeCompare(b.id));
   if (!catalogSnap.exists()) throw new BookingError(bt('Orari i grupeve dhe i mësimdhënësve nuk është konfiguruar.'));
   catalog = catalogSnap.data();
+  courses=timetableCourses(courseSnap.docs.map(d=>({id:d.id,...d.data()})),catalog);
   fillOptions($('room'),[{id:'',name:bt('Pa sallë')},...rooms],r=>r.id,r=>r.name);
   if (rooms.length) $('room').value = rooms[0].id;
   fillOptions($('event-type'),EVENT_TYPES,t=>t,t=>t);
@@ -676,6 +700,8 @@ async function loadApp() {
     }
     filterChoices(kind);
   }
+  updateParticipantRequirements();
+  $('replacement-date').min=settings.startDate;$('replacement-date').max=settings.endDate;
   fillOptions($('from'),periods,p=>p.id,p=>p.start);
   fillOptions($('through'),periods,p=>p.id,p=>p.end);
   const localToday = todayDate();
@@ -693,6 +719,32 @@ async function loadApp() {
   applyBookingLink();
   await Promise.all([readAvailability(), readMyBookings(), readRequests()]);
 }
+const selectedGroups=()=>[...$('groups').querySelectorAll('input:checked')].map(input=>input.value);
+function updateCourseOptions(){
+  const selected=$('replacement-course').value;
+  const available=coursesForGroups(courses,selectedGroups());
+  const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent=bt('Zgjidhni lëndën');
+  $('replacement-course').replaceChildren(placeholder);
+  for(const course of available){const option=document.createElement('option');option.value=course.title;option.textContent=course.title;$('replacement-course').append(option);}
+  $('replacement-course').value=available.some(course=>course.title===selected)?selected:'';
+  $('replacement-course-hint').textContent=bt(!courses.length?'Nuk ka lëndë në orarin e importuar. Kontaktoni administratorin.':!available.length?'Nuk ka lëndë për grupet e përzgjedhura.':selectedGroups().length?'Lëndët janë filtruar sipas grupeve të përzgjedhura.':'Zgjidhni grupin e studentëve për të filtruar lëndët.');
+}
+function updateParticipantRequirements() {
+  const required=isReplacement($('event-type').value);
+  const privateOnly=requiresPrivateVisibility($('event-type').value);
+  $('visibility').querySelector('[value="public"]').disabled=privateOnly;
+  if(privateOnly)$('visibility').value='private';
+  $('visibility-restriction').hidden=!privateOnly;
+  $('visibility').onchange();
+  $('replacement-fields').hidden=!required;
+  $('replacement-course').required=$('replacement-date').required=required;
+  $('replacement-course').disabled=$('replacement-date').disabled=!required;
+  $('title-field').hidden=$('english-fields').hidden=required;
+  $('title').required=!required;$('title').disabled=$('title-en').disabled=required;
+  updateCourseOptions();
+  $('groups-hint').textContent=bt(required?'Për zëvendësim të mësimit, zgjidhni të paktën një grup të studentëve.':'Mund të zgjidhni një ose më shumë grupe. Pa përzgjedhje: pa grup të studentëve.');
+  $('teachers-hint').textContent=bt(required?'Për zëvendësim të mësimit, zgjidhni të paktën një mësimdhënës.':'Mund të zgjidhni një ose më shumë mësimdhënës. Pa përzgjedhje: pa mësimdhënës.');
+}
 function filterChoices(kind) {
   const normalize = text => text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('sq').trim();
   const search = normalize($(`${kind}-search`).value);
@@ -704,7 +756,7 @@ function filterChoices(kind) {
 }
 for (const kind of ['groups','teachers']) {
   $(`${kind}-search`).addEventListener('input',()=>filterChoices(kind));
-  $(kind).addEventListener('change',()=>filterChoices(kind));
+  $(kind).addEventListener('change',()=>{filterChoices(kind);if(kind==='groups')updateCourseOptions();});
 }
 $('login').onclick = async () => { $('login').disabled=true;try { await signInWithPopup(auth, provider); } catch(e) {message(errText(e),true);} finally {$('login').disabled=staffAccessState==='checking';} };
 $('logout').onclick = async () => { try { await signOut(auth); } catch(e) {message(errText(e),true);} };
@@ -718,6 +770,7 @@ $('retry-access').onclick=async()=>{
 $('date').onchange = () => readAvailability().catch(e => message(errText(e),true));
 $('room').onchange = () => { updateLocationField();readAvailability().catch(e => message(errText(e),true)); };
 $('booking-form').onsubmit = createReservation;
+$('event-type').onchange = updateParticipantRequirements;
 $('stop-editing').onclick = stopEditing;
 $('email-delivery-section').addEventListener('toggle',()=>{if($('email-delivery-section').open)readEmailDelivery();});
 $('refresh-email-delivery').onclick=readEmailDelivery;
@@ -742,6 +795,7 @@ $('cancel-form').onsubmit = event => {
   $('cancel-dialog').close('cancel');
 };
 $('visibility').onchange = () => {
+  if(requiresPrivateVisibility($('event-type').value))$('visibility').value='private';
   $('description-en-field').hidden = $('email-notice').hidden = $('description-field').hidden = $('visibility').value !== 'public';
   $('description').required = $('visibility').value === 'public';
 };
@@ -781,6 +835,7 @@ function refreshLanguage(){
  dateCalendar.render();
  auth.languageCode=getLanguage();provider.setCustomParameters({hl:getLanguage(),prompt:'select_account'});
  setStaffAccess(staffAccessState);
+ updateParticipantRequirements();
  for(const id of ['room','event-type'])for(const option of $(id).options)option.textContent=displayRoom(bt(option.dataset.sourceLabel||option.textContent));
  for(const kind of ['groups','teachers']){
   for(const label of $(kind).querySelectorAll('label'))if(label.dataset.sourceName)label.lastChild.textContent=kind==='groups'?displayGroup(label.dataset.sourceName):label.dataset.sourceName;
