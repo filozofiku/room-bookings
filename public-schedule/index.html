@@ -132,6 +132,7 @@
     .today-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:18px;margin:20px 0}.today-section{padding:18px;min-width:0}.today-items{display:grid;gap:12px}.today-event{display:block;text-align:left;width:100%;padding:14px;border:1px solid #ddd;border-left:5px solid var(--event-border,var(--accent));border-radius:10px;background:white;color:var(--ink);font:inherit;overflow-wrap:anywhere;min-height:48px}.today-event strong,.today-event small{display:block;margin-top:5px}.today-book{display:inline-block;background:var(--accent);color:white;padding:12px 16px;border-radius:10px;text-decoration:none;font-weight:700}.today-room{padding:14px;border:1px solid #ddd;border-radius:10px}.today-room p{margin:8px 0}.today-section h3{margin-top:0}
     @media print{body{background:#fff}.hero{background:white!important;color:#15293e;padding:0 0 10px}.hero-p,.hero-bottom,.brand-mark,.navigation,.filters,.tools,.footnote,.hint,.load-status{display:none!important}.brand{margin:0 0 10px}.brand-name,.brand-sub,.eyebrow{color:#15293e}.page{padding:0}.calendar-box{border:0;box-shadow:none}.calendar-scroll{display:none!important}.agenda{display:block!important}.agenda-row{break-inside:avoid}.agenda-day{break-inside:avoid}.result-title{font-size:19px}}
     @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
+  .cancelled-class{background-image:repeating-linear-gradient(135deg,transparent,transparent 8px,rgba(45,55,65,.22) 8px,rgba(45,55,65,.22) 10px)!important}.cancelled-class .event-title,.cancelled-class strong{font-weight:800}
   .reservation-event{border-left-width:4px}
 .hero{position:relative}.hero .brand{padding-right:130px}.language-control{position:absolute;top:24px;right:32px;display:flex;align-items:center;gap:9px}.language-control label{margin:0;font-size:12px}.language-control select{width:100px;height:38px;padding:0 10px;background:white}.language-control{z-index:2}
 @media(max-width:800px){.language-control{top:20px;right:20px;display:block}.language-control label{font-size:10px;margin-bottom:4px}.hero .brand{padding-right:112px}.language-control select{height:36px}}
@@ -157,7 +158,7 @@
       <span class="micro" id="updateDate"></span>
     </div>
   </div>
-</header><aside id="university-sidebar" class="university-rail" aria-label="Portali i fakultetit"><div class="rail-brand"><span class="rail-monogram">FF</span><div>Fakulteti Filozofik<small>Universiteti i Prishtinës</small></div><button type="button" class="rail-toggle" aria-controls="university-sidebar" aria-expanded="true" aria-label="Fshih menynë"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span>Fshih menynë</span></button></div><div class="rail-caption">PORTALI AKADEMIK</div><nav class="rail-links" aria-label="Faqet e fakultetit"><a href="#orari/subgroups/" data-portal-page="schedules" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18m-13 4h2m4 0h2"/></svg><span>Orari mësimor</span></a><a href="#sot" data-portal-page="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Sot</span></a><a href="#sallat-e-lira" data-portal-page="free"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21h16M6 21V3h12v18M10 12h1"/></svg><span>Sallat e lira</span></a><div class="rail-staff-heading">PËR STAFIN AKADEMIK</div><a data-staff-entry href="https://filozofiku.github.io/room-bookings/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M14 8l4 4-4 4M18 12H3M10 4h10v16H10"/></svg><span>Hyni për rezervime</span></a><p class="rail-staff-note" data-staff-entry>Me llogarinë @uni-pr.edu</p><a data-staff-only hidden href="https://filozofiku.github.io/room-bookings/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18m6 5 2 2 4-4"/></svg><span>Rezervimi i sallave</span></a><a href="https://filozofiku.github.io/room-bookings/?section=my-reservations" data-my-reservations data-staff-only hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 10h6m-6 4h6m-6 4h4"/></svg><span>Rezervimet e mia</span></a><div class="rail-account" data-staff-only hidden><span data-staff-identity></span><button type="button" data-staff-logout>Dilni</button></div></nav><div class="rail-footer">Universiteti i Prishtinës<br><strong>Fakulteti Filozofik</strong></div></aside>
+</header><aside id="university-sidebar" class="university-rail" aria-label="Portali i fakultetit"><div class="rail-brand"><span class="rail-monogram">FF</span><div>Fakulteti Filozofik<small>Universiteti i Prishtinës</small></div><button type="button" class="rail-toggle" aria-controls="university-sidebar" aria-expanded="true" aria-label="Fshih menynë"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span>Fshih menynë</span></button></div><div class="rail-caption">PORTALI AKADEMIK</div><nav class="rail-links" aria-label="Faqet e fakultetit"><a href="#orari/subgroups/" data-portal-page="schedules" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18m-13 4h2m4 0h2"/></svg><span>Orari mësimor</span></a><a href="#sot" data-portal-page="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Sot</span></a><a href="#sallat-e-lira" data-portal-page="free"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21h16M6 21V3h12v18M10 12h1"/></svg><span>Sallat e lira</span></a><div class="rail-staff-heading">PËR STAFIN AKADEMIK</div><a data-staff-entry href="https://filozofiku.github.io/room-bookings/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M14 8l4 4-4 4M18 12H3M10 4h10v16H10"/></svg><span>Hyni për rezervime</span></a><p class="rail-staff-note" data-staff-entry>Me llogarinë @uni-pr.edu</p><a data-staff-only hidden href="https://filozofiku.github.io/room-bookings/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18m6 5 2 2 4-4"/></svg><span>Rezervimi i sallave</span></a><a href="https://filozofiku.github.io/room-bookings/?section=my-reservations" data-my-reservations data-staff-only hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 10h6m-6 4h6m-6 4h4"/></svg><span>Rezervimet e mia</span></a><a href="https://filozofiku.github.io/room-bookings/?section=class-cancellations" data-class-cancellations data-staff-only hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18m-13 3 5 5m0-5-5 5"/></svg><span>Anulimi i mësimit</span></a><div class="rail-account" data-staff-only hidden><span data-staff-identity></span><button type="button" data-staff-logout>Dilni</button></div></nav><div class="rail-footer">Universiteti i Prishtinës<br><strong>Fakulteti Filozofik</strong></div></aside>
 <div class="wrap"><div id="loadStatus" class="load-status" role="status" aria-live="polite">Duke ngarkuar oraret zyrtare…</div></div>
 <main class="wrap page" id="mainContent" hidden>
   <nav class="navigation" aria-label="Funksionet kryesore">
@@ -210,7 +211,7 @@
         </div>
       </div>
       <div class="agenda" id="agendaView" hidden></div>
-      <div class="legend" id="calendarNote"><div class="legend-items" aria-label="Kuptimi i ngjyrave"><span class="legend-item category-lecture"><span class="legend-swatch" aria-hidden="true"></span>Ligjërata obligative</span><span class="legend-item category-exercise"><span class="legend-swatch" aria-hidden="true"></span>Ushtrime obligative</span><span class="legend-item category-elective"><span class="legend-swatch" aria-hidden="true"></span>Lëndë zgjedhore</span><span class="legend-item category-public-reservation"><span class="legend-swatch" aria-hidden="true"></span>Rezervime publike</span><span class="legend-item category-private-reservation"><span class="legend-swatch" aria-hidden="true"></span>Rezervime jo publike</span></div><p>Kliko një aktivitet për të parë të gjitha hollësitë.</p></div>
+      <div class="legend" id="calendarNote"><div class="legend-items" aria-label="Kuptimi i ngjyrave"><span class="legend-item category-lecture"><span class="legend-swatch" aria-hidden="true"></span>Ligjërata obligative</span><span class="legend-item category-exercise"><span class="legend-swatch" aria-hidden="true"></span>Ushtrime obligative</span><span class="legend-item category-elective"><span class="legend-swatch" aria-hidden="true"></span>Lëndë zgjedhore</span><span class="legend-item category-public-reservation"><span class="legend-swatch" aria-hidden="true"></span>Rezervime publike</span><span class="legend-item category-private-reservation"><span class="legend-swatch" aria-hidden="true"></span>Rezervime jo publike</span></div><p>Kliko një aktivitet për të parë të gjitha hollësitë.</p><p>Mësimi i anuluar shënohet me vija diagonale dhe mbetet në orar.</p></div>
     </div>
   </section>
 
@@ -268,6 +269,7 @@
   connectStaffNavigation(config).catch(() => {});
 </script>
 <script type="module">
+  import {classCancellation,markClassCancellation} from './regular-classes.js';
   import {formatDate,formatDateTime,formatTimetableStamp} from './dates.js';
   import {inlineCalendar} from './date-picker.js';
   import {t,locale,getLanguage,initLanguage,roomLabel} from './i18n.js';
@@ -286,7 +288,7 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
   const entityLabel=entity=>state.type==='teachers'?entity.l:label(entity.l);
   let publicState = {status:'loading'};
   function renderBookings(result) {
-    publicState = result;
+    publicState = {...publicState,...result};
     $('bookingStatus').hidden=result.status==='ready';
     $('bookingStatus').textContent = result.status === 'ready'
       ? ''
@@ -294,6 +296,7 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
     display();
     renderFree();
     renderToday();
+    if(data&&selectedEvent&&!selectedEvent.booking&&publicState.days?.[selectedEvent.date]&&$('detailDialog').open)showEvent({...markClassCancellation(selectedEvent,publicState.days?.[selectedEvent.date],data.times,state.type,state.item?.n),date:selectedEvent.date});
   }
   function datesInView() { return weekDates($('bookingDate').value || localDate()); }
   function dateForDay(d) {
@@ -301,7 +304,7 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
   }
   function dayHeading(d) { const date=dateForDay(d);return date?displayDate(date):t(data.days[d]); }
   function visibleEvents() {
-    const recurring = (state.item?.e || []).filter(e => publicState.days?.[dateForDay(e.d)]?.fetActive !== false);
+    const recurring = (state.item?.e || []).filter(e => publicState.days?.[dateForDay(e.d)]?.fetActive !== false).map(e=>({...markClassCancellation(e,publicState.days?.[dateForDay(e.d)],data.times,state.type,state.item?.n),date:dateForDay(e.d)}));
     if (publicState.status !== 'ready') return recurring;
     return [...recurring,...reservationEvents(publicState.rows,state.item?.n,datesInView(),data.days,data.times,state.type)];
   }
@@ -505,7 +508,7 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
     return [...e].sort((a,b)=>a.d-b.d||a.s-b.s||a.t.localeCompare(b.t,"sq"));
   }
   function hours(e){return `${data.times[e.s]}–${data.times[e.e]}`;}
-  function colorClass(event){return "category-"+eventCategory(event);}
+  function colorClass(event){return "category-"+eventCategory(event)+(event.cancelled?" cancelled-class":"");}
   function extraForEvent(event){
     if(event.booking) return label(event.r);
     if(state.type==="subgroups") return [t(event.p),label(event.r)].filter(Boolean).join(" · ");
@@ -537,7 +540,7 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
         const index = evs.indexOf(event);
         const ht=(event.e-event.s)*15-3;
         const {lane,count}=layouts[dayPosition].get(event);
-        return `<button class="event ${colorClass(event)} ${event.booking?"reservation-event":""} ${ht<=48?"tiny":""}" data-event="${index}" type="button" aria-label="${esc(eventTitle(event))} · ${esc(t(EVENT_CATEGORY_LABELS[eventCategory(event)]))} – ${esc(t(day))} ${hours(event)}" title="${esc(eventTitle(event))} · ${esc(t(EVENT_CATEGORY_LABELS[eventCategory(event)]))} · ${hours(event)} · ${esc(extraForEvent(event))}" style="left:calc(${lane/count*100}% + 3px);right:auto;width:calc(${100/count}% - 6px);top:${event.s*15+2}px;height:${ht}px"><span class="event-title">${esc(eventTitle(event))}</span><span class="event-sub">${esc(extraForEvent(event))}</span></button>`;
+        return `<button class="event ${colorClass(event)} ${event.booking?"reservation-event":""} ${ht<=48?"tiny":""}" data-event="${index}" type="button" aria-label="${esc(event.cancelled?t('Anuluar')+': ':'')}${esc(eventTitle(event))} · ${esc(t(EVENT_CATEGORY_LABELS[eventCategory(event)]))} – ${esc(t(day))} ${hours(event)}" title="${esc(event.cancelled?t('Anuluar')+': ':'')}${esc(eventTitle(event))} · ${esc(t(EVENT_CATEGORY_LABELS[eventCategory(event)]))} · ${hours(event)} · ${esc(extraForEvent(event))}" style="left:calc(${lane/count*100}% + 3px);right:auto;width:calc(${100/count}% - 6px);top:${event.s*15+2}px;height:${ht}px"><span class="event-title">${esc(event.cancelled?t('Anuluar')+': ':'')}${esc(eventTitle(event))}</span><span class="event-sub">${esc(extraForEvent(event))}</span></button>`;
       }).join("");
       return `<div class="day-column" aria-label="${esc(t(day))}">${cells}</div>`;
     }).join("");
@@ -551,7 +554,7 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
       return `<section class="agenda-day"><h3>${esc(dayHeading(d))}</h3>${rows.length?
         rows.map((e)=>{
           const index=evs.indexOf(e);
-          return `<div class="agenda-row"><div class="agenda-time">${hours(e)}</div><button class="agenda-entry ${colorClass(e)} ${e.booking?"reservation-event":""}" data-agenda="${index}" type="button" aria-label="${esc(eventTitle(e))} · ${esc(t(EVENT_CATEGORY_LABELS[eventCategory(e)]))} · ${hours(e)}"><strong>${esc(eventTitle(e))}</strong><span>${esc(tags(e.a))}${e.a&&extraForEvent(e)?" · ":""}${esc(extraForEvent(e))}</span></button></div>`;
+          return `<div class="agenda-row"><div class="agenda-time">${hours(e)}</div><button class="agenda-entry ${colorClass(e)} ${e.booking?"reservation-event":""}" data-agenda="${index}" type="button" aria-label="${esc(e.cancelled?t('Anuluar')+': ':'')}${esc(eventTitle(e))} · ${esc(t(EVENT_CATEGORY_LABELS[eventCategory(e)]))} · ${hours(e)}"><strong>${esc(e.cancelled?t('Anuluar')+': ':'')}${esc(eventTitle(e))}</strong><span>${esc(tags(e.a))}${e.a&&extraForEvent(e)?" · ":""}${esc(extraForEvent(e))}</span></button></div>`;
         }).join(""):`<p class="no-events">${esc(t("Nuk ka aktivitete të planifikuara."))}</p>`}</section>`;
     }).join("");
     $("agendaView").querySelectorAll("[data-agenda]").forEach(button=>button.addEventListener("click",()=>showEvent(evs[Number(button.dataset.agenda)])));
@@ -593,6 +596,7 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
     $("modalTitle").textContent=eventTitle(e);
     $("modalTag").textContent=tags(e.a) || t("Aktivitet mësimor");
     const pairs=[["Kategoria e aktivitetit",t(EVENT_CATEGORY_LABELS[eventCategory(e)])],["Dita",t(data.days[e.d])],["Ora",hours(e)],["Studentët / Grupi",label(e.g)],["Mësimdhënësi",t(e.p)],["Salla",label(e.r)]];
+    if(e.cancelled)pairs.push(['Statusi',t('Anuluar')],['Data',displayDate(e.date)]);
     if(e.booking) pairs.push(["Përshkrimi",bookingText(e,getLanguage()).description],["Data",displayDate(e.date)],["Rezervuar nga",t(e.creatorName)],["Rezervimi u krijua më",t(bookingTimestamp(e.createdAt,locale()))],["Mënyra e zhvillimit",e.mode === "online" ? "Online" : e.mode === "physical" ? t("Fizik") : ""]);
     $("modalDetails").innerHTML=pairs.filter(([,v])=>v).map(([k,v])=>`<dt>${esc(t(k))}</dt><dd>${esc(v)}</dd>`).join("");
     if(e.booking && e.mode === 'online' && /^https?:\/\//i.test(e.onlineUrl || '')) {
@@ -605,7 +609,8 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
     while(!e.booking&&(firstClassDate.getUTCDay()+6)%7!==e.d)firstClassDate.setUTCDate(firstClassDate.getUTCDate()+1);
     const eventDate=e.booking?e.date:firstClassDate.toISOString().slice(0,10);
     const status=document.createElement('p');
-    status.textContent=e.booking?t('Statusi: E konfirmuar'):t('Përsëritet çdo javë deri më 31 dhjetor 2026.');
+    status.textContent=e.cancelled?t('Mësim i anuluar për këtë datë.'):e.booking?t('Statusi: E konfirmuar'):t('Përsëritet çdo javë deri më 31 dhjetor 2026.');
+    if(e.cancelled){$('modalCalendar').append(status);if(!$("detailDialog").open)$("detailDialog").showModal();return;}
     $('modalCalendar').append(status,calendarActions({
       id:e.id||JSON.stringify([e.t,e.a,e.g,e.p,e.d,e.s]),weekly:!e.booking,
       classKey:JSON.stringify([e.d,data.times[e.s],data.times[e.e],e.t,e.a,e.g,e.p,e.r].map((value,index)=>index===0?value:String(value||'').normalize('NFC').replace(/\s+/g,' ').trim())),
@@ -628,13 +633,13 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
     if(day?.fetActive)for(const entity of data.rooms)for(const e of entity.e)if(e.d===d)unique.set(JSON.stringify(e),e);
     // Include scheduled activities without a room, without repeating each student-group view.
     if(day?.fetActive)for(const entity of data.subgroups)for(const e of entity.e)if(e.d===d&&!e.r)unique.set(JSON.stringify(e),e);
-    const events=[...unique.values(),...(ready?reservationEvents(publicState.rows,'',[date],data.days,data.times,'reservations'):[])].sort((a,b)=>a.s-b.s||a.t.localeCompare(b.t,'sq'));
+    const events=[...[...unique.values()].map(e=>({...markClassCancellation(e,day,data.times),date})),...(ready?reservationEvents(publicState.rows,'',[date],data.days,data.times,'reservations'):[])].sort((a,b)=>a.s-b.s||a.t.localeCompare(b.t,'sq'));
     const active=e=>parseMinutes(data.times[e.s])<=minute&&parseMinutes(data.times[e.e])>minute;
     const render=(id,list)=>{
       const box=$(id);box.replaceChildren();
       if(!list.length){box.textContent=ready&&day?t('Nuk ka aktivitete.'):t('Duke pritur të dhënat e sotme…');return;}
       for(const e of list){const button=document.createElement('button');button.type='button';button.className='today-event '+colorClass(e);
-        const statusLabel=active(e)?t('Në zhvillim'):parseMinutes(data.times[e.e])<=minute?t('Përfunduar'):t('Në vijim');
+        const statusLabel=e.cancelled?t('Anuluar'):active(e)?t('Në zhvillim'):parseMinutes(data.times[e.e])<=minute?t('Përfunduar'):t('Në vijim');
         button.innerHTML=`<span>${esc(hours(e))} · ${statusLabel}</span><strong>${esc(eventTitle(e))}</strong><small>${esc([label(e.r),label(e.g),t(e.p)].filter(Boolean).join(' · '))}</small>`;
         button.addEventListener('click',()=>showEvent(e));box.append(button);}
     };
@@ -651,7 +656,7 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
     if(end<0){box.textContent=t('Nuk ka kohë të mjaftueshme brenda orarit për kohëzgjatjen e zgjedhur.');return;}
     for(const room of ordered.rooms){
       if(!publicState.rooms.some(r=>r.name===room.n))continue;
-      const busy=(start,end)=>(day.fetActive&&room.e.some(e=>e.d===d&&times[e.s]<end&&times[e.e]>start))||publicState.rows.some(b=>b.date===date&&overlaps(b,room.n,minuteLabel(start),minuteLabel(end)));
+      const busy=(start,end)=>(day.fetActive&&room.e.some(e=>e.d===d&&!classCancellation(e,day,data.times,'rooms',room.n)&&times[e.s]<end&&times[e.e]>start))||publicState.rows.some(b=>b.date===date&&overlaps(b,room.n,minuteLabel(start),minuteLabel(end)));
       if(busy(minute,times[end]))continue;
       const card=document.createElement('div');card.className='today-room';
       const features=roomFeatures[room.n];
@@ -694,7 +699,7 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
         (!whiteboard || (features&&features[2]===(whiteboard==='yes')));
     };
     const free=ordered.rooms.filter(room => matchesFeatures(room) && publicState.rooms.some(r => r.name === room.n) &&
-      (!day.fetActive || !room.e.some(event=>event.d===d&&event.s<e&&event.e>s)) &&
+      (!day.fetActive || !room.e.some(event=>event.d===d&&!classCancellation(event,day,data.times,'rooms',room.n)&&event.s<e&&event.e>s)) &&
       !publicState.rows.some(b => b.date === publicState.date && overlaps(b,room.n,data.times[s],data.times[e])));
     $("freeCount").textContent=t('{count} nga {total} salla të lira që përputhen me kërkimin',{count:free.length,total:data.rooms.length});
     $("freeSummary").textContent=`${displayDate(publicState.date)} · ${data.times[s]}–${data.times[e]}`;
@@ -791,5 +796,8 @@ import {bookingText, localDate, overlaps, dayIndex, weekDates, reservationEvents
   start();
 })();
 </script>
+<!-- Cloudflare Web Analytics -->
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "dbaf5970dd9649848c810f4c245f57ad"}'></script>
+<!-- End Cloudflare Web Analytics -->
 </body>
 </html>

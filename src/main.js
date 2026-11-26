@@ -2,6 +2,7 @@ import {bt,getLanguage,locale,initLanguage,displayRoom,displayGroup} from './boo
 const requestedSection=new URLSearchParams(location.search).get('section');
 const managementView=['my-reservations','requests'].includes(requestedSection);
 const reportsView=requestedSection==='reports';
+const classesView=requestedSection==='class-cancellations';
 import {isReplacement,requiresPrivateVisibility,timetableCourses,coursesForGroups,validReplacementDate} from './replacement-courses.js';
 import {recordActivity} from './activity-events.js';
 import {parseStudentEmails} from './student-emails.js';
@@ -29,6 +30,7 @@ let currentUser = null;
 let canCancelAll = false;
 let requiresApproval = false;
 let reportsController=null;
+let classesController=null;
 let authenticationGeneration=0;
 let staffAccessState='checking';
 let rooms = [];
@@ -50,7 +52,7 @@ function setStaffAccess(state) {
   const authorized=state==='authorized';
   setStaffNavigation(authorized,currentUser?.email||'');
   $('staff-access').hidden=authorized;
-  $('booking-help-panel').hidden=!authorized||managementView||reportsView;
+  $('booking-help-panel').hidden=!authorized||managementView||reportsView||classesView;
   $('login').hidden=Boolean(currentUser);
   $('login').disabled=state==='checking';
   $('switch-account').hidden=!currentUser||authorized;
@@ -172,7 +174,7 @@ async function readAvailability() {
   occupied = new Map(periods.map((p,i) => [p.id,
     !day.bookingAllowed ? {source:'closed'} :
     locks[`${roomId}__${p.id}`] ? {source:'booking'} :
-    day.fetActive && weeklyData?.busyKeys?.includes(`${roomId}__${p.id}`) ?
+    day.fetActive && weeklyData?.busyKeys?.includes(`${roomId}__${p.id}`) && !(day.releasedKeys||[]).includes(`${roomId}__${p.id}`) ?
       {source:'fet', ...(weeklyData.activities?.[p.id] || {})} : null
   ]));
   $('slots').replaceChildren();
@@ -557,7 +559,7 @@ async function createReservation(event) {
       const occupancy = await tx.get(occupancyRef);
       const locks = occupancy.exists() ? {...occupancy.data().bookings} : {};
       const weeklySnap = day.fetActive ? await tx.get(weeklyRef) : null;
-      const conflict = conflictMessage(data, locks, weeklySnap?.exists() ? weeklySnap.data().busyKeys : []);
+      const conflict = conflictMessage(data, locks, weeklySnap?.exists() ? weeklySnap.data().busyKeys : [],day.releasedKeys||[]);
       if (conflict) throw new BookingError(conflict);
       tx.set(reservationRef, {...data, ownerUid, createdAt:serverTimestamp()});
       recordActivity(tx,db,'created',reservationRef.id,{...data,ownerUid},currentUser,{method:'direct'});
@@ -672,6 +674,13 @@ async function loadApp() {
   if (!settingsSnap.exists()) throw new BookingError(bt('Administratori duhet të importojë fillimisht orarin.'));
   settings = settingsSnap.data();
   if(generation!==authenticationGeneration)return;
+  if(classesView){
+    $('class-cancellations').hidden=false;
+    const {createClassCancellationPage}=await import('./class-cancellation-page.js');
+    if(generation!==authenticationGeneration)return;
+    classesController=createClassCancellationPage(db,user,userSnap.data(),settings,bt,getLanguage);
+    await classesController.load();return;
+  }
   if(!settings.bookingOpen){
     $('app').hidden=true;
     message(bt('Rezervimet janë pezulluar përkohësisht gjatë kontrollit të shërbimit. Orari publik dhe rezervimet ekzistuese mbeten të dukshme në orar.'));
@@ -824,6 +833,13 @@ if(managementView){
  for(const link of document.querySelectorAll('.rail-links a'))link.removeAttribute('aria-current');
  document.querySelector('[data-my-reservations]').setAttribute('aria-current','page');
 }
+if(classesView){
+ $('booking-help-panel').hidden=true;
+ document.querySelector('header h1').textContent='Anulimi i mësimit';
+ document.title='Anulimi i mësimit | Universiteti i Prishtinës';
+ for(const link of document.querySelectorAll('.rail-links a'))link.removeAttribute('aria-current');
+ document.querySelector('[data-class-cancellations]').setAttribute('aria-current','page');
+}
 if(reportsView){
  $('booking-help').closest('section').hidden=true;
  document.querySelector('header h1').textContent='Statistika dhe raporte';
@@ -832,8 +848,9 @@ if(reportsView){
  $('reports-link').setAttribute('aria-current','page');
 }
 function refreshLanguage(){
- dateCalendar.render();
  auth.languageCode=getLanguage();provider.setCustomParameters({hl:getLanguage(),prompt:'select_account'});
+ if(classesView){setStaffAccess(staffAccessState);$('reports-link').hidden=!canCancelAll;classesController?.render();return;}
+ dateCalendar.render();
  setStaffAccess(staffAccessState);
  updateParticipantRequirements();
  for(const id of ['room','event-type'])for(const option of $(id).options)option.textContent=displayRoom(bt(option.dataset.sourceLabel||option.textContent));
@@ -859,6 +876,7 @@ initLanguage(refreshLanguage);
 onAuthStateChanged(auth,async user => {
   authenticationGeneration++;
   reportsController?.dispose();reportsController=null;
+  classesController?.dispose();classesController=null;$('class-cancellations').hidden=true;
   $('reports').hidden=true;$('reports-content').replaceChildren();$('reports-link').hidden=true;
   $('reports-feedback').textContent='';
   stopEditing();

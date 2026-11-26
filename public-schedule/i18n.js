@@ -1,5 +1,10 @@
 // Public-site translations only. No booking data or email templates are changed.
 export const EN={
+ "Anulimi i mësimit":"Class cancellations",
+ "Anulimi i mësimit | Universiteti i Prishtinës":"Class cancellations | University of Prishtina",
+ "Anuluar":"Cancelled",
+ "Mësim i anuluar për këtë datë.":"Class cancelled for this date.",
+ "Mësimi i anuluar shënohet me vija diagonale dhe mbetet në orar.":"Cancelled classes remain on the timetable with diagonal hatching.",
  "PËR STAFIN AKADEMIK":"FOR ACADEMIC STAFF",
  "Hyni për rezervime":"Sign in to book",
  "Me llogarinë @uni-pr.edu":"With your @uni-pr.edu account",
@@ -18,6 +23,7 @@ export const EN={
  'Gjej orarin e grupit të studentëve, mësimdhënësit ose sallës. Kontrollo cilat salla janë të lira gjatë kohës që të nevojitet.':'Find the timetable for a student group, teacher or room. Check which rooms are available when you need them.',
  'Portali i fakultetit':'Faculty portal','Fshih menynë':'Collapse menu','Shfaq menynë':'Expand menu','PORTALI AKADEMIK':'ACADEMIC PORTAL','Faqet e fakultetit':'Faculty pages',
  'Sot':'Today','Sallat e lira':'Available rooms','Rezervimi i sallave':'Room booking','Rezervimet e mia':'My reservations',
+ 'Statistika dhe raporte':'Statistics and reports',
  'Duke ngarkuar oraret zyrtare…':'Loading official timetables…','Funksionet kryesore':'Main features',
  'Rifresko të dhënat e fundit':'Refresh the latest data','↻ Rifresko të dhënat':'↻ Refresh data','Data':'Date','Duke ngarkuar rezervimet…':'Loading reservations…',
  'Gjej orarin që të duhet':'Find your timetable',

@@ -1,5 +1,6 @@
 // Dry run by default. No passwords are set and no emails are sent.
 import admin from 'firebase-admin';
+import {teacherIdsForEmail} from './teacher-identity.mjs';
 const [email, permission, ...args] = process.argv.slice(2);
 let apply=false, name;
 for(let i=0;i<args.length;i++){
@@ -19,7 +20,8 @@ try {
     if (user?.disabled) throw Error('Account is disabled; resolve this before granting booking access.');
     if (!user) user = await admin.auth().createUser({email,...(name?{displayName:name}:{})});
     else if(name && user.displayName!==name)user=await admin.auth().updateUser(user.uid,{displayName:name});
-    const update = {active:true,role:before?.role || 'teacher',email};
+    const teachers=(await admin.firestore().doc('resourceCatalog/current').get()).data()?.teachers||{};
+    const update = {active:true,role:before?.role || 'teacher',email,teacherIds:before?.teacherIds||teacherIdsForEmail(email,teachers)};
     if (permission === 'cancel-all') update.canCancelAll = true;
     if (permission === 'request-only')Object.assign(update,{role:'teacher',canCancelAll:false,requiresApproval:true});
     if (name)update.bookingName=name;

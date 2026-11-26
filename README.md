@@ -1,3 +1,7 @@
+## Anulimi i mësimit
+
+Shihni [konfigurimin dhe modelin e anulimeve](docs/class-cancellations.md).
+
 ## Statistics and management reports
 
 Elevated users (`canCancelAll: true`) can open `?section=reports` for reservation,

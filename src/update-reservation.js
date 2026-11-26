@@ -33,7 +33,7 @@ export async function applyReservationEdit(tx,db,id,before,data,user,students){
   if(oldKeys.some(key=>oldLocks[key]!==id))throw new BookingError('Të dhënat e rezervimit nuk përputhen. Rifreskoni faqen.');
   oldKeys.forEach(key=>delete oldLocks[key]);
   const newLocks=before.date===data.date?oldLocks:{...(newSnap.data()?.bookings||{})};
-  const conflict=conflictMessage(data,newLocks,weekly?.data()?.busyKeys||[]);
+  const conflict=conflictMessage(data,newLocks,weekly?.data()?.busyKeys||[],day.releasedKeys||[]);
   if(conflict)throw new BookingError(conflict);
   const booking={...data,studentEmails:recipients,ownerUid:before.ownerUid,creatorName:before.creatorName,createdAt:before.createdAt,revision:expectedRevision+1,updatedAt:serverTimestamp()};
   const {ownerUid,studentEmails,...published}=booking;

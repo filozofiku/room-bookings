@@ -104,8 +104,8 @@ service cloud.firestore {
       ].join('|').split('[|]').removeAll(['']);
     }
     function freeOfFet(d, expected) {
-      let day = get(dayPath(d.date)).data;
-      return !day.fetActive || !get(/databases/$(database)/documents/weeklyResources/$(day.weekday)).data.busyKeys.hasAny(expected);
+      let day = getAfter(dayPath(d.date)).data;
+      return !day.fetActive || !get(/databases/$(database)/documents/weeklyResources/$(day.weekday)).data.busyKeys.removeAll(day.get('releasedKeys',[])).hasAny(expected);
     }
     function validReplacement(d,config) {
       let source = d.get('courseSource',{});
@@ -242,6 +242,39 @@ service cloud.firestore {
     match /calendarDays/{date} {
       allow get: if true;
       allow list: if approved();
+      function restoreIsFree(lesson) {
+        let path = /databases/$(database)/documents/eventDays/$(date);
+        return !existsAfter(path) || !getAfter(path).data.bookings.keys().hasAny(lesson.keys);
+      }
+      function validEntry(entry,lesson,actor) {
+        return entry is map && entry.keys().hasOnly(['by','at','class']) &&
+          entry.by == actor && entry.at == request.time && entry.class == lesson.publicInfo;
+      }
+      function changeClass() {
+        let d = request.resource.data;
+        let id = d.changedClassId;
+        let lesson = get(/databases/$(database)/documents/regularClasses/$(id)).data;
+        let before = resource.data.get('cancelledClasses',{});
+        let after = d.cancelledClasses;
+        let released = resource.data.get('releasedKeys',[]).toSet();
+        return controls().bookingOpen == true &&
+          date >= controls().startDate && date <= controls().endDate &&
+          resource.data.fetActive == true && resource.data.weekday == lesson.weekday &&
+          id is string && id.matches('^class-[A-Za-z0-9_-]+$') &&
+          d.diff(resource.data).affectedKeys().hasOnly(['cancelledClasses','releasedKeys','changedClassId','classChangeAt','classChangeBy']) &&
+          d.classChangeAt == request.time &&
+          d.classChangeBy in lesson.teacherIds && d.classChangeBy in get(userPath()).data.get('teacherIds',[]) &&
+          after is map && after.diff(before).affectedKeys() == [id].toSet() &&
+          d.releasedKeys is list && d.releasedKeys.toSet().size() == d.releasedKeys.size() &&
+          (id in after ? (!(id in before) && validEntry(after[id],lesson,d.classChangeBy) &&
+            d.releasedKeys.toSet() == released.union(lesson.keys.toSet())) :
+            (id in before && d.releasedKeys.toSet() == released.difference(lesson.keys.toSet()) && restoreIsFree(lesson)));
+      }
+      allow update: if approved() && changeClass();
+      allow create, delete: if false;
+    }
+    match /regularClasses/{id} {
+      allow read: if approved();
       allow write: if false;
     }
     match /weeklyRooms/{key} {

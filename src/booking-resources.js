@@ -5,8 +5,9 @@ export function resourceIds(booking) {
 export function slotKeys(booking) {
   return resourceIds(booking).flatMap(id => booking.periodIds.map(period => `${id}__${period}`));
 }
-export function conflictMessage(booking, locks, busyKeys) {
-  const busy = new Set(busyKeys);
+export function conflictMessage(booking, locks, busyKeys, releasedKeys = []) {
+  const released = new Set(releasedKeys);
+  const busy = new Set(busyKeys.filter(key=>!released.has(key)));
   const overlaps = ids => ids.some(id => booking.periodIds.some(p => locks[`${id}__${p}`] || busy.has(`${id}__${p}`)));
   const messages = [];
   if (overlaps(booking.groupIds || [])) messages.push('Grupi i studentëve nuk është i lirë në intervalin e përzgjedhur.');

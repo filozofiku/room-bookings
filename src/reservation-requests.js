@@ -13,7 +13,7 @@ export async function submitReservationRequest(db,data,user,studentEmails=[]){
   if(!day.data()?.bookingAllowed)throw new BookingError('Rezervimet janë të mbyllura për këtë datë.');
   const occupancy=await tx.get(doc(db,'eventDays',data.date));
   const weekly=day.data().fetActive?await tx.get(doc(db,'weeklyResources',String(day.data().weekday))):null;
-  const conflict=conflictMessage(data,occupancy.data()?.bookings||{},weekly?.data()?.busyKeys||[]);
+  const conflict=conflictMessage(data,occupancy.data()?.bookings||{},weekly?.data()?.busyKeys||[],day.data()?.releasedKeys||[]);
   if(conflict)throw new BookingError(conflict);
   const booking={...data,studentEmails,ownerUid:user.uid,creatorName:user.displayName||'Mësimdhënës',createdAt:serverTimestamp()};
   tx.set(ref,booking);
@@ -43,7 +43,7 @@ export async function decideReservationRequest(db,id,outcome,reason,user){
    const occupancyRef=doc(db,'eventDays',data.date),occupancy=await tx.get(occupancyRef);
    const weekly=day.data().fetActive?await tx.get(doc(db,'weeklyResources',String(day.data().weekday))):null;
    const locks={...(occupancy.data()?.bookings||{})};
-   const conflict=conflictMessage(data,locks,weekly?.data()?.busyKeys||[]);
+   const conflict=conflictMessage(data,locks,weekly?.data()?.busyKeys||[],day.data()?.releasedKeys||[]);
    if(conflict)throw new BookingError(conflict);
    const booking={...data,createdAt:serverTimestamp()}, {ownerUid,studentEmails,...published}=booking;
    tx.set(doc(db,'reservations',id),booking);tx.set(doc(db,'publicBookings',id),published);
@@ -76,7 +76,7 @@ export async function submitReservationEditRequest(db,id,expectedRevision,data,u
   const occupied=await tx.get(doc(db,'eventDays',data.date));
   const weekly=day.data().fetActive?await tx.get(doc(db,'weeklyResources',String(day.data().weekday))):null;
   const locks=Object.fromEntries(Object.entries(occupied.data()?.bookings||{}).filter(([,value])=>value!==id));
-  const conflict=conflictMessage(data,locks,weekly?.data()?.busyKeys||[]);
+  const conflict=conflictMessage(data,locks,weekly?.data()?.busyKeys||[],day.data()?.releasedKeys||[]);
   if(conflict)throw new BookingError(conflict);
   const booking={...data,ownerUid:before.ownerUid,creatorName:before.creatorName,createdAt:before.createdAt};
   tx.set(ref,{reservationId:id,expectedRevision,booking,ownerUid:user.uid,createdAt:serverTimestamp()});
