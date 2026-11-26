@@ -1,4 +1,5 @@
 import {calendarFile} from '../src/calendar-export.js';
+import {classCancellation} from '../public-schedule/regular-classes.js';
 // Only public Firestore documents are fetched, without authentication or secrets.
 const DOCUMENTS='https://firestore.googleapis.com/v1/projects/filozofiku/databases/(default)/documents/';
 const CATALOG='https://filozofiku.github.io/calendar-classes.json';
@@ -35,7 +36,10 @@ export function eventFor(parameters){
  days.forEach((response,index)=>{
   if(response.getResponseCode()!==200)throw Error('Calendar dates unavailable. Try again later.');
   const raw=JSON.parse(response.getContentText()),day=decode({mapValue:{fields:raw.fields}});
-  if(day.fetActive===false)exclusions.add(dates[index]);
+  // Use the same dated snapshots as the public timetable. Matching the class
+  // details also supports older calendar IDs retained through catalog updates.
+  const cancelled=classCancellation({t:event.title,r:event.room,p:event.teacher,s:0,e:1},day,[event.start,event.end]);
+  if(day.fetActive===false||cancelled)exclusions.add(dates[index]);
   if(raw.updateTime>updatedAt)updatedAt=raw.updateTime;
  });
  return{...event,date:first.toISOString().slice(0,10),weekly:true,until:catalog.semesterEnd,exclusions:[...exclusions].sort(),description:[event.tag,event.groups,event.teacher].filter(Boolean).join('\n\n'),updatedAt,sequence:Math.floor(Date.parse(updatedAt)/1000)};

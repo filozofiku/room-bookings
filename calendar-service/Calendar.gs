@@ -77,6 +77,21 @@ var FacultyCalendar = (() => {
     return lines.map(fold).join("\r\n") + "\r\n";
   }
 
+  // public-schedule/regular-classes.js
+  var clean = (value) => String(value || "").normalize("NFC").replace(/\s+/g, " ").trim();
+  function classCancellation(event, day, times, kind, entityName) {
+    if (event.booking) return null;
+    for (const [id, entry] of Object.entries(day?.cancelledClasses || {})) {
+      const info = entry.class;
+      if (!info || clean(info.subject) !== clean(event.t) || info.start !== times[event.s] || info.end !== times[event.e] || clean(info.room) !== clean(event.r)) continue;
+      if (event.p && !info.teachers.some((name) => clean(event.p).split(" \xB7 ").includes(clean(name)))) continue;
+      if (kind === "teachers" && !info.teachers.includes(entityName)) continue;
+      if (kind === "subgroups" && !info.groups.includes(entityName)) continue;
+      return { id, ...entry };
+    }
+    return null;
+  }
+
   // calendar-service/worker.js
   var DOCUMENTS = "https://firestore.googleapis.com/v1/projects/filozofiku/databases/(default)/documents/";
   var CATALOG = "https://filozofiku.github.io/calendar-classes.json";
@@ -129,7 +144,8 @@ var FacultyCalendar = (() => {
     days.forEach((response, index) => {
       if (response.getResponseCode() !== 200) throw Error("Calendar dates unavailable. Try again later.");
       const raw = JSON.parse(response.getContentText()), day = decode({ mapValue: { fields: raw.fields } });
-      if (day.fetActive === false) exclusions.add(dates[index]);
+      const cancelled = classCancellation({ t: event.title, r: event.room, p: event.teacher, s: 0, e: 1 }, day, [event.start, event.end]);
+      if (day.fetActive === false || cancelled) exclusions.add(dates[index]);
       if (raw.updateTime > updatedAt) updatedAt = raw.updateTime;
     });
     return { ...event, date: first.toISOString().slice(0, 10), weekly: true, until: catalog.semesterEnd, exclusions: [...exclusions].sort(), description: [event.tag, event.groups, event.teacher].filter(Boolean).join("\n\n"), updatedAt, sequence: Math.floor(Date.parse(updatedAt) / 1e3) };

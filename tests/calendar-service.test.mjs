@@ -36,6 +36,39 @@ test('source failures do not masquerade as cancellations and parameters cannot a
  for(const p of [{},{booking:'id1',class:'class-1'},{booking:'../reservations/private'},{class:'https://example.org'},{booking:['id1','id2']}])assert.throws(()=>s.get(p));
  assert(!s.calls.some(url=>url.includes('/reservations/')));
 });
+test('a dated cancellation excludes only that class occurrence and restoration removes the exception',()=>{
+ const s=service(),url='https://filozofiku.github.io/calendar-classes.json';
+ const event={id:'class-1',d:4,start:'09:45',end:'11:15',title:'Course',tag:'Ligjërata',teacher:'Teacher',groups:'Group',room:'Room',updatedAt:'2026-11-01T00:00:00Z'};
+ const info={subject:event.title,start:event.start,end:event.end,room:event.room,teachers:[event.teacher],groups:['Group Automatic Subgroup']};
+ s.data.set(url,{semesterStart:'2026-09-15',semesterEnd:'2026-12-31',holidays:['2026-12-25'],classes:[event]});
+ const before=s.get({class:event.id}).body;
+ s.put('calendarDays/2026-11-20',{fetActive:true,cancelledClasses:{'class-1':{by:'t',class:info}}},'2026-11-20T08:00:00Z');
+ // A different class on another date must not exclude this class.
+ s.put('calendarDays/2026-11-27',{fetActive:true,cancelledClasses:{'class-other':{class:{...info,teachers:['Other teacher']}}}},'2026-11-20T08:00:00Z');
+ const cancelled=s.get({class:event.id}).body;
+ assert.match(cancelled,/EXDATE;TZID=Europe\/Tirane:20261120T094500/);
+ assert.doesNotMatch(cancelled,/EXDATE[^\r\n]*20261127/);
+ assert.match(cancelled,/EXDATE;TZID=Europe\/Tirane:20261225T094500/);
+ assert.match(cancelled,/RRULE:FREQ=WEEKLY/);assert.match(cancelled,/UID:class-1@filozofiku.github.io/);
+ assert.equal((cancelled.match(/BEGIN:VEVENT/g)||[]).length,1);
+ assert.notEqual(cancelled.match(/SEQUENCE:(\d+)/)[1],before.match(/SEQUENCE:(\d+)/)[1]);
+ s.put('calendarDays/2026-11-20',{fetActive:true,cancelledClasses:{}},'2026-11-21T08:00:00Z');
+ const restored=s.get({class:event.id}).body;
+ assert.doesNotMatch(restored,/EXDATE[^\r\n]*20261120/);assert.match(restored,/UID:class-1@filozofiku.github.io/);
+ assert.notEqual(restored.match(/SEQUENCE:(\d+)/)[1],cancelled.match(/SEQUENCE:(\d+)/)[1]);
+});
+test('cancellation matching supports retained calendar IDs and multiple teachers',()=>{
+ const s=service(),event={id:'class-legacy',d:0,start:'10:00',end:'11:00',title:'Co-taught class',teacher:'Teacher B',groups:'Year',room:'',updatedAt:'2026-11-01T00:00:00Z'};
+ s.data.set('https://filozofiku.github.io/calendar-classes.json',{semesterStart:'2026-09-15',semesterEnd:'2026-12-31',classes:[event]});
+ s.put('calendarDays/2026-11-23',{fetActive:true,cancelledClasses:{'class-123':{class:{subject:event.title,start:event.start,end:event.end,room:'',teachers:['Teacher A','Teacher B'],groups:['Group A','Group B']}}}});
+ assert.match(s.get({class:event.id}).body,/EXDATE;TZID=Europe\/Tirane:20261123T100000/);
+});
+test('the feed deployment permits anonymous readers while calendar sync remains user-owned',()=>{
+ const feed=JSON.parse(readFileSync(new URL('../calendar-service/appsscript.json',import.meta.url)));
+ const sync=JSON.parse(readFileSync(new URL('../calendar-sync/appsscript.json',import.meta.url)));
+ assert.deepEqual(feed.webapp,{access:'ANYONE_ANONYMOUS',executeAs:'USER_DEPLOYING'});
+ assert.equal(sync.webapp.executeAs,'USER_ACCESSING');
+});
 test('class identities survive moves and title changes, without merging distinct weekly sessions',()=>{
  const one={d:1,start:'10:00',end:'11:00',title:'Histori',tag:'Ligjërata',groups:'Histori-1BA',teacher:'Arta',room:'Salla 1'},two={...one,d:3};
  const previous=[{...one,id:'class-1'},{...two,id:'class-2'}];

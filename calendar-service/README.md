@@ -6,7 +6,7 @@ This is a separate, read-only Apps Script web app. It serves one event per subsc
 
 1. Open https://script.google.com/ and create a **new project** named **Faculty calendar subscriptions**. Keep the email-worker project separate.
 2. Replace the new project's `Code.gs` contents with **[Calendar.gs](Calendar.gs)** from this folder. This file is already built: paste the complete contents.
-3. Save. Choose **Deploy → New deployment → Web app**.
+3. In **Project Settings**, enable **Show appsscript.json manifest file in editor** and use this folder's `appsscript.json`. It explicitly sets `ANYONE_ANONYMOUS` and `USER_DEPLOYING`. Save and choose **Deploy → New deployment → Web app**.
 4. Set **Execute as: Me** and **Who has access: Anyone** (including people who are not signed in). A domain-only or signed-in-only endpoint cannot be fetched by Google Calendar. If your university account does not offer anonymous access, ask its administrator to allow it or use an account that does.
 5. Click **Deploy**, authorize fetching external public data, and copy the URL ending in **`/exec`**. Send that URL back so it can be configured and verified on both websites. Do not use a `/dev` URL.
 
@@ -38,3 +38,35 @@ node --test tests/calendar-export.test.mjs tests/calendar-service.test.mjs
 ```
 
 `Calendar.gs` is generated from `worker.js` and the shared calendar serializer. It deliberately has no dependency on the email Apps Script build.
+
+## Dated class cancellations
+
+The service reads individual `calendarDays.cancelledClasses` snapshots as well
+as academic-calendar closures. It matches the same class details as the public
+timetable, including co-teachers and retained calendar IDs. A cancelled date is
+emitted as a timezone-qualified `EXDATE` on the existing recurring event. Other
+weeks retain their normal recurrence and event UID. Restoring the class removes
+that exception when the feed is next fetched. A local downloaded `.ics` copy does
+not update automatically.
+
+The Google Calendar sync project bundles this same class reader. Rebuild and
+redeploy **both** existing projects, keeping their deployment URLs:
+
+```sh
+node scripts/build-calendar-service.mjs
+node scripts/build-calendar-sync.mjs
+node --test tests/calendar-service.test.mjs tests/calendar-sync.test.mjs
+```
+
+For the public feed, update `Code.gs` from `Calendar.gs` and set its manifest to
+this directory's `appsscript.json`. Edit the **existing** deployment, select the
+new version and confirm anonymous access. An unauthenticated request must return
+`BEGIN:VCALENDAR`, rather than an access-denied or sign-in page. For a cancelled
+occurrence, verify the feed contains an `EXDATE` for that date and class start
+time. After restoring the occurrence, that exception must disappear.
+
+For the user-owned sync project, use `calendar-sync/CalendarSync.gs` and preserve
+its **User accessing** deployment and existing scopes. Do not switch that project
+to owner execution or anonymous calendar writes. Existing subscriptions, user
+selections and per-user triggers remain in place. Check the user's connected
+activity after redeployment; local tests alone do not prove live Google updates.

@@ -49,3 +49,17 @@ A Calendar API 401 means Google rejected the access token. It is not the externa
 Without updating the deployment first, the user can remove this app's access at https://myaccount.google.com/connections, then reopen the connection link and authorize again. Keep the same Google account and the same Apps Script project to retain access to the existing app-created calendar. Do not remove the calendar itself. If the error persists, copy the now-expanded error details; the Google error reason is needed before changing scopes or OAuth settings.
 
 CalendarList visibility changes are now best-effort and cannot block event creation or manual checks. A visibility failure appears as a separate warning. Actual calendar/event authorization failures remain errors and never report a successful connection.
+
+## Dated teaching cancellations
+
+The shared public class reader now excludes dated cancellations from
+`calendarDays.cancelledClasses`. Synchronization patches an `EXDATE` into the
+existing recurring Google event. It retains the event ID, connected activity and
+weekly recurrence; it does not delete the series or remove the user's selection.
+Restoring a class removes that dated exception on the next successful check.
+
+Redeploy the rebuilt `CalendarSync.gs` to the existing **User accessing** project,
+preserving its URL, manifest scopes and user properties. The public subscription
+feed is a separate deployment and must be updated separately. Cancellation and
+restoration tests use mocked Google APIs; verify the connected account after the
+actual deployment before claiming that live synchronization is working.

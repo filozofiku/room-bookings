@@ -24,11 +24,11 @@ test('same event is patched on changes, unchanged sources make no writes, and ca
  run({cancelled:true});assert.equal(calls.at(-1).method,'DELETE');assert(calls.at(-1).path.startsWith('/calendars/app-created/events/'));assert.equal(stored.size,0);
 });
 function fixture(){
- let user='alice';const users=new Map(),events=new Map(),requests=[],cache=new Map();let next=0,unavailable=false,version=0,googleFailure=null;const invalidated=[];const calendars=new Map(),calendarEvents=new Map(),entries=new Map();
+ let user='alice';const users=new Map(),events=new Map(),requests=[],cache=new Map();let next=0,unavailable=false,version=0,googleFailure=null;const invalidated=[];const calendars=new Map(),calendarEvents=new Map(),entries=new Map();let catalog;
  const state=()=>{if(!users.has(user))users.set(user,{properties:new Map(),triggers:[]});return users.get(user);};
- const encode=v=>typeof v==='string'?{stringValue:v}:Array.isArray(v)?{arrayValue:{values:v.map(encode)}}:{mapValue:{fields:Object.fromEntries(Object.entries(v).map(([k,v])=>[k,encode(v)]))}};
+ const encode=v=>typeof v==='string'?{stringValue:v}:typeof v==='boolean'?{booleanValue:v}:typeof v==='number'?{integerValue:String(v)}:Array.isArray(v)?{arrayValue:{values:v.map(encode)}}:{mapValue:{fields:Object.fromEntries(Object.entries(v).map(([k,v])=>[k,encode(v)]))}};
  const response=(status,data)=>({getResponseCode:()=>status,getContentText:()=>data?JSON.stringify(data):''});
- const fetch=(url,options={})=>{if(url.includes('firestore.googleapis.com')){if(unavailable)return response(503,{});const value=events.get(url.split('/documents/')[1]);return value?response(200,{fields:encode(value).mapValue.fields,updateTime:'2026-11-08T10:00:00Z'}):response(404,{});}
+ const fetch=(url,options={})=>{if(url==='https://filozofiku.github.io/calendar-classes.json')return response(catalog?200:503,catalog);if(url.includes('firestore.googleapis.com')){if(unavailable)return response(503,{});const path=url.split('/documents/')[1];const value=events.get(path)||(path.startsWith('calendarDays/')?{fetActive:true}:null);return value?response(200,{fields:encode(value).mapValue.fields,updateTime:'2026-11-08T10:00:00Z'}):response(404,{});}
   assert(url.startsWith('https://www.googleapis.com/calendar/v3/'));assert.equal(options.headers.Authorization,'Bearer '+user);requests.push({user,url,...options});
   if(googleFailure&&url.includes(googleFailure.includes))return response(googleFailure.status,{error:{message:googleFailure.status===401?'Invalid Credentials':'Insufficient Permission',errors:[{reason:googleFailure.status===401?'authError':'insufficientPermissions'}]}});
   const body=options.payload?JSON.parse(options.payload):null;
@@ -42,7 +42,7 @@ function fixture(){
  };
  const ctx=vm.createContext({Intl,Date,console,PropertiesService:{getUserProperties:()=>({getProperties:()=>Object.fromEntries(state().properties),getProperty:k=>state().properties.get(k)||null,setProperty:(k,v)=>state().properties.set(k,v),deleteProperty:k=>state().properties.delete(k)})},LockService:{getUserLock:()=>({tryLock:()=>true,releaseLock:()=>{}})},CacheService:{getScriptCache:()=>({get:k=>cache.get(k),put:(k,v)=>cache.set(k,v)})},ScriptApp:{invalidateAuth:()=>invalidated.push(user),getOAuthToken:()=>user,getProjectTriggers:()=>state().triggers,newTrigger:handler=>({timeBased:()=>({everyMinutes:n=>({create:()=>{assert.equal(n,5);state().triggers.push({getHandlerFunction:()=>handler});}})})}),deleteTrigger:t=>{state().triggers=state().triggers.filter(v=>v!==t);}},Utilities:{DigestAlgorithm:{SHA_256:'sha256'},Charset:{UTF_8:'utf8'},computeDigest:(_,s)=>[...createHash('sha256').update(s).digest()]},UrlFetchApp:{fetch,fetchAll:rs=>rs.map(r=>fetch(r.url,r))}});
  vm.runInContext(readFileSync(new URL('../calendar-sync/CalendarSync.gs',import.meta.url),'utf8'),ctx);
- return {api:ctx,events,requests,cache,invalidated,failGoogle:value=>{googleFailure=value;},as:value=>{user=value;},fail:value=>{unavailable=value;}};
+ return {api:ctx,events,requests,cache,calendarEvents,setCatalog:value=>{catalog=value;},invalidated,failGoogle:value=>{googleFailure=value;},as:value=>{user=value;},fail:value=>{unavailable=value;}};
 }
 test('standalone app isolates user properties, calendars, tokens and triggers; retries failed sources safely',()=>{
  const f=fixture();f.events.set('publicBookings/one',{title:'Titulli',date:'2026-11-08',periodIds:['p1'],roomId:'r1'});f.events.set('periods/p1',{start:'14:30',end:'16:00'});f.events.set('rooms/r1',{name:'Salla 128'});
@@ -63,4 +63,20 @@ test('calendar-list permission errors do not block writes; 401 errors explain re
  f.failGoogle({includes:'/calendar/v3/',status:401});const status=f.api.facultyCalendarStatus();assert.equal(status.calendar.errorStatus,401);assert.match(status.calendar.error,/authError: Invalid Credentials/);assert.throws(()=>f.api.connectFacultyActivity({kind:'booking',id:'one'}),/\(401\)/);
  const reset=f.api.reauthorizeFacultyCalendar();assert.equal(reset.authorizationReset,true);assert.equal(f.invalidated.length,1);assert.equal(f.api.facultyCalendarStatus().items.length,1);assert.equal(f.api.facultyCalendarStatus().automatic,false);
  f.failGoogle(null);const again=f.api.connectFacultyActivity({kind:'booking',id:'one'});assert.equal(again.calendar.id,connected.calendar.id);assert.equal(again.automatic,true);assert.equal(again.items.length,1);
+});
+
+test('dated class cancellation and restoration patch the same recurring Google event without losing the subscription',()=>{
+ const f=fixture(),weekly={id:'class-1',d:0,start:'10:00',end:'11:00',title:'Class',teacher:'Teacher',groups:'Year',room:'Room',updatedAt:'2026-11-01T00:00:00Z'};
+ f.setCatalog({semesterStart:'2026-09-15',semesterEnd:'2026-12-31',holidays:[],classes:[weekly]});
+ f.api.connectFacultyActivity({kind:'class',id:'class-1'});
+ const initial=[...f.calendarEvents.values()][0];assert(initial.recurrence[0].startsWith('RRULE:FREQ=WEEKLY;'));assert.equal(initial.recurrence.length,1);
+ const info={subject:'Class',start:'10:00',end:'11:00',room:'Room',teachers:['Teacher'],groups:['Group']};
+ f.events.set('calendarDays/2026-11-23',{fetActive:true,cancelledClasses:{'class-1':{by:'t',class:info}}});
+ f.api.checkFacultyCalendar();const cancelled=[...f.calendarEvents.values()][0];
+ assert.equal(cancelled.id,initial.id);assert.equal(cancelled.recurrence[0],initial.recurrence[0]);assert(cancelled.recurrence.includes('EXDATE;TZID=Europe/Tirane:20261123T100000'));
+ assert.equal(f.api.facultyCalendarStatus().items.length,1);
+ f.events.set('calendarDays/2026-11-23',{fetActive:true,cancelledClasses:{}});
+ f.api.checkFacultyCalendar();const restored=[...f.calendarEvents.values()][0];
+ assert.equal(restored.id,initial.id);assert.equal(restored.recurrence.length,1);assert.equal(restored.recurrence[0],initial.recurrence[0]);
+ assert.equal(f.calendarEvents.size,1);assert.equal(f.api.facultyCalendarStatus().items.length,1);assert(!f.requests.some(r=>r.method==='DELETE'));
 });
